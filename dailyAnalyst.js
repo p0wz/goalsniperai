@@ -21,15 +21,16 @@ const MATCH_LIMIT = 100;
 // Helper: Delay
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper: Fetch with Retry (Handles 429)
-async function fetchWithRetry(url, options, retries = 3) {
+// Helper: Fetch with Retry (Handles 429 with Exponential Backoff)
+async function fetchWithRetry(url, options, retries = 5, delay = 2000) {
     try {
         return await axios.get(url, options);
     } catch (error) {
         if (error.response && error.response.status === 429 && retries > 0) {
-            console.log(`[DailyAnalyst] Rate limit hit (429). Waiting 2s...`);
-            await sleep(2000);
-            return fetchWithRetry(url, options, retries - 1);
+            console.log(`[DailyAnalyst] Rate limit (429). Waiting ${delay / 1000}s...`);
+            await sleep(delay);
+            // Double the delay for next attempt (Exponential Backoff)
+            return fetchWithRetry(url, options, retries - 1, delay * 2);
         }
         throw error;
     }
