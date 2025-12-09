@@ -65,7 +65,7 @@ async function initDatabase() {
 // ============================================
 async function createAdminUser() {
     const adminEmail = 'admin@goalgpt.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'yousaywhat123@';
 
     if (!process.env.ADMIN_PASSWORD) {
         console.warn('[DB] ⚠️ WARNING: Using default admin password! Set ADMIN_PASSWORD in environment!');
