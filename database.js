@@ -15,6 +15,17 @@ const db = createClient({
     authToken,
 });
 
+// Debug Connection Config
+console.log(`[DB Config] URL: ${url.replace(/:[^:]*@/, ':****@')}`);
+console.log(`[DB Config] Token present: ${!!authToken}`);
+if (url.startsWith('file:')) {
+    console.log('[DB Config] Mode: Local File');
+} else if (url.startsWith('libsql:')) {
+    console.log('[DB Config] Mode: WebSocket (libsql://)');
+} else if (url.startsWith('https:')) {
+    console.log('[DB Config] Mode: HTTP (https://)');
+}
+
 // ============================================
 // 📦 Initialize Database
 // ============================================
