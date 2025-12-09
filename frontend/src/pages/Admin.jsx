@@ -8,6 +8,7 @@ export default function Admin() {
     const [stats, setStats] = useState({ total: 0, free: 0, pro: 0, premium: 0, revenue: 0 });
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [scanning, setScanning] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -59,6 +60,26 @@ export default function Admin() {
             console.error(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleScan = async () => {
+        setScanning(true);
+        try {
+            const res = await fetch(`${API_URL}/api/scan`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(`Scan Complete! Found ${data.data.length} signals.`);
+            } else {
+                alert('Scan Failed: ' + data.error);
+            }
+        } catch (error) {
+            alert('Scan Error: ' + error.message);
+        } finally {
+            setScanning(false);
         }
     };
 
@@ -134,9 +155,28 @@ export default function Admin() {
                     animate={{ opacity: 1, y: 0 }}
                     className="max-w-5xl"
                 >
-                    <div className="mb-8">
-                        <h1 className="font-display text-3xl">Admin Dashboard</h1>
-                        <p className="text-muted-foreground mt-1">Kullanıcı yönetimi ve sistem istatistikleri</p>
+                    <div className="mb-8 flex items-center justify-between">
+                        <div>
+                            <h1 className="font-display text-3xl">Admin Dashboard</h1>
+                            <p className="text-muted-foreground mt-1">Kullanıcı yönetimi ve sistem istatistikleri</p>
+                        </div>
+                        <Button
+                            variant="primary"
+                            onClick={handleScan}
+                            disabled={scanning}
+                            className="flex items-center gap-2"
+                        >
+                            {scanning ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                    Taranıyor...
+                                </>
+                            ) : (
+                                <>
+                                    🚀 Şimdi Tara
+                                </>
+                            )}
+                        </Button>
                     </div>
 
                     {/* Stats */}
