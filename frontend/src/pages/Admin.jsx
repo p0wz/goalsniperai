@@ -9,6 +9,7 @@ export default function Admin() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [scanning, setScanning] = useState(false);
+    const [logs, setLogs] = useState([]);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -35,13 +36,15 @@ export default function Admin() {
 
     const loadData = async () => {
         try {
-            const [statsRes, usersRes] = await Promise.all([
+            const [statsRes, usersRes, logsRes] = await Promise.all([
                 fetch(`${API_URL}/api/admin/stats`, { credentials: 'include' }),
-                fetch(`${API_URL}/api/admin/users`, { credentials: 'include' })
+                fetch(`${API_URL}/api/admin/users`, { credentials: 'include' }),
+                fetch(`${API_URL}/api/admin/logs`, { credentials: 'include' })
             ]);
 
             const statsData = await statsRes.json();
             const usersData = await usersRes.json();
+            const logsData = await logsRes.json();
 
             if (statsData.success) {
                 setStats({
@@ -55,6 +58,10 @@ export default function Admin() {
 
             if (usersData.success) {
                 setUsers(usersData.users);
+            }
+
+            if (logsData.success) {
+                setLogs(logsData.logs);
             }
         } catch (err) {
             console.error(err);
@@ -177,6 +184,42 @@ export default function Admin() {
                                 </>
                             )}
                         </Button>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+                        {/* System Logs */}
+                        <Card hover={false} className="p-0 overflow-hidden flex flex-col h-[500px]">
+                            <div className="bg-black/90 p-3 border-b border-white/10 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                                    <span className="ml-2 text-xs font-mono text-muted-foreground">system_logs.log</span>
+                                </div>
+                                <button onClick={loadData} className="text-xs text-accent hover:text-white transition-colors">
+                                    🔄 Yenile
+                                </button>
+                            </div>
+                            <div className="flex-1 bg-black/95 p-4 overflow-y-auto font-mono text-xs space-y-1 scrollbar-hide">
+                                {logs.length === 0 && (
+                                    <div className="text-muted-foreground italic">Henüz log kaydı yok...</div>
+                                )}
+                                {logs.map((log) => (
+                                    <div key={log.id} className="flex gap-2">
+                                        <span className="text-gray-500 shrink-0">[{new Date(log.created_at).toLocaleTimeString()}]</span>
+                                        <span className={`uppercase font-bold shrink-0 w-16 ${log.level === 'error' ? 'text-red-500' :
+                                            log.level === 'warn' ? 'text-yellow-500' :
+                                                log.level === 'success' ? 'text-green-500' :
+                                                    log.level === 'gemini' ? 'text-purple-400' :
+                                                        log.level === 'signal' ? 'text-blue-400' :
+                                                            'text-gray-300'
+                                            }`}>{log.level}</span>
+                                        <span className="text-gray-300 break-all">{log.message}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+
+                        {/* Recent Users / Quick Actions placeholder or kept empty for layout */}
                     </div>
 
                     {/* Stats */}

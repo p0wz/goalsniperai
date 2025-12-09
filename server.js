@@ -82,11 +82,24 @@ app.use(express.static('public'));
 // ============================================
 // 🎨 Console Styling
 // ============================================
+// Helper for logging
 const log = {
-    info: (msg) => console.log(`\x1b[36m[INFO]\x1b[0m ${msg}`),
-    success: (msg) => console.log(`\x1b[32m[SUCCESS]\x1b[0m ${msg}`),
-    warn: (msg) => console.log(`\x1b[33m[WARN]\x1b[0m ${msg}`),
-    error: (msg) => console.log(`\x1b[31m[ERROR]\x1b[0m ${msg}`),
+    info: (msg, meta = {}) => {
+        console.log(`[INFO] ${msg}`, meta);
+        database.addLog('info', msg, meta);
+    },
+    error: (msg, error = null) => {
+        console.error(`[ERROR] ${msg}`, error);
+        database.addLog('error', msg, { error: error?.message || error });
+    },
+    success: (msg, meta = {}) => {
+        console.log(`[SUCCESS] ${msg}`, meta);
+        database.addLog('success', msg, meta);
+    },
+    warn: (msg, meta = {}) => {
+        console.warn(`[WARN] ${msg}`, meta);
+        database.addLog('warn', msg, meta);
+    },
     api: (msg) => console.log(`\x1b[35m[API]\x1b[0m ${msg}`),
     signal: (msg) => console.log(`\x1b[32m[SIGNAL]\x1b[0m ${msg}`),
     gemini: (msg) => console.log(`\x1b[33m[GEMINI]\x1b[0m ${msg}`)

@@ -5,11 +5,24 @@
 
 const express = require('express');
 const router = express.Router();
-const { getAllUsers, getUserStats, updateUserPlan, deleteUser, getUserById } = require('../database');
+const { getAllUsers, getUserStats, updateUserPlan, deleteUser, getUserById, getRecentLogs } = require('../database');
 const { requireAdmin } = require('../auth');
 
 // All admin routes require admin role
 router.use(requireAdmin);
+
+// ============================================
+// 📜 System Logs
+// ============================================
+router.get('/logs', async (req, res) => {
+    try {
+        const logs = await getRecentLogs(200);
+        res.json({ success: true, logs });
+    } catch (error) {
+        console.error('[ADMIN] Logs error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
 
 // ============================================
 // 📊 Dashboard Stats

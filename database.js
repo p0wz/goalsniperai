@@ -68,6 +68,17 @@ async function initDatabase() {
             )
         `);
 
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS system_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT,
+                message TEXT,
+                meta TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         // Create Admin
         await createAdminUser();
 
@@ -216,6 +227,29 @@ async function incrementSignalCount(userId) {
         });
     }
 }
+async function addLog(level, message, meta = {}) {
+    try {
+        await db.execute({
+            sql: "INSERT INTO system_logs (level, message, meta) VALUES (?, ?, ?)",
+            args: [level, message, JSON.stringify(meta)]
+        });
+    } catch (e) {
+        console.error('[DB] Log Error:', e);
+    }
+}
+
+async function getRecentLogs(limit = 100) {
+    try {
+        const { rows } = await db.execute({
+            sql: "SELECT * FROM system_logs ORDER BY created_at DESC LIMIT ?",
+            args: [limit]
+        });
+        return rows;
+    } catch (e) {
+        console.error('[DB] Get Logs Error:', e);
+        return [];
+    }
+}
 
 module.exports = {
     db,
@@ -230,5 +264,7 @@ module.exports = {
     updateUserPlan,
     deleteUser,
     canViewSignal,
-    incrementSignalCount
+    incrementSignalCount,
+    addLog,
+    getRecentLogs
 };

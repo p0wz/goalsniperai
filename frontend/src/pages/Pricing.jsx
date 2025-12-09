@@ -41,7 +41,7 @@ export default function Pricing() {
                         initial="hidden"
                         animate="visible"
                         variants={stagger}
-                        className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-20"
+                        className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-20"
                     >
                         <PricingCard
                             name="Başlangıç"
@@ -72,20 +72,7 @@ export default function Pricing() {
                             buttonText="Pro'ya geçin"
                             buttonVariant="primary"
                         />
-                        <PricingCard
-                            name="Premium"
-                            price="199₺"
-                            period="aylık"
-                            features={[
-                                { text: 'Tüm Pro özellikleri', included: true },
-                                { text: 'Gemini AI analizi', included: true },
-                                { text: 'Öncelikli sinyaller', included: true },
-                                { text: 'Detaylı AI raporları', included: true },
-                                { text: 'Öncelikli destek', included: true },
-                            ]}
-                            buttonText="Premium al"
-                            buttonVariant="secondary"
-                        />
+
                     </motion.div>
 
                     {/* FAQ */}
