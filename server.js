@@ -340,8 +340,8 @@ function analyzeFirstHalfSniper(match, elapsed, stats) {
     const totalDA = (stats?.dangerousAttacks?.home || 0) + (stats?.dangerousAttacks?.away || 0);
     const daPerMin = elapsed > 0 ? totalDA / elapsed : 0;
 
-    // Trigger: SoT >= 2 AND DA/min > 1.0
-    if (totalSoT < 2 || daPerMin <= 1.0) {
+    // Trigger (Gevşetilmiş Mod): Total Shots >= 3 AND DA/min >= 0.7
+    if (totalShots < 3 || daPerMin < 0.7) {
         return null;
     }
 
