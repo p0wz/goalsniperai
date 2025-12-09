@@ -129,6 +129,9 @@ async function processAndFilter(matches, log = console) {
         const mid = m.event_key || m.match_id;
         if (!mid) continue;
 
+        // Rate Limit: 800ms between calls
+        await sleep(800);
+
         // Fetch H2H
         const h2hData = await fetchMatchH2H(mid);
         if (!h2hData) continue;
