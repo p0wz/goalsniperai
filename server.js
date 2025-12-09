@@ -710,8 +710,22 @@ app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: 'API endpoint not found' });
     }
-    // Serve React app for all other routes
-    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+
+    // Check if frontend build exists
+    const fs = require('fs');
+    const indexPath = path.join(__dirname, 'frontend/dist/index.html');
+
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(200).send(`
+            <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+                <h1>GoalGPT Pro API Server 🚀</h1>
+                <p>Engine is running perfectly.</p>
+                <p>Note: This is the Backend URL. Please visit your <b>Cloudflare Pages URL</b> to use the app.</p>
+            </div>
+        `);
+    }
 });
 
 
