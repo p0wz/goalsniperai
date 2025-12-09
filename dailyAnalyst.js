@@ -154,8 +154,16 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     console.log(`[DailyAnalyst] Processing top ${limit} matches...`);
 
     let processed = 0;
+    let consecutiveErrors = 0;
+
     for (const m of matches) {
         if (processed >= limit) break;
+
+        // Circuit Breaker: If 3 matches fail in a row (likely 429 or API down), STOP.
+        if (consecutiveErrors >= 3) {
+            log.error('[DailyAnalyst] Circuit Breaker: Too many consecutive API errors/429s. Aborting analysis to save quota.');
+            break;
+        }
 
         // Skip match if missing ID
         const mid = m.event_key || m.match_id;
@@ -166,7 +174,10 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
 
         // Fetch H2H
         const h2hData = await fetchMatchH2H(mid);
-        if (!h2hData) continue;
+        if (!h2hData) {
+            consecutiveErrors++;
+            continue;
+        }
 
         // API returns Array directly now, logic update:
         const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
@@ -177,8 +188,13 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         const homeStats = calculateFormStats(homeHistory, '1');
         const awayStats = calculateFormStats(awayHistory, '2');
 
-        if (!homeStats || !awayStats) continue;
+        if (!homeStats || !awayStats) {
+            consecutiveErrors++; // No stats counts as error for safety
+            continue;
+        }
 
+        // Success! Reset errors
+        consecutiveErrors = 0;
         processed++;
 
         const stats = {
