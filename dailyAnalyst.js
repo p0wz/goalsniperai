@@ -182,6 +182,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         // API returns Array directly now, logic update:
         const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
 
+        // DEBUG: Log first section to understand structure
+        if (consecutiveErrors === 0 && processed === 0) {
+            console.log('[DailyAnalyst] H2H Sample Section:', JSON.stringify(sections[0] || "Empty").slice(0, 200));
+        }
+
         const homeHistory = sections.find(d => d.GROUPS_LABEL?.includes('Home'))?.ROWS || [];
         const awayHistory = sections.find(d => d.GROUPS_LABEL?.includes('Away'))?.ROWS || [];
 
