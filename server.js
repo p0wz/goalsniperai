@@ -658,8 +658,9 @@ app.get('/api/daily-analysis', async (req, res) => {
         }
 
         // Run Analysis (This takes time, ideally run in background)
+        const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
         log.info('Running Daily Pre-Match Analysis...');
-        const results = await runDailyAnalysis(log);
+        const results = await runDailyAnalysis(log, limit);
 
         DAILY_ANALYSIS_CACHE = results;
         DAILY_ANALYSIS_TIMESTAMP = today;

@@ -92,10 +92,14 @@ export default function Admin() {
         }
     };
 
-    const handleDailyAnalysis = async () => {
+    const handleDailyAnalysis = async (limit) => {
         setAnalyzing(true);
         try {
-            const res = await fetch(`${API_URL}/api/daily-analysis?force=true`, {
+            const url = limit
+                ? `${API_URL}/api/daily-analysis?force=true&limit=${limit}`
+                : `${API_URL}/api/daily-analysis?force=true`;
+
+            const res = await fetch(url, {
                 credentials: 'include'
             });
             const data = await res.json();
@@ -222,6 +226,14 @@ export default function Admin() {
                                     📈 Günlük Analiz (100 Maç)
                                 </>
                             )}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => handleDailyAnalysis(1)}
+                            disabled={analyzing}
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            {analyzing ? '...' : '🧪 Test (1 Maç)'}
                         </Button>
                     </div>
 

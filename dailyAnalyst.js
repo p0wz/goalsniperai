@@ -150,18 +150,18 @@ function calculateFormStats(history, teamType) {
 }
 
 // 3. The "4-Pillar" Filter Logic
-async function processAndFilter(matches, log = console) {
+async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     const candidates = {
         over15: [],
         btts: [],
         homeOver15: []
     };
 
-    console.log(`[DailyAnalyst] Processing top ${MATCH_LIMIT} matches...`);
+    console.log(`[DailyAnalyst] Processing top ${limit} matches...`);
 
     let processed = 0;
     for (const m of matches) {
-        if (processed >= MATCH_LIMIT) break;
+        if (processed >= limit) break;
 
         // Skip match if missing ID
         const mid = m.event_key || m.match_id;
@@ -206,7 +206,7 @@ async function processAndFilter(matches, log = console) {
         }
     }
 
-    log.info(`[DailyAnalyst] Filtered ${processed} matches. Candidates: O1.5(${candidates.over15.length}), BTTS(${candidates.btts.length})`);
+    log.info(`[DailyAnalyst] Filtered ${processed} matches (Limit: ${limit}). Candidates: O1.5(${candidates.over15.length}), BTTS(${candidates.btts.length})`);
 
     return candidates;
 }
@@ -239,7 +239,7 @@ async function validateWithGemini(match) {
 }
 
 // Main Runner
-async function runDailyAnalysis(log = console) {
+async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     // 1. Fetch
     let matches = await fetchTodaysFixtures(log);
 
@@ -249,10 +249,10 @@ async function runDailyAnalysis(log = console) {
         return { over15: [], btts: [], homeOver15: [] };
     }
 
-    log.info(`[DailyAnalyst] Found ${matches.length} raw fixtures. Processing top ${MATCH_LIMIT}...`);
+    log.info(`[DailyAnalyst] Found ${matches.length} raw fixtures. Processing top ${customLimit}...`);
 
     // 2. Filter
-    const candidates = await processAndFilter(matches, log);
+    const candidates = await processAndFilter(matches, log, customLimit);
 
     const results = {
         over15: [],
@@ -279,7 +279,7 @@ async function runDailyAnalysis(log = console) {
         }
     }
 
-    log.success(`[DailyAnalyst] Analysis Done. AI Checks: ${aiCount}. Found: ${results.over15.length + results.btts.length} signals.`);
+    log.success(`[DailyAnalyst] Analysis Done (Limit: ${customLimit}). AI Checks: ${aiCount}. Found: ${results.over15.length + results.btts.length} signals.`);
     return results;
 }
 
