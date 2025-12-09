@@ -99,10 +99,9 @@ async function fetchFinishedMatches(dayOffset) {
         list.forEach(tournament => {
             if (tournament.matches) {
                 tournament.matches.forEach(m => {
-                    // Filter for Finished matches
-                    // Status codes: 'Finished', 'After ET', 'After Pen' usually indicate finality
-                    // Flashscore API often uses status check. We look for validation of scores.
-                    if (m.home_team?.score !== undefined && m.away_team?.score !== undefined) {
+                    // Filter for Finished matches: score must be present and not null
+                    // API returns null score for unplayed/live matches sometimes
+                    if (m.home_team && m.home_team.score !== null && m.away_team && m.away_team.score !== null) {
                         finishedMatches.push(m);
                     }
                 });
@@ -117,22 +116,10 @@ async function fetchFinishedMatches(dayOffset) {
 }
 
 // Core Logic: Resolve specific markets
-function checkWinCondition(market, homeScore, awayScore, halftimeScore) {
+function checkWinCondition(market, homeScore, awayScore) {
     const h = parseInt(homeScore);
     const a = parseInt(awayScore);
     const total = h + a;
-
-    // Parse Halftime if available "1-0"
-    let htH = 0, htA = 0;
-    if (halftimeScore) {
-        const parts = halftimeScore.split('-');
-        if (parts.length === 2) {
-            htH = parseInt(parts[0]);
-            htA = parseInt(parts[1]);
-        }
-    }
-    const shH = h - htH; // Second Half Home
-    const shA = a - htA; // Second Half Away
 
     switch (market) {
         case 'Over 1.5 Goals':
@@ -150,14 +137,9 @@ function checkWinCondition(market, homeScore, awayScore, halftimeScore) {
         case 'Home Team Over 1.5':
             return h >= 2;
 
-        case 'Home Win Either Half':
-            // Requires HT score. If unknown, we can't settle perfectly, but if full time is Home Win, likely won one half? No.
-            // Strict check: if metadata missing, maybe skip? 
-            // For now assuming we parse HT from API result if available
-            if (halftimeScore) {
-                return (htH > htA) || (shH > shA);
-            }
-            return null; // Cannot determine
+        // Note: 'Home Win Either Half' requires HT scores.
+        // The list endpoint often does not provide HT scores.
+        // We skip this market for batch settlement to avoid false negatives.
 
         default:
             return null; // Unknown market
@@ -174,8 +156,7 @@ async function settleBets() {
         return;
     }
 
-    // Optimization: Only fetch days relevant to pending bets?
-    // For simplicity: Fetch Day 0 (Today) and Day -1 (Yesterday) to cover overnight games.
+    // Optimization: Fetch Day 0 (Today) and Day -1 (Yesterday)
     const batches = [
         await fetchFinishedMatches(0),
         await fetchFinishedMatches(-1)
@@ -194,22 +175,11 @@ async function settleBets() {
         const matchResult = resultMap[bet.api_fixture_id];
 
         if (matchResult) {
-            // Check if truly finished (sometimes list returns live scores)
-            // We assume if score exists it's useful, but ideally check 'status_type' if API allows.
-            // Flashscore status: "Finished"
-            if (matchResult.status !== 'Finished' && matchResult.status !== 'After Pen.' && matchResult.status !== 'After ET') {
-                // Skip if not final
-                return;
-            }
-
+            // Already filtered for non-null scores in fetchFinishedMatches
             const homeScore = matchResult.home_team.score;
             const awayScore = matchResult.away_team.score;
-            // Note: Flashscore list often doesn't give HT info directly in basic list object.
-            // If checking 'Home Win Either Half', we might lack data here.
-            // MVP: Pass 0-0 or skip that market if logic complex. 
-            // We'll proceed with FT scores for main markets.
 
-            const isWin = checkWinCondition(bet.market, homeScore, awayScore, null); // HT hard to get in batch
+            const isWin = checkWinCondition(bet.market, homeScore, awayScore);
 
             if (isWin !== null) {
                 bet.status = isWin ? 'WON' : 'LOST';
