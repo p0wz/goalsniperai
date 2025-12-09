@@ -23,6 +23,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 // Routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const { runDailyAnalysis } = require('./dailyAnalyst');
 
 const app = express();
 
@@ -636,6 +637,36 @@ app.post('/api/scan', async (req, res) => {
         });
     } catch (error) {
         log.error(`Scan error: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// 📈 Daily Pre-Match Analyst Endpoint
+// ============================================
+let DAILY_ANALYSIS_CACHE = null;
+let DAILY_ANALYSIS_TIMESTAMP = null;
+
+app.get('/api/daily-analysis', async (req, res) => {
+    try {
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+
+        // Return cache if valid and from today
+        if (DAILY_ANALYSIS_CACHE && DAILY_ANALYSIS_TIMESTAMP === today) {
+            return res.json({ success: true, data: DAILY_ANALYSIS_CACHE, cached: true });
+        }
+
+        // Run Analysis (This takes time, ideally run in background)
+        log.info('Running Daily Pre-Match Analysis...');
+        const results = await runDailyAnalysis();
+
+        DAILY_ANALYSIS_CACHE = results;
+        DAILY_ANALYSIS_TIMESTAMP = today;
+
+        res.json({ success: true, data: results, cached: false });
+    } catch (error) {
+        log.error(`Daily Analyst Error: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
     }
 });

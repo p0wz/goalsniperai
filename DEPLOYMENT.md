@@ -34,9 +34,9 @@ Verilerimiz (üyelikler, maç geçmişi) silinmesin diye Turso kullanacağız.
 1. [Cloudflare Dashboard](https://dash.cloudflare.com/) > **Workers & Pages**.
 2. "Create Application" > "Connect to Git".
 3. Ayarlar:
+   - **Root directory**: `frontend` (⚠️ Bu çok önemli, yoksa build hata verir)
    - **Build command**: `npm run build`
-   - **Output directory**: `frontend/dist`
-   - **Root directory**: `frontend`
+   - **Output directory**: `dist`
 4. **Environment Variables**:
    - `VITE_API_URL`: `https://goalsniper-api.onrender.com` (Render'ın size verdiği URL)
 
