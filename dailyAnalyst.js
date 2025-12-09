@@ -49,9 +49,12 @@ async function fetchTodaysFixtures(log = console) {
             });
             const data = response.data;
 
-            // Debug Log structure
-            // log.info(`[DailyAnalyst] Day ${day} Keys: ${Object.keys(data).join(', ')}`);
-            if (data.DATA) log.info(`[DailyAnalyst] Day ${day} DATA length: ${data.DATA.length}`);
+            // DEEP DEBUG: Log structure to identify the issue
+            log.info(`[DailyAnalyst] Response Type: ${typeof data}`);
+            if (typeof data === 'object') {
+                log.info(`[DailyAnalyst] Keys: ${Object.keys(data).join(', ')}`);
+                log.info(`[DailyAnalyst] Preview: ${JSON.stringify(data).slice(0, 300)}`);
+            }
 
             const parsed = [];
             const list = data.DATA || data;
