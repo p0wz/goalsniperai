@@ -19,25 +19,28 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MATCH_LIMIT = 100; // Increased to 100 (Max 12h live bot usage allows this)
 
 // 1. Data Fetching - Today's Schedule
-async function fetchTodaysFixtures() {
+async function fetchTodaysFixtures(log = console) {
     try {
-        console.log('[DailyAnalyst] Fetching schedule...');
-        // Endpoint provided by user: 'match/list/1/0' (1=Today, 0=Page/Offset)
+        log.info('[DailyAnalyst] Fetching schedule from /match/list/1/0 ...');
+        // Endpoint provided by user: 'match/list/1/0' (1=Today/Tomorrow, 0=Page/Offset)
         const response = await axios.get(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/1/0`, {
             headers: FLASHSCORE_API.headers
         });
 
-        // Data structure varies by provider version, usually response.data is array of groups/matches
-        // Flatten logic
-        const data = response.data || [];
-        const matches = [];
+        const data = response.data;
+        // Debug Log to help user
+        // log.info(`[DailyAnalyst] API Response Keys: ${Object.keys(data)}`);
 
-        // Handle different possible structures (array of leagues or flat matches)
-        if (Array.isArray(data)) {
-            data.forEach(league => {
-                if (league.events) {
-                    league.events.forEach(event => {
-                        matches.push({ ...event, league_name: league.NAME });
+        // Flashscore4 'match/list' structure handling
+        const matches = [];
+        const list = data.DATA || data;
+
+        if (Array.isArray(list)) {
+            list.forEach(item => {
+                // Item might be a Tournament object with EVENTS
+                if (item.EVENTS && Array.isArray(item.EVENTS)) {
+                    item.EVENTS.forEach(event => {
+                        matches.push({ ...event, league_name: item.NAME });
                     });
                 }
             });
@@ -45,7 +48,7 @@ async function fetchTodaysFixtures() {
 
         return matches;
     } catch (error) {
-        console.error('[DailyAnalyst] Fetch Schedule Error:', error.message);
+        log.error(`[DailyAnalyst] Fetch Schedule Error: ${error.message}`);
         return [];
     }
 }
@@ -53,30 +56,23 @@ async function fetchTodaysFixtures() {
 // 2. Fetch H2H & Form for Stats
 async function fetchMatchH2H(matchId) {
     try {
-        // Endpoint provided by user: '/match/h2h/{id}'
         const response = await axios.get(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`, {
             headers: FLASHSCORE_API.headers
         });
         return response.data;
     } catch (error) {
-        // console.warn(`[DailyAnalyst] No H2H for ${matchId}`);
         return null;
     }
 }
 
 // Helper: Calculate Stats from Last 5 Matches
-function calculateFormStats(history, teamType) { // teamType = '1' (Home) or '2' (Away)
+function calculateFormStats(history, teamType) {
     if (!history || !Array.isArray(history)) return null;
 
-    // Most recent 5-8 matches
+    // Most recent 8 matches
     const recent = history.slice(0, 8);
 
     let totalGoals = 0;
-    let goalsScored = 0;
-    let goalsConceded = 0;
-    let wins = 0;
-    let losses = 0;
-    let homeLosses = 0; // Lost at home
     let count = 0;
 
     for (const m of recent) {
@@ -87,50 +83,41 @@ function calculateFormStats(history, teamType) { // teamType = '1' (Home) or '2'
         const score1 = parseInt(scores[0]);
         const score2 = parseInt(scores[1]);
 
-        // Determine isHome (Not always easy from simple array, usually H2H array has markers)
-        // Assuming user H2H format has 'host_guest_type' or we infer.
-        // Simplified assumption: We trust the list passed is relevant to the team.
-
         totalGoals += (score1 + score2);
-
-        // Simple heuristic: If we don't know if match was H/A, we take general avg
-        // This is "Form" analysis
         count++;
     }
 
     if (count === 0) return null;
 
     return {
-        avgGoalsMatch: totalGoals / count,
-        avgScored: totalGoals / count / 2, // Rough estimate if we don't track side
-        avgConceded: totalGoals / count / 2
+        avgGoalsMatch: totalGoals / count
     };
 }
 
 // 3. The "4-Pillar" Filter Logic
-async function processAndFilter(matches) {
+async function processAndFilter(matches, log = console) {
     const candidates = {
-        over15: [],         // Pillar 1: Safety Net
-        doubleChance1X: [], // Pillar 2: The Fortress (Skip for now as H/A detection tricky)
-        btts: [],           // Pillar 3: Goal Fest
-        homeOver15: []      // Pillar 4: Pro Value
+        over15: [],
+        btts: [],
+        homeOver15: []
     };
 
     console.log(`[DailyAnalyst] Processing top ${MATCH_LIMIT} matches...`);
-
-    // Prioritize major leagues if we can, or just take first N
-    // Filter matches that are NOT started or finished (status logic if needed)
 
     let processed = 0;
     for (const m of matches) {
         if (processed >= MATCH_LIMIT) break;
 
+        // Skip match if missing ID
+        const mid = m.event_key || m.match_id;
+        if (!mid) continue;
+
         // Fetch H2H
-        const h2hData = await fetchMatchH2H(m.event_key || m.match_id); // Adjust key based on API
+        const h2hData = await fetchMatchH2H(mid);
         if (!h2hData) continue;
 
-        const homeHistory = h2hData.DATA?.find(d => d.GROUPS_LABEL === 'Last matches: Home team')?.ROWS || [];
-        const awayHistory = h2hData.DATA?.find(d => d.GROUPS_LABEL === 'Last matches: Away team')?.ROWS || [];
+        const homeHistory = h2hData.DATA?.find(d => d.GROUPS_LABEL?.includes('Home'))?.ROWS || [];
+        const awayHistory = h2hData.DATA?.find(d => d.GROUPS_LABEL?.includes('Away'))?.ROWS || [];
 
         const homeStats = calculateFormStats(homeHistory, '1');
         const awayStats = calculateFormStats(awayHistory, '2');
@@ -140,7 +127,7 @@ async function processAndFilter(matches) {
         processed++;
 
         const stats = {
-            leagueAvgGoals: (homeStats.avgGoalsMatch + awayStats.avgGoalsMatch) / 2, // Proxy for league avg
+            leagueAvgGoals: (homeStats.avgGoalsMatch + awayStats.avgGoalsMatch) / 2, // Proxy
             homeAvgGoals: homeStats.avgGoalsMatch,
             awayAvgGoals: awayStats.avgGoalsMatch
         };
@@ -156,10 +143,12 @@ async function processAndFilter(matches) {
         }
 
         // 4. Pro Value (Home Over 1.5) -> High Home Avg
-        if (homeStats.avgGoalsMatch > 3.5) { // Adjusted threshold for proxy
+        if (homeStats.avgGoalsMatch > 3.5) {
             candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
         }
     }
+
+    log.info(`[DailyAnalyst] Filtered ${processed} matches. Candidates: O1.5(${candidates.over15.length}), BTTS(${candidates.btts.length})`);
 
     return candidates;
 }
@@ -192,15 +181,20 @@ async function validateWithGemini(match) {
 }
 
 // Main Runner
-async function runDailyAnalysis() {
+async function runDailyAnalysis(log = console) {
     // 1. Fetch
-    const matches = await fetchTodaysFixtures();
-    console.log(`[DailyAnalyst] Found ${matches.length} fixtures. Filtering...`);
+    let matches = await fetchTodaysFixtures(log);
 
-    if (matches.length === 0) return { over15: [], btts: [], homeOver15: [] };
+    // Fallback: If 0 matches, maybe day '1' is tomorrow and today is empty?
+    if (matches.length === 0) {
+        log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
+        return { over15: [], btts: [], homeOver15: [] };
+    }
+
+    log.info(`[DailyAnalyst] Found ${matches.length} raw fixtures. Processing top ${MATCH_LIMIT}...`);
 
     // 2. Filter
-    const candidates = await processAndFilter(matches);
+    const candidates = await processAndFilter(matches, log);
 
     const results = {
         over15: [],
@@ -209,9 +203,12 @@ async function runDailyAnalysis() {
     };
 
     // 3. AI Validate (Limit to top 3 per category)
+    let aiCount = 0;
     for (const cat of Object.keys(candidates)) {
-        if (!results[cat]) continue;
+        if (!candidates[cat]) continue; // Safety check
         for (const match of candidates[cat].slice(0, 3)) {
+            aiCount++;
+            log.info(`[DailyAnalyst] Asking Gemini: ${match.event_home_team} vs ${match.event_away_team}`);
             const aiRes = await validateWithGemini(match);
             if (aiRes.verdict === 'PLAY') {
                 results[cat].push({
@@ -224,6 +221,7 @@ async function runDailyAnalysis() {
         }
     }
 
+    log.success(`[DailyAnalyst] Analysis Done. AI Checks: ${aiCount}. Found: ${results.over15.length + results.btts.length} signals.`);
     return results;
 }
 

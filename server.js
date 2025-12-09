@@ -659,7 +659,7 @@ app.get('/api/daily-analysis', async (req, res) => {
 
         // Run Analysis (This takes time, ideally run in background)
         log.info('Running Daily Pre-Match Analysis...');
-        const results = await runDailyAnalysis();
+        const results = await runDailyAnalysis(log);
 
         DAILY_ANALYSIS_CACHE = results;
         DAILY_ANALYSIS_TIMESTAMP = today;
