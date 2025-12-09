@@ -108,12 +108,6 @@ async function fetchMatchH2H(matchId) {
             headers: FLASHSCORE_API.headers
         });
 
-        // DEBUG first H2H response
-        if (Math.random() < 0.05) { // Log occasional H2H structure
-            console.log(`[DailyAnalyst] H2H Structure for ${matchId}:`, Object.keys(response.data));
-            if (Array.isArray(response.data)) console.log('[DailyAnalyst] H2H is Array');
-        }
-
         return response.data;
     } catch (error) {
         return null; // Silent fail (continue loop)
@@ -174,8 +168,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         const h2hData = await fetchMatchH2H(mid);
         if (!h2hData) continue;
 
-        const homeHistory = h2hData.DATA?.find(d => d.GROUPS_LABEL?.includes('Home'))?.ROWS || [];
-        const awayHistory = h2hData.DATA?.find(d => d.GROUPS_LABEL?.includes('Away'))?.ROWS || [];
+        // API returns Array directly now, logic update:
+        const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+
+        const homeHistory = sections.find(d => d.GROUPS_LABEL?.includes('Home'))?.ROWS || [];
+        const awayHistory = sections.find(d => d.GROUPS_LABEL?.includes('Away'))?.ROWS || [];
 
         const homeStats = calculateFormStats(homeHistory, '1');
         const awayStats = calculateFormStats(awayHistory, '2');
