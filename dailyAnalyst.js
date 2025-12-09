@@ -115,7 +115,7 @@ async function fetchMatchH2H(matchId) {
 }
 
 // Helper: Calculate Stats from Last 5 Matches
-function calculateFormStats(history, teamType) {
+function calculateFormStats(history, teamType) { // teamType not strictly needed anymore but kept for signature
     if (!history || !Array.isArray(history)) return null;
 
     // Most recent 8 matches
@@ -125,14 +125,28 @@ function calculateFormStats(history, teamType) {
     let count = 0;
 
     for (const m of recent) {
-        // Parse score "2 : 1"
-        const scores = (m.result || "").split(" : ");
-        if (scores.length !== 2) continue;
+        // New structure: home_team.score, away_team.score
+        let s1 = 0, s2 = 0;
 
-        const score1 = parseInt(scores[0]);
-        const score2 = parseInt(scores[1]);
+        if (m.home_team?.score !== undefined && m.away_team?.score !== undefined) {
+            s1 = parseInt(m.home_team.score);
+            s2 = parseInt(m.away_team.score);
+        } else if (m.result) {
+            // Legacy/Fallback parsing
+            const scores = m.result.split(" : ");
+            if (scores.length === 2) {
+                s1 = parseInt(scores[0]);
+                s2 = parseInt(scores[1]);
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        }
 
-        totalGoals += (score1 + score2);
+        if (isNaN(s1) || isNaN(s2)) continue;
+
+        totalGoals += (s1 + s2);
         count++;
     }
 
