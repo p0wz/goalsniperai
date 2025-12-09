@@ -108,54 +108,78 @@ async function fetchMatchH2H(matchId) {
     }
 }
 
-// Helper: Calculate Stats from Last 5 Matches
-function calculateFormStats(history, teamType) { // teamType not strictly needed anymore but kept for signature
-    if (!history || !Array.isArray(history)) return null;
+// Helper: Calculate Detailed Stats
+function calculateAdvancedStats(history, teamName) {
+    if (!history || !Array.isArray(history) || history.length === 0) return null;
 
-    // Most recent 8 matches
-    const recent = history.slice(0, 8);
-
+    let totalMatches = 0;
     let totalGoals = 0;
-    let count = 0;
+    let goalsScored = 0;
+    let goalsConceded = 0;
+    let over15Count = 0;
+    let bttsCount = 0;
+    let cleanSheetCount = 0;
+    let failedToScoreCount = 0;
+    let wins = 0;
+    let draws = 0;
+    let losses = 0;
 
-    for (const m of recent) {
-        // New structure: home_team.score, away_team.score
-        let s1 = 0, s2 = 0;
+    for (const m of history) {
+        let s1 = 0, s2 = 0; // s1=Home, s2=Away (in the match context)
 
         if (m.home_team?.score !== undefined && m.away_team?.score !== undefined) {
             s1 = parseInt(m.home_team.score);
             s2 = parseInt(m.away_team.score);
-        } else if (m.result) {
-            // Legacy/Fallback parsing
-            const scores = m.result.split(" : ");
-            if (scores.length === 2) {
-                s1 = parseInt(scores[0]);
-                s2 = parseInt(scores[1]);
-            } else {
-                continue;
-            }
         } else {
+            // Fallback
             continue;
         }
 
         if (isNaN(s1) || isNaN(s2)) continue;
 
-        totalGoals += (s1 + s2);
-        count++;
+        totalMatches++;
+        const total = s1 + s2;
+        totalGoals += total;
+
+        // Determine if target team is Home or Away in this specific historical match
+        const isHome = m.home_team?.name === teamName;
+        const myScore = isHome ? s1 : s2;
+        const oppScore = isHome ? s2 : s1;
+
+        goalsScored += myScore;
+        goalsConceded += oppScore;
+
+        if (total > 1.5) over15Count++;
+        if (s1 > 0 && s2 > 0) bttsCount++;
+        if (oppScore === 0) cleanSheetCount++;
+        if (myScore === 0) failedToScoreCount++;
+
+        if (myScore > oppScore) wins++;
+        else if (myScore === oppScore) draws++;
+        else losses++;
     }
 
-    if (count === 0) return null;
+    if (totalMatches === 0) return null;
 
     return {
-        avgGoalsMatch: totalGoals / count
+        matches: totalMatches,
+        avgTotalGoals: totalGoals / totalMatches,
+        avgScored: goalsScored / totalMatches,
+        avgConceded: goalsConceded / totalMatches,
+        over15Rate: (over15Count / totalMatches) * 100,
+        bttsRate: (bttsCount / totalMatches) * 100,
+        scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
+        winRate: (wins / totalMatches) * 100,
+        lossCount: losses
     };
 }
 
-// 3. The "4-Pillar" Filter Logic
+// 3. The "Scout" Filter Logic (Updated)
 async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     const candidates = {
         over15: [],
         btts: [],
+        doubleChance: [], // 1X
         homeOver15: []
     };
 
@@ -167,72 +191,88 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     for (const m of matches) {
         if (processed >= limit) break;
 
-        // Circuit Breaker: If 3 matches fail in a row (likely 429 or API down), STOP.
+        // Circuit Breaker
         if (consecutiveErrors >= 3) {
-            log.error('[DailyAnalyst] Circuit Breaker: Too many consecutive API errors/429s. Aborting analysis to save quota.');
+            log.error('[DailyAnalyst] Circuit Breaker: Too many consecutive errors. Aborting.');
             break;
         }
 
-        // Skip match if missing ID
         const mid = m.event_key || m.match_id;
         if (!mid) continue;
 
-        // Rate Limit: 800ms between calls
         await sleep(800);
 
-        // Fetch H2H
         const h2hData = await fetchMatchH2H(mid);
         if (!h2hData) {
             consecutiveErrors++;
             continue;
         }
 
-        // API returns Array directly now, logic update:
         const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
 
-
-        const homeHistory = sections.filter(x =>
+        // 1. All History (For Form)
+        const homeAllHistory = sections.filter(x =>
             (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team)
-        );
-        const awayHistory = sections.filter(x =>
+        ).slice(0, 5); // Last 5 for Form
+
+        const awayAllHistory = sections.filter(x =>
             (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team)
-        );
+        ).slice(0, 5); // Last 5 for Form
 
-        const homeStats = calculateFormStats(homeHistory, '1');
-        const awayStats = calculateFormStats(awayHistory, '2');
+        // 2. Venue Specific History (For Stats) - Use more history for better averages
+        const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
+        const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
 
-        if (!homeStats || !awayStats) {
-            consecutiveErrors++; // No stats counts as error for safety
+        // Calc Stats
+        const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
+        const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
+        const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
+        const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
+
+        if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
+            // Not enough data to judge
+            consecutiveErrors = 0; // It's not an API error, just data lack
             continue;
         }
 
-        // Success! Reset errors
         consecutiveErrors = 0;
         processed++;
 
         const stats = {
-            leagueAvgGoals: (homeStats.avgGoalsMatch + awayStats.avgGoalsMatch) / 2, // Proxy
-            homeAvgGoals: homeStats.avgGoalsMatch,
-            awayAvgGoals: awayStats.avgGoalsMatch
+            homeForm, awayForm, homeHomeStats, awayAwayStats
         };
 
-        // 1. Safety Net (Over 1.5 Goals) -> Both teams high goal trends
-        if (stats.homeAvgGoals > 2.5 && stats.awayAvgGoals > 2.5) {
+        // --- STRATEGY A: Over 1.5 Goals (Garanti) ---
+        // 1. League Avg > 2.5 (Proxy: Combined Avg of both teams > 2.5)
+        const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
+        // 2. Form: 3 of last 5 matches > 1.5 Goals (60%)
+        if (proxyLeagueAvg >= 2.5 && homeForm.over15Rate >= 60 && awayForm.over15Rate >= 60) {
             candidates.over15.push({ ...m, filterStats: stats, market: 'Over 1.5 Goals' });
         }
 
-        // 3. Goal Fest (BTTS) -> Both teams typically score/concede (High avg match goals)
-        if (stats.homeAvgGoals > 3.0 || stats.awayAvgGoals > 3.0) {
+        // --- STRATEGY B: BTTS (Gol Soleni) ---
+        // 1. Home at Home scoring rate >= 70%
+        // 2. Away at Away scoring rate >= 65%
+        if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
             candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
         }
 
-        // 4. Pro Value (Home Over 1.5) -> High Home Avg
-        if (homeStats.avgGoalsMatch > 3.5) {
+        // --- STRATEGY C: 1X Double Chance (Kale) ---
+        // 1. Home at Home Loss Count <= 2
+        // 2. Away at Away Win Rate < 35%
+        if (homeHomeStats.lossCount <= 2 && awayAwayStats.winRate < 35) {
+            candidates.doubleChance.push({ ...m, filterStats: stats, market: '1X Double Chance' });
+        }
+
+        // --- STRATEGY D: Home Over 1.5 (Pro Value) ---
+        // 1. Home at Home Avg Scored >= 1.4
+        // 2. Away at Away Avg Conceded >= 1.2
+        if (homeHomeStats.avgScored >= 1.4 && awayAwayStats.avgConceded >= 1.2) {
             candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
         }
     }
 
-    log.info(`[DailyAnalyst] Filtered ${processed} matches (Limit: ${limit}). Candidates: O1.5(${candidates.over15.length}), BTTS(${candidates.btts.length})`);
+    log.info(`[DailyAnalyst] Filtered ${processed} matches (Limit: ${limit}). O1.5:${candidates.over15.length}, BTTS:${candidates.btts.length}, 1X:${candidates.doubleChance.length}, H1.5:${candidates.homeOver15.length}`);
 
     return candidates;
 }
@@ -246,10 +286,14 @@ async function validateWithGemini(match) {
 
     const prompt = `
     Analyze this football match for market: ${match.market}.
-    Match: ${match.event_home_team || 'Home'} vs ${match.event_away_team || 'Away'} (League: ${match.league_name})
-    Stats: Avg Match Goals (Home Form): ${match.filterStats.homeAvgGoals.toFixed(2)}, Away Form: ${match.filterStats.awayAvgGoals.toFixed(2)}
+    Match: ${match.event_home_team} vs ${match.event_away_team}
+    Stats: 
+    - Home Form (Last 5): Over 1.5 Rate ${match.filterStats.homeForm.over15Rate}%, Avg Scored ${match.filterStats.homeForm.avgScored}
+    - Away Form (Last 5): Over 1.5 Rate ${match.filterStats.awayForm.over15Rate}%, Avg Scored ${match.filterStats.awayForm.avgScored}
+    - Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored}
+    - Away @ Away: Scored in ${match.filterStats.awayAwayStats.scoringRate}% of games, Avg Conceded ${match.filterStats.awayAwayStats.avgConceded}
     
-    Is this a safe bet?
+    Is this bet solid?
     Respond in JSON: { "verdict": "PLAY", "confidence": 90, "reason": "Short reason" }
     `;
 
@@ -272,7 +316,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     // Fallback: If 0 matches, maybe day '1' is tomorrow and today is empty?
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { over15: [], btts: [], homeOver15: [] };
+        return { over15: [], btts: [], doubleChance: [], homeOver15: [] };
     }
 
     log.info(`[DailyAnalyst] Found ${matches.length} raw fixtures. Processing top ${customLimit}...`);
@@ -283,6 +327,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     const results = {
         over15: [],
         btts: [],
+        doubleChance: [],
         homeOver15: []
     };
 
