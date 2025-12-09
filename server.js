@@ -748,11 +748,12 @@ function startAutoPolling() {
         const now = new Date();
         const hour = now.getHours();
 
-        if (hour >= 13 && hour <= 23) {
+        // Schedule: 16:00 - 02:00
+        if (hour >= 16 || hour < 2) {
             log.info('Scheduled poll...');
             await processMatches();
         } else {
-            log.info('Outside active hours');
+            log.info('Outside active hours (16:00-02:00)');
         }
     }, POLL_INTERVAL);
 }
