@@ -652,8 +652,8 @@ app.get('/api/daily-analysis', async (req, res) => {
         const now = new Date();
         const today = now.toISOString().split('T')[0];
 
-        // Return cache if valid and from today
-        if (DAILY_ANALYSIS_CACHE && DAILY_ANALYSIS_TIMESTAMP === today) {
+        // Return cache if valid and from today (and not forced)
+        if (DAILY_ANALYSIS_CACHE && DAILY_ANALYSIS_TIMESTAMP === today && req.query.force !== 'true') {
             return res.json({ success: true, data: DAILY_ANALYSIS_CACHE, cached: true });
         }
 

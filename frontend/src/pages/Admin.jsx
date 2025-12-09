@@ -95,7 +95,7 @@ export default function Admin() {
     const handleDailyAnalysis = async () => {
         setAnalyzing(true);
         try {
-            const res = await fetch(`${API_URL}/api/daily-analysis`, {
+            const res = await fetch(`${API_URL}/api/daily-analysis?force=true`, {
                 credentials: 'include'
             });
             const data = await res.json();
