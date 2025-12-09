@@ -16,14 +16,31 @@ const FLASHSCORE_API = {
 };
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MATCH_LIMIT = 100; // Increased to 100 (Max 12h live bot usage allows this)
+const MATCH_LIMIT = 100;
+
+// Helper: Delay
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper: Fetch with Retry (Handles 429)
+async function fetchWithRetry(url, options, retries = 3) {
+    try {
+        return await axios.get(url, options);
+    } catch (error) {
+        if (error.response && error.response.status === 429 && retries > 0) {
+            console.log(`[DailyAnalyst] Rate limit hit (429). Waiting 2s...`);
+            await sleep(2000);
+            return fetchWithRetry(url, options, retries - 1);
+        }
+        throw error;
+    }
+}
 
 // 1. Data Fetching - Today's Schedule
 async function fetchTodaysFixtures(log = console) {
     try {
         log.info('[DailyAnalyst] Fetching schedule from /match/list/1/0 ...');
-        // Endpoint provided by user: 'match/list/1/0' (1=Today/Tomorrow, 0=Page/Offset)
-        const response = await axios.get(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/1/0`, {
+        // Use fetchWithRetry instead of plain axios.get
+        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/1/0`, {
             headers: FLASHSCORE_API.headers
         });
 
@@ -56,7 +73,7 @@ async function fetchTodaysFixtures(log = console) {
 // 2. Fetch H2H & Form for Stats
 async function fetchMatchH2H(matchId) {
     try {
-        const response = await axios.get(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`, {
+        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`, {
             headers: FLASHSCORE_API.headers
         });
         return response.data;
