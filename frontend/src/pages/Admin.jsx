@@ -9,6 +9,8 @@ export default function Admin() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [scanning, setScanning] = useState(false);
+    const [analyzing, setAnalyzing] = useState(false);
+    const [analysisResults, setAnalysisResults] = useState(null);
     const [logs, setLogs] = useState([]);
     const navigate = useNavigate();
 
@@ -87,6 +89,26 @@ export default function Admin() {
             alert('Scan Error: ' + error.message);
         } finally {
             setScanning(false);
+        }
+    };
+
+    const handleDailyAnalysis = async () => {
+        setAnalyzing(true);
+        try {
+            const res = await fetch(`${API_URL}/api/daily-analysis`, {
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAnalysisResults(data.data);
+                alert('Analysis Complete! Scroll down to view results.');
+            } else {
+                alert('Analysis Failed: ' + data.error);
+            }
+        } catch (error) {
+            alert('Analysis Error: ' + error.message);
+        } finally {
+            setAnalyzing(false);
         }
     };
 
@@ -184,7 +206,59 @@ export default function Admin() {
                                 </>
                             )}
                         </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={handleDailyAnalysis}
+                            disabled={analyzing}
+                            className="flex items-center gap-2"
+                        >
+                            {analyzing ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                    Analiz Ediliyor...
+                                </>
+                            ) : (
+                                <>
+                                    📈 Günlük Analiz (100 Maç)
+                                </>
+                            )}
+                        </Button>
                     </div>
+
+                    {/* Analysis Results */}
+                    {analysisResults && (
+                        <div className="mb-10 space-y-6">
+                            <h2 className="font-display text-2xl">📊 Günlük Analiz Sonuçları</h2>
+                            {['over15', 'btts', 'homeOver15'].map(cat => (
+                                <Card key={cat} hover={false} className="p-4">
+                                    <h3 className="font-bold text-lg mb-2 capitalize border-b border-white/10 pb-2">
+                                        {cat === 'over15' ? '🔥 Over 1.5 Goals' : cat === 'btts' ? '🤝 BTTS (KG Var)' : '🏠 Home 1.5+'}
+                                    </h3>
+                                    {analysisResults[cat]?.length === 0 ? (
+                                        <div className="text-muted-foreground text-sm">Uygun maç bulunamadı.</div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {analysisResults[cat]?.map((match, i) => (
+                                                <div key={i} className="bg-black/40 p-3 rounded border border-white/5 flex flex-col gap-1">
+                                                    <div className="flex justify-between font-bold text-accent">
+                                                        <span>{match.match}</span>
+                                                        <span>{match.aiAnalysis?.verdict} ({match.aiAnalysis?.confidence}%)</span>
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {new Date(match.startTime * 1000).toLocaleString()} |
+                                                        Avg Goals: {match.stats?.leagueAvgGoals?.toFixed(2)}
+                                                    </div>
+                                                    <div className="text-xs text-green-400 italic">
+                                                        🤖 AI: {match.aiAnalysis?.reason}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </Card>
+                            ))}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
                         {/* System Logs */}
                         <Card hover={false} className="p-0 overflow-hidden flex flex-col h-[500px]">
