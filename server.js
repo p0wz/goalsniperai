@@ -109,7 +109,7 @@ const log = {
 // ⚙️ Configuration
 // ============================================
 const PORT = process.env.PORT || 3000;
-const POLL_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const POLL_INTERVAL = 3 * 60 * 1000; // 3 minutes
 
 // Validate required environment variables
 if (!process.env.RAPIDAPI_KEY) {
@@ -709,7 +709,7 @@ app.get('/profile', (req, res) => {
 // ⏰ Auto-Poll System
 // ============================================
 function startAutoPolling() {
-    log.success('Auto-poll started (every 10 minutes)');
+    log.success('Auto-poll started (every 3 minutes)');
 
     setInterval(async () => {
         const now = new Date();
