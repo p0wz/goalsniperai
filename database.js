@@ -7,7 +7,13 @@ const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
 
 // Config
-const url = process.env.TURSO_DATABASE_URL || 'file:local.db';
+// Force HTTP mode to prevent 400 errors if user accidentally used libsql://
+let url = process.env.TURSO_DATABASE_URL || 'file:local.db';
+if (url.startsWith('libsql://')) {
+    url = url.replace('libsql://', 'https://');
+    console.log('[DB Config] Auto-corrected URL scheme from libsql:// to https://');
+}
+
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
 const db = createClient({
