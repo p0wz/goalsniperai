@@ -407,10 +407,11 @@ function analyzeLateGameMomentum(match, elapsed, stats) {
     const totalSoT = (stats?.shotsOnTarget?.home || 0) + (stats?.shotsOnTarget?.away || 0);
     const totalxG = (stats?.xG?.home || 0) + (stats?.xG?.away || 0);
     const totalDA = (stats?.dangerousAttacks?.home || 0) + (stats?.dangerousAttacks?.away || 0);
+    const totalCorners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
     const daPerMin = elapsed > 0 ? totalDA / elapsed : 0;
 
-    // Trigger: DA/min > 0.9 OR Total Shots > 13
-    if (daPerMin <= 0.9 && totalShots <= 13) {
+    // Trigger (Gevşetilmiş Mod): Shots >= 10 AND DA/min >= 0.8 AND Corners >= 3
+    if (totalShots < 10 || daPerMin < 0.8 || totalCorners < 3) {
         return null;
     }
 
@@ -443,7 +444,7 @@ function analyzeLateGameMomentum(match, elapsed, stats) {
         stats: {
             shots: totalShots,
             shots_on_target: totalSoT,
-            corners: (stats?.corners?.home || 0) + (stats?.corners?.away || 0),
+            corners: totalCorners,
             dangerous_attacks: totalDA,
             da_per_min: daPerMin.toFixed(2),
             xG: totalxG.toFixed(2),
