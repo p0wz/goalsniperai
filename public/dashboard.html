@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | GoalGPT</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- DOMPurify for XSS protection -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --dark: #0c0c0c;
+            --gray-900: #141414;
+            --gray-800: #1a1a1a;
+            --gray-700: #262626;
+            --gray-600: #404040;
+            --gray-500: #5c5c5c;
+            --gray-400: #8c8c8c;
+            --gray-300: #b3b3b3;
+            --white: #ffffff;
+            --lime: #c6f135;
+            --lime-dark: #a8d42e;
+            --blue: #3b82f6;
+            --orange: #f97316;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--dark);
+            color: var(--white);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        /* Page transition */
+        .page-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+
+        .page-transition.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader-ring {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--gray-800);
+            border-top-color: var(--lime);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 240px;
+            background: var(--gray-900);
+            border-right: 1px solid var(--gray-800);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            animation: slideInLeft 0.5s ease;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--white);
+            text-decoration: none;
+            margin-bottom: 40px;
+            transition: transform 0.3s;
+        }
+
+        .sidebar-brand:hover {
+            transform: scale(1.02);
+        }
+
+        .sidebar-brand-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--lime);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(198, 241, 53, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(198, 241, 53, 0);
+            }
+        }
+
+        .sidebar-nav {
+            flex: 1;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--gray-400);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--lime);
+            transform: scaleY(0);
+            transition: transform 0.3s;
+        }
+
+        .sidebar-link:hover {
+            color: var(--white);
+            background: var(--gray-800);
+        }
+
+        .sidebar-link:hover::before {
+            transform: scaleY(1);
+        }
+
+        .sidebar-link.active {
+            color: var(--lime);
+            background: rgba(198, 241, 53, 0.1);
+        }
+
+        .sidebar-link.active::before {
+            transform: scaleY(1);
+        }
+
+        .sidebar-user {
+            padding: 16px;
+            background: var(--gray-800);
+            border-radius: 12px;
+            border: 1px solid var(--gray-700);
+            animation: fadeIn 0.5s ease 0.3s backwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .sidebar-user-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .sidebar-user-plan {
+            font-size: 12px;
+            color: var(--lime);
+            text-transform: uppercase;
+            display: inline-block;
+            animation: glow 2s infinite;
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                text-shadow: 0 0 5px rgba(198, 241, 53, 0.3);
+            }
+
+            50% {
+                text-shadow: 0 0 15px rgba(198, 241, 53, 0.6);
+            }
+        }
+
+        .sidebar-logout {
+            margin-top: 12px;
+            padding: 8px;
+            background: transparent;
+            border: 1px solid var(--gray-700);
+            border-radius: 6px;
+            color: var(--gray-400);
+            font-size: 13px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .sidebar-logout:hover {
+            border-color: var(--gray-500);
+            color: var(--white);
+        }
+
+        /* Main */
+        .main {
+            margin-left: 240px;
+            padding: 32px 40px;
+            max-width: 1200px;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 28px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            border: none;
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: var(--lime);
+            color: var(--black);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(198, 241, 53, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--gray-900);
+            border: 1px solid var(--gray-800);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+            animation: fadeIn 0.5s ease backwards;
+        }
+
+        .stat-card:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .stat-card:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .stat-card:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .stat-card:nth-child(4) {
+            animation-delay: 0.25s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--gray-600);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .stat-value.accent {
+            color: var(--lime);
+        }
+
+        /* Filter tabs */
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            background: var(--gray-900);
+            border: 1px solid var(--gray-800);
+            border-radius: 8px;
+            color: var(--gray-400);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-tab:hover {
+            border-color: var(--gray-600);
+            color: var(--white);
+        }
+
+        .filter-tab.active {
+            background: var(--lime);
+            border-color: var(--lime);
+            color: var(--black);
+            animation: bounce 0.3s ease;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Signals */
+        .signals-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .signal-card {
+            background: var(--gray-900);
+            border: 1px solid var(--gray-800);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.4s;
+            animation: slideIn 0.5s ease backwards;
+        }
+
+        .signal-card:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .signal-card:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .signal-card:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .signal-card:nth-child(4) {
+            animation-delay: 0.25s;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .signal-card:hover {
+            transform: translateY(-6px);
+            border-color: var(--gray-600);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .signal-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--gray-800);
+        }
+
+        .signal-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .signal-badge.iy {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--blue);
+        }
+
+        .signal-badge.ms {
+            background: rgba(249, 115, 22, 0.2);
+            color: var(--orange);
+        }
+
+        .signal-time {
+            font-size: 13px;
+            color: var(--gray-400);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .signal-time::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--lime);
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .signal-body {
+            padding: 20px;
+        }
+
+        .signal-teams {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .signal-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .signal-team-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--gray-800);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: transform 0.3s;
+        }
+
+        .signal-card:hover .signal-team-logo {
+            transform: scale(1.1);
+        }
+
+        .signal-team-name {
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+            max-width: 100px;
+        }
+
+        .signal-score {
+            padding: 12px 24px;
+            background: rgba(198, 241, 53, 0.1);
+            border: 1px solid rgba(198, 241, 53, 0.3);
+            border-radius: 10px;
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+
+            0%,
+            100% {
+                border-color: rgba(198, 241, 53, 0.3);
+            }
+
+            50% {
+                border-color: rgba(198, 241, 53, 0.6);
+            }
+        }
+
+        .signal-score-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--lime);
+        }
+
+        .signal-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .signal-stat {
+            text-align: center;
+            padding: 12px;
+            background: var(--gray-800);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .signal-stat:hover {
+            background: var(--gray-700);
+        }
+
+        .signal-stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--lime);
+        }
+
+        .signal-stat-label {
+            font-size: 11px;
+            color: var(--gray-500);
+            margin-top: 2px;
+        }
+
+        .signal-ai {
+            padding: 16px;
+            background: var(--gray-800);
+            border-radius: 10px;
+            border: 1px solid var(--gray-700);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .signal-ai::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(198, 241, 53, 0.05), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                left: -100%;
+            }
+
+            100% {
+                left: 100%;
+            }
+        }
+
+        .signal-ai-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .signal-ai-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--lime);
+        }
+
+        .signal-ai-verdict {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .signal-ai-verdict.play {
+            background: var(--lime);
+            color: var(--black);
+            animation: pop 0.3s ease;
+        }
+
+        .signal-ai-verdict.skip {
+            background: #ef4444;
+            color: var(--white);
+        }
+
+        @keyframes pop {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .signal-ai-reason {
+            font-size: 13px;
+            color: var(--gray-300);
+            line-height: 1.5;
+            position: relative;
+            z-index: 1;
+        }
+
+        .signal-footer {
+            padding: 12px 20px;
+            background: var(--gray-800);
+            font-size: 12px;
+            color: var(--gray-500);
+        }
+
+        /* Empty state */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 80px 20px;
+            background: var(--gray-900);
+            border: 1px dashed var(--gray-700);
+            border-radius: 16px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .empty-title {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        /* Upgrade banner */
+        .upgrade-banner {
+            background: linear-gradient(135deg, rgba(198, 241, 53, 0.1), rgba(198, 241, 53, 0.05));
+            border: 1px solid rgba(198, 241, 53, 0.2);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeIn 0.5s ease 0.3s backwards;
+        }
+
+        .upgrade-banner.hidden {
+            display: none;
+        }
+
+        .upgrade-text h3 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .upgrade-text p {
+            font-size: 13px;
+            color: var(--gray-400);
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 200px;
+                padding: 16px;
+            }
+
+            .main {
+                margin-left: 200px;
+                padding: 24px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .signals-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-transition" id="pageTransition">
+        <div class="loader-ring"></div>
+    </div>
+
+    <aside class="sidebar">
+        <a href="/" class="sidebar-brand">
+            <div class="sidebar-brand-icon">⚽</div>
+            GoalGPT
+        </a>
+
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="sidebar-link active">
+                <span>📊</span> Dashboard
+            </a>
+            <a href="/pricing" class="sidebar-link">
+                <span>💎</span> Planlar
+            </a>
+        </nav>
+
+        <div class="sidebar-user">
+            <div class="sidebar-user-name" id="userName">-</div>
+            <div class="sidebar-user-plan" id="userPlan">FREE</div>
+            <button class="sidebar-logout" onclick="logout()">Cikis yap</button>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Canli Sinyaller</h1>
+            <button class="btn btn-primary" id="scanBtn" onclick="manualScan()">
+                <span id="scanIcon">🔄</span>
+                <span id="scanText">Tara</span>
+            </button>
+        </div>
+
+        <div class="upgrade-banner hidden" id="upgradeBanner">
+            <div class="upgrade-text">
+                <h3>Pro'ya yukselt</h3>
+                <p>Sinirsiz sinyal ve tum stratejilere eris</p>
+            </div>
+            <a href="/pricing" class="btn btn-primary">Planlari gor</a>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Toplam Sinyal</div>
+                <div class="stat-value accent" id="totalSignals">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">IY 0.5 Ust</div>
+                <div class="stat-value" id="iySignals">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">MS Gol</div>
+                <div class="stat-value" id="msSignals">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">API Kota</div>
+                <div class="stat-value" id="quotaDisplay">500</div>
+            </div>
+        </div>
+
+        <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all">Tumu</button>
+            <button class="filter-tab" data-filter="IY_05">IY 0.5 Ust</button>
+            <button class="filter-tab" data-filter="MS_GOL">MS Gol</button>
+        </div>
+
+        <div class="signals-grid" id="signalsGrid">
+            <div class="empty-state">
+                <div class="empty-icon">📡</div>
+                <div class="empty-title">Sinyal bekleniyor</div>
+                <div class="empty-desc">Tarama yaparak canli sinyalleri gorebilirsiniz</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Hide page transition
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('pageTransition').classList.add('hidden');
+            }, 800);
+        });
+
+        let currentFilter = 'all';
+        let allSignals = [];
+
+        async function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) { window.location.href = '/login'; return; }
+
+            try {
+                const res = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('userName').textContent = data.user.name;
+                    document.getElementById('userPlan').textContent = data.user.plan.toUpperCase();
+                    if (data.user.plan === 'free') document.getElementById('upgradeBanner').classList.remove('hidden');
+                } else {
+                    localStorage.removeItem('token');
+                    window.location.href = '/login';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        }
+
+        async function fetchSignals() {
+            try {
+                const res = await fetch('/api/signals');
+                const data = await res.json();
+                if (data.success) {
+                    allSignals = data.data || [];
+                    document.getElementById('totalSignals').textContent = data.meta.totalSignals || 0;
+                    document.getElementById('iySignals').textContent = data.meta.iySignals || 0;
+                    document.getElementById('msSignals').textContent = data.meta.msSignals || 0;
+                    document.getElementById('quotaDisplay').textContent = data.meta.quotaRemaining || 0;
+                    renderSignals();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function manualScan() {
+            const btn = document.getElementById('scanBtn');
+            const icon = document.getElementById('scanIcon');
+            const text = document.getElementById('scanText');
+            btn.disabled = true;
+            icon.style.animation = 'spin 0.5s linear infinite';
+            text.textContent = 'Taraniyor...';
+
+            try {
+                const res = await fetch('/api/scan', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    allSignals = data.data || [];
+                    document.getElementById('totalSignals').textContent = data.meta.signalCount || 0;
+                    document.getElementById('quotaDisplay').textContent = data.meta.quotaRemaining || 0;
+                    renderSignals();
+                }
+            } catch (e) { console.error(e); }
+            finally {
+                btn.disabled = false;
+                icon.style.animation = '';
+                text.textContent = 'Tara';
+            }
+        }
+
+        function renderSignals() {
+            const grid = document.getElementById('signalsGrid');
+            const filtered = currentFilter === 'all' ? allSignals : allSignals.filter(s => s.strategyCode === currentFilter);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📡</div>
+                        <div class="empty-title">Sinyal bulunamadi</div>
+                        <div class="empty-desc">Su an kriterlere uyan mac yok</div>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map((s, i) => `
+                <div class="signal-card" style="animation-delay: ${i * 0.05}s">
+                    <div class="signal-header">
+                        <span class="signal-badge ${s.strategyCode === 'IY_05' ? 'iy' : 'ms'}">${s.strategy}</span>
+                        <span class="signal-time">${s.elapsed}'</span>
+                    </div>
+                    <div class="signal-body">
+                        <div class="signal-teams">
+                            <div class="signal-team">
+                                <div class="signal-team-logo">⚽</div>
+                                <div class="signal-team-name">${s.home}</div>
+                            </div>
+                            <div class="signal-score">
+                                <div class="signal-score-value">${s.score}</div>
+                            </div>
+                            <div class="signal-team">
+                                <div class="signal-team-logo">⚽</div>
+                                <div class="signal-team-name">${s.away}</div>
+                            </div>
+                        </div>
+                        <div class="signal-stats">
+                            <div class="signal-stat">
+                                <div class="signal-stat-value">${s.stats?.shots || 0}</div>
+                                <div class="signal-stat-label">Sut</div>
+                            </div>
+                            <div class="signal-stat">
+                                <div class="signal-stat-value">${s.stats?.xG || '0.00'}</div>
+                                <div class="signal-stat-label">xG</div>
+                            </div>
+                            <div class="signal-stat">
+                                <div class="signal-stat-value">${s.stats?.corners || 0}</div>
+                                <div class="signal-stat-label">Korner</div>
+                            </div>
+                        </div>
+                        <div class="signal-ai">
+                            <div class="signal-ai-header">
+                                <span class="signal-ai-label">GEMINI AI</span>
+                                <span class="signal-ai-verdict ${s.verdict === 'PLAY' ? 'play' : 'skip'}">${s.verdict}</span>
+                            </div>
+                            <p class="signal-ai-reason">${DOMPurify.sanitize(s.geminiReason || s.reason || 'Analiz tamamlandi')}</p>
+                        </div>
+                    </div>
+                    <div class="signal-footer">${s.league}</div>
+                </div>
+            `).join('');
+        }
+
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentFilter = tab.dataset.filter;
+                renderSignals();
+            });
+        });
+
+        checkAuth();
+        fetchSignals();
+        setInterval(fetchSignals, 30000);
+    </script>
+</body>
+
+</html>

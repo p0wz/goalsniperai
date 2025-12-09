@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kayit | GoalGPT</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --dark: #0c0c0c;
+            --gray-900: #141414;
+            --gray-800: #1a1a1a;
+            --gray-700: #262626;
+            --gray-600: #404040;
+            --gray-500: #5c5c5c;
+            --gray-400: #8c8c8c;
+            --gray-300: #b3b3b3;
+            --white: #ffffff;
+            --lime: #c6f135;
+            --lime-dark: #a8d42e;
+            --red: #ef4444;
+            --green: #22c55e;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--dark);
+            color: var(--white);
+            min-height: 100vh;
+            display: flex;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .auth-container {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        .auth-left {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+        }
+
+        .auth-right {
+            flex: 1;
+            background: var(--gray-900);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 80px;
+            border-left: 1px solid var(--gray-800);
+        }
+
+        .auth-form-wrapper {
+            max-width: 360px;
+            width: 100%;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--white);
+            text-decoration: none;
+            margin-bottom: 48px;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--lime);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .auth-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .auth-subtitle {
+            color: var(--gray-400);
+            font-size: 15px;
+            margin-bottom: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-300);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--gray-800);
+            border: 1px solid var(--gray-700);
+            border-radius: 8px;
+            font-size: 15px;
+            color: var(--white);
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--lime);
+        }
+
+        .form-input::placeholder {
+            color: var(--gray-500);
+        }
+
+        .password-strength {
+            height: 3px;
+            background: var(--gray-700);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0;
+            border-radius: 2px;
+            transition: all 0.3s;
+        }
+
+        .strength-weak {
+            width: 33%;
+            background: var(--red);
+        }
+
+        .strength-medium {
+            width: 66%;
+            background: #f59e0b;
+        }
+
+        .strength-strong {
+            width: 100%;
+            background: var(--green);
+        }
+
+        .error-box,
+        .success-box {
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-box {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--red);
+        }
+
+        .success-box {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: var(--green);
+        }
+
+        .error-box.show,
+        .success-box.show {
+            display: block;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--lime);
+            color: var(--black);
+        }
+
+        .btn-primary:hover {
+            background: var(--lime-dark);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .auth-footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--gray-400);
+        }
+
+        .auth-footer a {
+            color: var(--lime);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        /* Left side */
+        .promo {
+            max-width: 480px;
+        }
+
+        .promo-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--gray-800);
+            border: 1px solid var(--gray-700);
+            border-radius: 100px;
+            font-size: 13px;
+            color: var(--gray-300);
+            margin-bottom: 24px;
+        }
+
+        .promo-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 48px;
+            font-weight: 600;
+            line-height: 1.1;
+            margin-bottom: 16px;
+        }
+
+        .promo-title span {
+            color: var(--lime);
+        }
+
+        .promo-desc {
+            font-size: 16px;
+            color: var(--gray-400);
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        .features-list {
+            list-style: none;
+        }
+
+        .features-list li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            font-size: 15px;
+            color: var(--gray-300);
+        }
+
+        .features-list li::before {
+            content: '';
+            width: 20px;
+            height: 20px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c6f135'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E") center/contain no-repeat;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--gray-600);
+            border-top-color: var(--black);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .auth-left {
+                display: none;
+            }
+
+            .auth-right {
+                flex: 1;
+                border-left: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .auth-right {
+                padding: 40px 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="promo">
+                <div class="promo-tag">Ucretsiz hesap olusturun</div>
+                <h1 class="promo-title">Profesyonel analize <span>simdi baslayin</span></h1>
+                <p class="promo-desc">Kredi karti gerektirmez. Istediginiz zaman iptal edebilirsiniz.</p>
+                <ul class="features-list">
+                    <li>Gunluk 3 ucretsiz sinyal</li>
+                    <li>Canli mac istatistikleri</li>
+                    <li>IY 0.5 Ust stratejisi</li>
+                    <li>Temel analiz araclari</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="auth-right">
+            <div class="auth-form-wrapper">
+                <a href="/" class="brand">
+                    <div class="brand-icon">⚽</div>
+                    GoalGPT
+                </a>
+
+                <h2 class="auth-title">Hesap olustur</h2>
+                <p class="auth-subtitle">Ucretsiz hesabinizi olusturun</p>
+
+                <div class="error-box" id="errorBox"></div>
+                <div class="success-box" id="successBox"></div>
+
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label class="form-label" for="name">Ad Soyad</label>
+                        <input type="text" id="name" class="form-input" placeholder="Adiniz Soyadiniz" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="email">E-posta</label>
+                        <input type="email" id="email" class="form-input" placeholder="ornek@email.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">Sifre</label>
+                        <input type="password" id="password" class="form-input" placeholder="En az 6 karakter" required
+                            minlength="6">
+                        <div class="password-strength">
+                            <div class="password-strength-bar" id="strengthBar"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <span id="btnText">Kayit ol</span>
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    Zaten hesabiniz var mi? <a href="/login">Giris yapin</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const errorBox = document.getElementById('errorBox');
+        const successBox = document.getElementById('successBox');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const passwordInput = document.getElementById('password');
+        const strengthBar = document.getElementById('strengthBar');
+
+        passwordInput.addEventListener('input', (e) => {
+            const pwd = e.target.value;
+            strengthBar.className = 'password-strength-bar';
+
+            if (pwd.length >= 8 && /[A-Z]/.test(pwd) && /[0-9]/.test(pwd)) {
+                strengthBar.classList.add('strength-strong');
+            } else if (pwd.length >= 6) {
+                strengthBar.classList.add('strength-medium');
+            } else if (pwd.length > 0) {
+                strengthBar.classList.add('strength-weak');
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorBox.classList.remove('show');
+            successBox.classList.remove('show');
+
+            submitBtn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span>Kaydediliyor...';
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('name').value,
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password').value
+                    }),
+                    credentials: 'include'
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    successBox.textContent = 'Hesabiniz olusturuldu. Yonlendiriliyorsunuz...';
+                    successBox.classList.add('show');
+                    setTimeout(() => window.location.href = '/dashboard', 1500);
+                } else {
+                    errorBox.textContent = data.error || 'Kayit basarisiz';
+                    errorBox.classList.add('show');
+                }
+            } catch (err) {
+                errorBox.textContent = 'Baglanti hatasi';
+                errorBox.classList.add('show');
+            } finally {
+                submitBtn.disabled = false;
+                btnText.textContent = 'Kayit ol';
+            }
+        });
+    </script>
+</body>
+
+</html>
