@@ -56,18 +56,32 @@ async function fetchTodaysFixtures(log = console) {
                 log.info(`[DailyAnalyst] Preview: ${JSON.stringify(data).slice(0, 300)}`);
             }
 
-            const parsed = [];
-            const list = data.DATA || data;
+            // PARSING STRATEGY:
+            // The API returns an Array of Tournaments directly.
+            // Structure: [ { name: "League", matches: [ { match_id: "...", home_team: { name: "..." } } ] } ]
 
-            if (Array.isArray(list)) {
-                list.forEach(item => {
-                    if (item.EVENTS && Array.isArray(item.EVENTS)) {
-                        item.EVENTS.forEach(event => {
-                            parsed.push({ ...event, league_name: item.NAME });
+            const parsed = [];
+
+            // Handle if data is array or object-array
+            const list = Array.isArray(data) ? data : Object.values(data);
+
+            list.forEach(tournament => {
+                if (tournament.matches && Array.isArray(tournament.matches)) {
+                    tournament.matches.forEach(match => {
+                        // Map API fields to our internal format
+                        parsed.push({
+                            event_key: match.match_id,
+                            match_id: match.match_id, // duplicate for safety
+                            event_start_time: match.timestamp,
+                            event_home_team: match.home_team?.name || 'Unknown Home',
+                            event_away_team: match.away_team?.name || 'Unknown Away',
+                            league_name: tournament.name || 'Unknown League'
                         });
-                    }
-                });
-            }
+                    });
+                }
+            });
+
+            log.info(`[DailyAnalyst] Parsed ${parsed.length} matches from Day ${day}.`);
             return parsed;
         } catch (e) {
             log.error(`[DailyAnalyst] Failed to fetch day ${day}: ${e.message}`);
