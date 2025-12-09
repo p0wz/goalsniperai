@@ -107,9 +107,16 @@ async function fetchMatchH2H(matchId) {
         const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`, {
             headers: FLASHSCORE_API.headers
         });
+
+        // DEBUG first H2H response
+        if (Math.random() < 0.05) { // Log occasional H2H structure
+            console.log(`[DailyAnalyst] H2H Structure for ${matchId}:`, Object.keys(response.data));
+            if (Array.isArray(response.data)) console.log('[DailyAnalyst] H2H is Array');
+        }
+
         return response.data;
     } catch (error) {
-        return null;
+        return null; // Silent fail (continue loop)
     }
 }
 
