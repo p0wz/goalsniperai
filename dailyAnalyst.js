@@ -38,37 +38,50 @@ async function fetchWithRetry(url, options, retries = 5, delay = 2000) {
 
 // 1. Data Fetching - Today's Schedule
 async function fetchTodaysFixtures(log = console) {
-    try {
-        log.info('[DailyAnalyst] Fetching schedule from /match/list/1/0 ...');
-        // Use fetchWithRetry instead of plain axios.get
-        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/1/0`, {
-            headers: FLASHSCORE_API.headers
-        });
+    let matches = [];
 
-        const data = response.data;
-        // Debug Log to help user
-        // log.info(`[DailyAnalyst] API Response Keys: ${Object.keys(data)}`);
-
-        // Flashscore4 'match/list' structure handling
-        const matches = [];
-        const list = data.DATA || data;
-
-        if (Array.isArray(list)) {
-            list.forEach(item => {
-                // Item might be a Tournament object with EVENTS
-                if (item.EVENTS && Array.isArray(item.EVENTS)) {
-                    item.EVENTS.forEach(event => {
-                        matches.push({ ...event, league_name: item.NAME });
-                    });
-                }
+    // Helper to fetch/parse a specific day
+    const fetchDay = async (day) => {
+        try {
+            log.info(`[DailyAnalyst] Fetching day ${day}...`);
+            const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/${day}/0`, {
+                headers: FLASHSCORE_API.headers
             });
-        }
+            const data = response.data;
 
-        return matches;
-    } catch (error) {
-        log.error(`[DailyAnalyst] Fetch Schedule Error: ${error.message}`);
-        return [];
+            // Debug Log structure
+            // log.info(`[DailyAnalyst] Day ${day} Keys: ${Object.keys(data).join(', ')}`);
+            if (data.DATA) log.info(`[DailyAnalyst] Day ${day} DATA length: ${data.DATA.length}`);
+
+            const parsed = [];
+            const list = data.DATA || data;
+
+            if (Array.isArray(list)) {
+                list.forEach(item => {
+                    if (item.EVENTS && Array.isArray(item.EVENTS)) {
+                        item.EVENTS.forEach(event => {
+                            parsed.push({ ...event, league_name: item.NAME });
+                        });
+                    }
+                });
+            }
+            return parsed;
+        } catch (e) {
+            log.error(`[DailyAnalyst] Failed to fetch day ${day}: ${e.message}`);
+            return [];
+        }
+    };
+
+    // Try Day 1 (User provided default)
+    matches = await fetchDay(1);
+
+    // Fallback to Day 0 (Today) if Day 1 (Tomorrow?) is empty or failed
+    if (matches.length === 0) {
+        log.warn('[DailyAnalyst] Day 1 returned 0 matches. Trying Day 0 (Today)...');
+        matches = await fetchDay(0);
     }
+
+    return matches;
 }
 
 // 2. Fetch H2H & Form for Stats
