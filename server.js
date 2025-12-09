@@ -24,6 +24,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { runDailyAnalysis } = require('./dailyAnalyst');
+const betTracker = require('./betTracker');
 
 const app = express();
 
@@ -642,6 +643,15 @@ app.post('/api/scan', async (req, res) => {
     }
 });
 
+res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/performance', (req, res) => {
+    const stats = betTracker.getPerformanceStats();
+    res.json({ success: true, data: stats });
+});
+
 // ============================================
 // 📈 Daily Pre-Match Analyst Endpoint
 // ============================================
@@ -808,5 +818,7 @@ app.listen(PORT, async () => {
     log.info(`Security: Helmet + Rate Limiting enabled`);
     log.success(`Server running on http://localhost:${PORT}`);
 
+    // Start Services
     startAutoPolling();
+    betTracker.startTracking();
 });

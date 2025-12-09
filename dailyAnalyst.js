@@ -4,6 +4,7 @@
  */
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const betTracker = require('./betTracker');
 require('dotenv').config();
 
 // Config
@@ -358,6 +359,14 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
             log.info(`[DailyAnalyst] Asking Gemini: ${match.event_home_team} vs ${match.event_away_team}`);
             const aiRes = await validateWithGemini(match);
             if (aiRes.verdict === 'PLAY') {
+
+                // Record Bet for Tracking
+                betTracker.recordBet({
+                    match_id: match.event_key || match.match_id,
+                    home_team: match.event_home_team,
+                    away_team: match.event_away_team
+                }, match.market, cat, aiRes.confidence);
+
                 results[cat].push({
                     match: `${match.event_home_team} vs ${match.event_away_team}`,
                     startTime: match.event_start_time,
