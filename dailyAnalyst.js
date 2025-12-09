@@ -117,6 +117,7 @@ function calculateAdvancedStats(history, teamName) {
     let goalsScored = 0;
     let goalsConceded = 0;
     let over15Count = 0;
+    let under35Count = 0;
     let bttsCount = 0;
     let cleanSheetCount = 0;
     let failedToScoreCount = 0;
@@ -150,6 +151,7 @@ function calculateAdvancedStats(history, teamName) {
         goalsConceded += oppScore;
 
         if (total > 1.5) over15Count++;
+        if (total <= 3.5) under35Count++;
         if (s1 > 0 && s2 > 0) bttsCount++;
         if (oppScore === 0) cleanSheetCount++;
         if (myScore === 0) failedToScoreCount++;
@@ -167,6 +169,7 @@ function calculateAdvancedStats(history, teamName) {
         avgScored: goalsScored / totalMatches,
         avgConceded: goalsConceded / totalMatches,
         over15Rate: (over15Count / totalMatches) * 100,
+        under35Rate: (under35Count / totalMatches) * 100,
         bttsRate: (bttsCount / totalMatches) * 100,
         scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
         winRate: (wins / totalMatches) * 100,
@@ -180,7 +183,8 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         over15: [],
         btts: [],
         doubleChance: [], // 1X
-        homeOver15: []
+        homeOver15: [],
+        under35: [] // NEW: Sigorta Bahsi
     };
 
     console.log(`[DailyAnalyst] Processing top ${limit} matches...`);
@@ -219,9 +223,15 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team)
         ).slice(0, 5); // Last 5 for Form
 
-        // 2. Venue Specific History (For Stats) - Use more history for better averages
+        // 2. Venue Specific History (For Stats)
         const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
         const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
+
+        // 3. Mutual H2H (Last 3)
+        const mutualH2H = sections.filter(x =>
+            (x.home_team?.name === m.event_home_team && x.away_team?.name === m.event_away_team) ||
+            (x.home_team?.name === m.event_away_team && x.away_team?.name === m.event_home_team)
+        ).slice(0, 3);
 
         // Calc Stats
         const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
@@ -230,8 +240,7 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
 
         if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
-            // Not enough data to judge
-            consecutiveErrors = 0; // It's not an API error, just data lack
+            consecutiveErrors = 0;
             continue;
         }
 
@@ -239,40 +248,48 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         processed++;
 
         const stats = {
-            homeForm, awayForm, homeHomeStats, awayAwayStats
+            homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H
         };
 
         // --- STRATEGY A: Over 1.5 Goals (Garanti) ---
-        // 1. League Avg > 2.5 (Proxy: Combined Avg of both teams > 2.5)
         const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
-        // 2. Form: 3 of last 5 matches > 1.5 Goals (60%)
         if (proxyLeagueAvg >= 2.5 && homeForm.over15Rate >= 60 && awayForm.over15Rate >= 60) {
             candidates.over15.push({ ...m, filterStats: stats, market: 'Over 1.5 Goals' });
         }
 
         // --- STRATEGY B: BTTS (Gol Soleni) ---
-        // 1. Home at Home scoring rate >= 70%
-        // 2. Away at Away scoring rate >= 65%
         if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
             candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
         }
 
         // --- STRATEGY C: 1X Double Chance (Kale) ---
-        // 1. Home at Home Loss Count <= 2
-        // 2. Away at Away Win Rate < 35%
         if (homeHomeStats.lossCount <= 2 && awayAwayStats.winRate < 35) {
             candidates.doubleChance.push({ ...m, filterStats: stats, market: '1X Double Chance' });
         }
 
         // --- STRATEGY D: Home Over 1.5 (Pro Value) ---
-        // 1. Home at Home Avg Scored >= 1.4
-        // 2. Away at Away Avg Conceded >= 1.2
         if (homeHomeStats.avgScored >= 1.4 && awayAwayStats.avgConceded >= 1.2) {
             candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
         }
+
+        // --- STRATEGY E: Under 3.5 Goals (Sigorta) ---
+        // 1. League Avg < 2.4
+        // 2. Both teams 80% Under 3.5 in last 5
+        // 3. Mutual H2H: No match > 4 goals
+        let h2hSafe = true;
+        if (mutualH2H.length > 0) {
+            h2hSafe = mutualH2H.every(g => {
+                const t = parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0);
+                return t <= 4; // "Hiç 4'ü geçmemiş" -> Max 4 allowed
+            });
+        }
+
+        if (proxyLeagueAvg < 2.4 && homeForm.under35Rate >= 80 && awayForm.under35Rate >= 80 && h2hSafe) {
+            candidates.under35.push({ ...m, filterStats: stats, market: 'Under 3.5 Goals' });
+        }
     }
 
-    log.info(`[DailyAnalyst] Filtered ${processed} matches (Limit: ${limit}). O1.5:${candidates.over15.length}, BTTS:${candidates.btts.length}, 1X:${candidates.doubleChance.length}, H1.5:${candidates.homeOver15.length}`);
+    log.info(`[DailyAnalyst] Filtered ${processed} matches (Limit: ${limit}). O1.5:${candidates.over15.length}, BTTS:${candidates.btts.length}, 1X:${candidates.doubleChance.length}, H1.5:${candidates.homeOver15.length}, U3.5:${candidates.under35.length}`);
 
     return candidates;
 }
@@ -316,7 +333,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     // Fallback: If 0 matches, maybe day '1' is tomorrow and today is empty?
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { over15: [], btts: [], doubleChance: [], homeOver15: [] };
+        return { over15: [], btts: [], doubleChance: [], homeOver15: [], under35: [] };
     }
 
     log.info(`[DailyAnalyst] Found ${matches.length} raw fixtures. Processing top ${customLimit}...`);
@@ -328,7 +345,8 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
         over15: [],
         btts: [],
         doubleChance: [],
-        homeOver15: []
+        homeOver15: [],
+        under35: []
     };
 
     // 3. AI Validate (Limit to top 3 per category)
