@@ -201,8 +201,12 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             console.log('[DailyAnalyst] H2H Sample Section:', JSON.stringify(sections[0] || "Empty").slice(0, 200));
         }
 
-        const homeHistory = sections.find(d => d.GROUPS_LABEL?.includes('Home'))?.ROWS || [];
-        const awayHistory = sections.find(d => d.GROUPS_LABEL?.includes('Away'))?.ROWS || [];
+        const homeHistory = sections.filter(x =>
+            (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team)
+        );
+        const awayHistory = sections.filter(x =>
+            (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team)
+        );
 
         const homeStats = calculateFormStats(homeHistory, '1');
         const awayStats = calculateFormStats(awayHistory, '2');
