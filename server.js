@@ -140,7 +140,7 @@ let CACHED_DATA = {
 
 let PREVIOUS_SNAPSHOT = {};
 let dailyRequestCount = 0;
-const DAILY_LIMIT = 500;
+const DAILY_LIMIT = 1000;
 
 // ============================================
 // 🕐 Parse Match Time

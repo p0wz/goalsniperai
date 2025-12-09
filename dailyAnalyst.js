@@ -16,7 +16,7 @@ const FLASHSCORE_API = {
 };
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MATCH_LIMIT = 15; // Limit analysis to 15 matches to respect API rate limits
+const MATCH_LIMIT = 40; // Increased limit for 1000 req/day plan
 
 // 1. Data Fetching - Today's Schedule
 async function fetchTodaysFixtures() {
