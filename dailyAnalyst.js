@@ -328,12 +328,17 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
             );
             let text = response.data?.choices?.[0]?.message?.content || '{}';
 
+            // Log raw response
+            console.log(`[Groq Raw] ${text.substring(0, 200)}...`);
+
             // Clean up markdown formatting from Groq response
             text = text.trim();
             if (text.startsWith('```json')) text = text.slice(7);
             if (text.startsWith('```')) text = text.slice(3);
             if (text.endsWith('```')) text = text.slice(0, -3);
             text = text.trim();
+
+            console.log(`[Groq Clean] ${text}`);
 
             return JSON.parse(text);
         } catch (e) {

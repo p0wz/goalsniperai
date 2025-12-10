@@ -516,7 +516,7 @@ OUTPUT STRICTLY AS JSON:
                 }
             );
             text = response.data?.choices?.[0]?.message?.content || '{}';
-            log.info(`[Groq] Response received`);
+            log.info(`[Groq Raw] ${text.substring(0, 200)}...`);
 
             // Clean up markdown formatting
             text = text.trim();
@@ -524,6 +524,7 @@ OUTPUT STRICTLY AS JSON:
             if (text.startsWith('```')) text = text.slice(3);
             if (text.endsWith('```')) text = text.slice(0, -3);
             text = text.trim();
+            log.info(`[Groq Clean] ${text}`);
 
             // Try to extract JSON from response using regex (handles partial/malformed responses)
             let result;
