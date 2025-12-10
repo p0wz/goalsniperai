@@ -22,6 +22,14 @@ export default function Dashboard() {
             fetchDailySignals();
         }
         init();
+
+        // Auto-refresh live signals every 30 seconds
+        const intervalId = setInterval(() => {
+            fetchSignals();
+        }, 30000);
+
+        // Cleanup interval on unmount
+        return () => clearInterval(intervalId);
     }, []);
 
     const checkAuth = async () => {

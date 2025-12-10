@@ -970,6 +970,9 @@ async function processMatches() {
             candidate.id = `${matchId}_${candidate.strategyCode}`;
             log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
             signals.push(candidate);
+
+            // Auto-approve live signals (no admin approval needed)
+            APPROVED_IDS.add(candidate.id);
         } else {
             log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
         }
