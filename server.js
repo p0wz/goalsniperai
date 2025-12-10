@@ -128,7 +128,6 @@ const FLASHSCORE_API = {
 };
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY || '';
 
 // ============================================
 // 💾 Cache & State
@@ -607,57 +606,20 @@ OUTPUT STRICTLY AS JSON:
             const isOverloaded = status === 503 || error.message?.includes('overloaded');
             const isRateLimited = status === 429 || error.message?.includes('429') || error.message?.includes('quota');
 
-            // Try Together AI as fallback for rate limits
-            if (isRateLimited && TOGETHER_API_KEY) {
-                log.warn(`[Groq] Rate limited, trying Together AI fallback...`);
-                try {
-                    const togetherRes = await axios.post(
-                        'https://api.together.xyz/v1/chat/completions',
-                        {
-                            model: 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo',
-                            messages: [{ role: 'user', content: prompt }],
-                            temperature: 0.2,
-                            max_tokens: 200
-                        },
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${TOGETHER_API_KEY}`,
-                                'Content-Type': 'application/json'
-                            },
-                            timeout: 15000
-                        }
-                    );
-                    let togetherText = togetherRes.data?.choices?.[0]?.message?.content || '{}';
-                    log.info(`[Together Raw] ${togetherText.substring(0, 200)}...`);
-
-                    // Clean markdown
-                    togetherText = togetherText.trim();
-                    if (togetherText.startsWith('```json')) togetherText = togetherText.slice(7);
-                    if (togetherText.startsWith('```')) togetherText = togetherText.slice(3);
-                    if (togetherText.endsWith('```')) togetherText = togetherText.slice(0, -3);
-                    togetherText = togetherText.trim();
-
-                    const togetherResult = JSON.parse(togetherText);
-                    log.info(`[Together] ${candidate.home} vs ${candidate.away}: ${togetherResult.verdict}`);
-                    return togetherResult;
-                } catch (togetherErr) {
-                    log.error(`[Together] Error: ${togetherErr.message}`);
-                }
-            }
-
             if ((isOverloaded || isRateLimited) && attempt < MAX_RETRIES) {
+                // Longer delays for rate limit (5s, 10s, 15s)
                 const delay = isRateLimited ? attempt * 5000 : attempt * 2000;
                 const errType = isRateLimited ? '429 Rate Limit' : '503 Overloaded';
-                log.warn(`[Groq] ${errType} - Retrying in ${delay / 1000}s (${attempt}/${MAX_RETRIES})...`);
+                log.warn(`[Gemini] ${errType} - Retrying in ${delay / 1000}s (${attempt}/${MAX_RETRIES})...`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
             }
-            log.error(`AI API error: ${error.message}`);
+            log.error(`Gemini API error: ${error.message}`);
             // On error, use local analysis with high confidence if candidate has good stats
             return {
                 verdict: candidate.confidencePercent >= 65 ? 'PLAY' : 'SKIP',
                 confidence: candidate.confidencePercent,
-                reason: 'AI unavailable, using local analysis'
+                reason: 'Gemini unavailable, using local analysis'
             };
         }
     }

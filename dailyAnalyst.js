@@ -290,9 +290,8 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation with Retry (Groq + Together AI Fallback)
+// 4. AI Validation with Retry (Groq Llama 3.1 70B)
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY || '';
 
 async function validateWithAI(match, retries = 3) {
     if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
@@ -345,41 +344,6 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
         } catch (e) {
             const isRateLimited = e.message?.includes('429') || e.message?.includes('quota');
             const isOverloaded = e.message?.includes('503') || e.message?.includes('overloaded');
-
-            // Try Together AI as fallback for rate limits
-            if (isRateLimited && TOGETHER_API_KEY) {
-                console.log(`[Groq] Rate limited, trying Together AI fallback...`);
-                try {
-                    const togetherRes = await axios.post(
-                        'https://api.together.xyz/v1/chat/completions',
-                        {
-                            model: 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo',
-                            messages: [{ role: 'user', content: prompt }],
-                            temperature: 0.2,
-                            max_tokens: 200
-                        },
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${TOGETHER_API_KEY}`,
-                                'Content-Type': 'application/json'
-                            },
-                            timeout: 15000
-                        }
-                    );
-                    let togetherText = togetherRes.data?.choices?.[0]?.message?.content || '{}';
-                    console.log(`[Together Raw] ${togetherText.substring(0, 200)}...`);
-
-                    togetherText = togetherText.trim();
-                    if (togetherText.startsWith('```json')) togetherText = togetherText.slice(7);
-                    if (togetherText.startsWith('```')) togetherText = togetherText.slice(3);
-                    if (togetherText.endsWith('```')) togetherText = togetherText.slice(0, -3);
-                    togetherText = togetherText.trim();
-
-                    return JSON.parse(togetherText);
-                } catch (togetherErr) {
-                    console.error(`[Together] Error: ${togetherErr.message}`);
-                }
-            }
 
             if ((isRateLimited || isOverloaded) && attempt < retries) {
                 const delay = attempt * 2000;
