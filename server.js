@@ -781,6 +781,62 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
     }
 });
 
+// ============================================
+// 📡 SSE Streaming Endpoint for Live Analysis
+// ============================================
+app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'pro') {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    const limit = parseInt(req.query.limit) || 50;
+
+    // Custom logger that streams to client
+    const streamLog = {
+        info: (msg) => {
+            res.write(`data: ${JSON.stringify({ type: 'info', message: msg, time: new Date().toISOString() })}\n\n`);
+        },
+        warn: (msg) => {
+            res.write(`data: ${JSON.stringify({ type: 'warn', message: msg, time: new Date().toISOString() })}\n\n`);
+        },
+        error: (msg) => {
+            res.write(`data: ${JSON.stringify({ type: 'error', message: msg, time: new Date().toISOString() })}\n\n`);
+        },
+        success: (msg) => {
+            res.write(`data: ${JSON.stringify({ type: 'success', message: msg, time: new Date().toISOString() })}\n\n`);
+        },
+        progress: (current, total, match) => {
+            res.write(`data: ${JSON.stringify({ type: 'progress', current, total, match, percent: Math.round((current / total) * 100) })}\n\n`);
+        }
+    };
+
+    try {
+        streamLog.info(`🚀 Analiz başlıyor (Limit: ${limit} maç)...`);
+
+        const results = await runDailyAnalysis(streamLog, limit);
+
+        // Update cache
+        const today = new Date().toISOString().split('T')[0];
+        DAILY_ANALYSIS_CACHE = results;
+        DAILY_ANALYSIS_TIMESTAMP = today;
+
+        streamLog.success(`✅ Analiz tamamlandı! ${Object.values(results).flat().length} sinyal bulundu.`);
+        res.write(`data: ${JSON.stringify({ type: 'done', results })}\n\n`);
+    } catch (error) {
+        streamLog.error(`❌ Hata: ${error.message}`);
+        res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    } finally {
+        res.end();
+    }
+});
+
 app.post('/api/admin/approve/:id', requireAuth, (req, res) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ success: false, error: 'Admin access required' });

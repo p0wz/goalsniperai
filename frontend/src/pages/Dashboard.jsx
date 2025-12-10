@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, StatusBadge } from '../components/ui';
+import AnalysisTerminal from '../components/AnalysisTerminal';
 
 export default function Dashboard() {
     const [user, setUser] = useState(null);
@@ -156,15 +157,19 @@ export default function Dashboard() {
                     {/* DAILY TAB */}
                     {activeTab === 'daily' && (
                         <div className="space-y-8">
+                            {/* Analysis Terminal */}
+                            <AnalysisTerminal onComplete={(results) => setDailySignals(results)} />
+
+                            {/* Results */}
                             {Object.entries(dailySignals).map(([cat, list]) => (
                                 <section key={cat}>
                                     <h3 className="font-display text-xl mb-4 capitalize flex items-center gap-2">
                                         <div className="w-2 h-8 rounded-full bg-accent"></div>
                                         {cat.replace(/([A-Z])/g, ' $1').trim()}
-                                        <Badge variant="outline" className="ml-2">{list.length}</Badge>
+                                        <Badge variant="outline" className="ml-2">{list?.length || 0}</Badge>
                                     </h3>
                                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {list.length === 0 ? <div className="text-sm text-muted-foreground px-4">Bu strateji için uygun maç yok.</div> : (
+                                        {(!list || list.length === 0) ? <div className="text-sm text-muted-foreground px-4">Bu strateji için uygun maç yok.</div> : (
                                             list.map((m, i) => <DailyCard key={i} match={m} index={i} category={cat} />)
                                         )}
                                     </div>
