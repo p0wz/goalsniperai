@@ -290,7 +290,7 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation with Retry (Groq - Llama 3 70B)
+// 4. AI Validation with Retry (Groq - Llama 4 Scout)
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 async function validateWithAI(match, retries = 3) {
@@ -313,7 +313,7 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
             const response = await axios.post(
                 'https://api.groq.com/openai/v1/chat/completions',
                 {
-                    model: 'llama3-70b-8192',
+                    model: 'meta-llama/llama-4-scout-17b-16e-instruct',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.2,
                     max_tokens: 200

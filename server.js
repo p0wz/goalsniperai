@@ -509,7 +509,7 @@ ${signal.geminiReason || 'Analiz yok'}
     log.info(`[Telegram] ═══════════════════════════════════════`);
 }
 // ============================================
-// 🧠 AI Analyst (Groq - Llama 3 70B)
+// 🧠 AI Analyst (Groq - Llama 4 Scout)
 // ============================================
 async function askAIAnalyst(candidate) {
     if (!GROQ_API_KEY) {
@@ -566,7 +566,7 @@ OUTPUT STRICTLY AS JSON:
             const response = await axios.post(
                 'https://api.groq.com/openai/v1/chat/completions',
                 {
-                    model: 'llama3-70b-8192',
+                    model: 'meta-llama/llama-4-scout-17b-16e-instruct',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.2,
                     max_tokens: 200
