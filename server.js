@@ -289,6 +289,60 @@ function parseMatchStats(statsData) {
 }
 
 // ============================================
+// 🔍 Base Activity Check ("Is it Dead?" Filter)
+// ============================================
+// Phase-specific minimum thresholds to consider a match "alive"
+const BASE_ACTIVITY_THRESHOLDS = {
+    FIRST_HALF: {
+        // 15'-45': Just need early life
+        MIN_SHOTS: 4,
+        MIN_CORNERS: 2
+    },
+    LATE_GAME: {
+        // 60'-85': Must have established stats by now
+        MIN_SHOTS: 10,
+        MIN_CORNERS: 4
+    }
+};
+
+function checkBaseActivity(elapsed, stats) {
+    const totalShots = (stats?.shots?.home || 0) + (stats?.shots?.away || 0);
+    const totalCorners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
+
+    // Determine which phase we're checking
+    const isFirstHalf = elapsed >= 15 && elapsed <= 45;
+    const isLateGame = elapsed >= 60 && elapsed <= 85;
+
+    if (isFirstHalf) {
+        const thresholds = BASE_ACTIVITY_THRESHOLDS.FIRST_HALF;
+        const isAlive = totalShots >= thresholds.MIN_SHOTS || totalCorners >= thresholds.MIN_CORNERS;
+        return {
+            phase: 'FIRST_HALF',
+            isAlive,
+            reason: isAlive
+                ? `Base Activity ✓ (${totalShots} shots, ${totalCorners} corners)`
+                : `Dead match (need ${thresholds.MIN_SHOTS}+ shots OR ${thresholds.MIN_CORNERS}+ corners)`,
+            stats: { shots: totalShots, corners: totalCorners }
+        };
+    }
+
+    if (isLateGame) {
+        const thresholds = BASE_ACTIVITY_THRESHOLDS.LATE_GAME;
+        const isAlive = totalShots >= thresholds.MIN_SHOTS || totalCorners >= thresholds.MIN_CORNERS;
+        return {
+            phase: 'LATE_GAME',
+            isAlive,
+            reason: isAlive
+                ? `Base Activity ✓ (${totalShots} shots, ${totalCorners} corners)`
+                : `Dead match (need ${thresholds.MIN_SHOTS}+ shots OR ${thresholds.MIN_CORNERS}+ corners)`,
+            stats: { shots: totalShots, corners: totalCorners }
+        };
+    }
+
+    return { phase: null, isAlive: false, reason: 'Outside valid time range' };
+}
+
+// ============================================
 // 🎯 Dynamic Momentum Detection (Lookback)
 // ============================================
 // Thresholds for momentum triggers
@@ -778,15 +832,24 @@ async function processMatches() {
             const totalSoT = stats.shotsOnTarget.home + stats.shotsOnTarget.away;
             const totalCorners = stats.corners.home + stats.corners.away;
             log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
-
-            // Record to history buffer for momentum tracking
-            recordMatchStats(matchId, stats);
         } else {
             log.warn(`      ⚠️ Could not fetch stats for this match`);
             continue; // Skip if no stats
         }
 
-        // Detect momentum (Dynamic Lookback)
+        // STEP 1: Base Activity Check ("Is it Dead?" Filter)
+        const baseCheck = checkBaseActivity(elapsed, stats);
+
+        if (!baseCheck.isAlive) {
+            log.info(`      💀 ${baseCheck.reason}`);
+            continue; // Dead match, skip immediately
+        }
+        log.info(`      ✅ ${baseCheck.reason}`);
+
+        // Record to history AFTER base activity check passes
+        recordMatchStats(matchId, stats);
+
+        // STEP 2: Detect Momentum (Dynamic Lookback)
         const momentum = detectMomentum(matchId, stats);
 
         if (momentum.detected) {
@@ -806,6 +869,9 @@ async function processMatches() {
             log.info(`      ❌ Failed phase criteria (time/score mismatch)`);
             continue;
         }
+
+        // Include base activity in reason
+        candidate.reason = `${baseCheck.reason} + ${candidate.reason}`;
 
         log.info(`      ✓ ${candidate.phase}: ${candidate.strategyCode} (${candidate.confidencePercent}% base)`);
 
