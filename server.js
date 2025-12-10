@@ -240,8 +240,8 @@ function parseMatchStats(statsData) {
     const allKeys = Object.keys(statsData || {});
     log.info(`[StatsDebug] API response keys: ${allKeys.join(', ') || 'empty'}`);
 
-    // Priority order: all-match > ALL > 2nd-half > 1st-half > any other
-    const priorityKeys = ['all-match', 'ALL', 'all', 'full-match', '2nd-half', '2nd half', '1st-half', '1st half'];
+    // Priority order: match (likely full game) > all-match > 2nd-half > 1st-half
+    const priorityKeys = ['match', 'all-match', 'ALL', 'all', 'full-match', '2nd-half', '2nd half', '1st-half', '1st half'];
 
     for (const key of priorityKeys) {
         if (statsData[key] && Array.isArray(statsData[key]) && statsData[key].length > 0) {
