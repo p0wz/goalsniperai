@@ -235,12 +235,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation
-async function validateWithGemini(match) {
+// 4. AI Validation with Retry
+async function validateWithGemini(match, retries = 3) {
     if (!GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // 'gemini-pro' and 'gemini-1.5-flash' returned 404s. Using 'gemini-flash-latest' from checked list.
     const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
     const prompt = `
@@ -256,15 +255,25 @@ async function validateWithGemini(match) {
     Respond in JSON: { "verdict": "PLAY", "confidence": 90, "reason": "Short reason" }
     `;
 
-    try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text().replace(/```json|```/g, '').trim();
-        return JSON.parse(text);
-    } catch (e) {
-        console.error('Gemini Error:', e.message);
-        return { verdict: 'SKIP', reason: 'AI Error' };
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text().replace(/```json|```/g, '').trim();
+            return JSON.parse(text);
+        } catch (e) {
+            const isOverloaded = e.message?.includes('503') || e.message?.includes('overloaded');
+            if (isOverloaded && attempt < retries) {
+                const delay = attempt * 2000; // 2s, 4s, 6s
+                console.log(`[Gemini] 503 - Retrying in ${delay / 1000}s (${attempt}/${retries})...`);
+                await sleep(delay);
+                continue;
+            }
+            console.error('Gemini Error:', e.message);
+            return { verdict: 'SKIP', reason: 'AI Error' };
+        }
     }
+    return { verdict: 'SKIP', reason: 'Max retries exceeded' };
 }
 
 // Main Runner

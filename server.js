@@ -277,52 +277,64 @@ OUTPUT STRICTLY AS JSON:
   "reason": "Detailed 1-2 sentence analysis."
 }`;
 
-    try {
-        const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.2, maxOutputTokens: 200 }
-            },
-            { timeout: 15000 }
-        );
+    const MAX_RETRIES = 3;
 
-        let text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+                {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 200 }
+                },
+                { timeout: 15000 }
+            );
 
-        // Clean up markdown formatting
-        text = text.trim();
-        if (text.startsWith('```json')) text = text.slice(7);
-        if (text.startsWith('```')) text = text.slice(3);
-        if (text.endsWith('```')) text = text.slice(0, -3);
-        text = text.trim();
+            let text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
 
-        const result = JSON.parse(text);
+            // Clean up markdown formatting
+            text = text.trim();
+            if (text.startsWith('```json')) text = text.slice(7);
+            if (text.startsWith('```')) text = text.slice(3);
+            if (text.endsWith('```')) text = text.slice(0, -3);
+            text = text.trim();
 
-        // Validate LLM output to prevent prompt injection
-        const ALLOWED_VERDICTS = ['PLAY', 'SKIP'];
-        if (!ALLOWED_VERDICTS.includes(result.verdict)) {
-            result.verdict = 'SKIP'; // Safe default
+            const result = JSON.parse(text);
+
+            // Validate LLM output to prevent prompt injection
+            const ALLOWED_VERDICTS = ['PLAY', 'SKIP'];
+            if (!ALLOWED_VERDICTS.includes(result.verdict)) {
+                result.verdict = 'SKIP'; // Safe default
+            }
+
+            // Validate confidence range
+            if (typeof result.confidence !== 'number' || result.confidence < 0 || result.confidence > 100) {
+                result.confidence = candidate.confidencePercent || 50;
+            }
+
+            // Sanitize reason to prevent XSS (remove HTML tags)
+            if (result.reason && typeof result.reason === 'string') {
+                result.reason = result.reason.replace(/<[^>]*>/g, '').trim();
+            } else {
+                result.reason = 'Analysis completed';
+            }
+
+            log.gemini(`${candidate.home} vs ${candidate.away}: ${result.verdict} (${result.confidence}%)`);
+            return result;
+
+        } catch (error) {
+            const isOverloaded = error.response?.status === 503 || error.message?.includes('overloaded');
+            if (isOverloaded && attempt < MAX_RETRIES) {
+                const delay = attempt * 2000;
+                log.warn(`[Gemini] 503 - Retrying in ${delay / 1000}s (${attempt}/${MAX_RETRIES})...`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            log.error(`Gemini API error: ${error.message}`);
+            return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Gemini unavailable, using local analysis' };
         }
-
-        // Validate confidence range
-        if (typeof result.confidence !== 'number' || result.confidence < 0 || result.confidence > 100) {
-            result.confidence = candidate.confidencePercent || 50;
-        }
-
-        // Sanitize reason to prevent XSS (remove HTML tags)
-        if (result.reason && typeof result.reason === 'string') {
-            result.reason = result.reason.replace(/<[^>]*>/g, '').trim();
-        } else {
-            result.reason = 'Analysis completed';
-        }
-
-        log.gemini(`${candidate.home} vs ${candidate.away}: ${result.verdict} (${result.confidence}%)`);
-        return result;
-
-    } catch (error) {
-        log.error(`Gemini API error: ${error.message}`);
-        return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Gemini unavailable, using local analysis' };
     }
+    return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Max retries exceeded' };
 }
 
 // ============================================
