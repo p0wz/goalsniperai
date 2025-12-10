@@ -129,6 +129,10 @@ const FLASHSCORE_API = {
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
+// Telegram Bot Configuration
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+
 // ============================================
 // 💾 Cache & State
 // ============================================
@@ -444,6 +448,50 @@ function detectMomentum(matchId, currentStats) {
     return { detected: false, trigger: null, timeframe: null };
 }
 
+// ============================================
+// 📱 Telegram Notifications
+// ============================================
+async function sendTelegramNotification(signal) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+        return; // Telegram not configured
+    }
+
+    try {
+        const emoji = signal.strategyCode === 'IY_05' ? '⚽' : '🎯';
+        const confidenceEmoji = signal.confidencePercent >= 75 ? '🔥' : signal.confidencePercent >= 60 ? '✅' : '⚠️';
+
+        const message = `
+${emoji} *YENİ SİNYAL* ${emoji}
+
+🏟️ *${signal.home} vs ${signal.away}*
+🏆 ${signal.league}
+⏱️ ${signal.elapsed}'  |  📊 ${signal.score}
+
+📌 *Strateji:* ${signal.strategy}
+${confidenceEmoji} *Güven:* ${signal.confidencePercent}%
+
+📈 *İstatistikler:*
+• Şutlar: ${signal.stats?.shots || 0} (İsabetli: ${signal.stats?.shots_on_target || 0})
+• Kornerler: ${signal.stats?.corners || 0}
+• xG: ${signal.stats?.xG || 'N/A'}
+
+💡 *AI Analizi:*
+${signal.geminiReason || 'Analiz yok'}
+
+⏰ ${new Date().toLocaleTimeString('tr-TR')}
+        `.trim();
+
+        await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: 'Markdown'
+        });
+
+        log.info(`[Telegram] Signal sent: ${signal.home} vs ${signal.away}`);
+    } catch (error) {
+        log.error(`[Telegram] Error: ${error.message}`);
+    }
+}
 // ============================================
 // 🧠 AI Analyst (Groq Llama 3.1 70B)
 // ============================================
@@ -985,6 +1033,9 @@ async function processMatches() {
 
             // Auto-approve live signals (no admin approval needed)
             APPROVED_IDS.add(candidate.id);
+
+            // Send Telegram notification
+            await sendTelegramNotification(candidate);
         } else {
             log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
         }
