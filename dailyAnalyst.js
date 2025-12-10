@@ -300,7 +300,7 @@ async function validateWithGemini(match) {
     if (!GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
     Analyze this football match for market: ${match.market}.
