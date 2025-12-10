@@ -140,6 +140,27 @@ let CACHED_DATA = {
 };
 
 const APPROVED_IDS = new Set();
+const APPROVALS_FILE = path.join(__dirname, 'approvals.json');
+
+// Load Approvals
+if (fs.existsSync(APPROVALS_FILE)) {
+    try {
+        const saved = JSON.parse(fs.readFileSync(APPROVALS_FILE));
+        saved.forEach(id => APPROVED_IDS.add(id));
+        console.log(`Loaded ${saved.length} approved signals.`);
+    } catch (e) {
+        console.error('Failed to load approvals:', e);
+    }
+}
+
+// Helper to save approvals
+const saveApprovals = () => {
+    try {
+        fs.writeFileSync(APPROVALS_FILE, JSON.stringify([...APPROVED_IDS]));
+    } catch (e) {
+        console.error('Failed to save approvals:', e);
+    }
+};
 
 let PREVIOUS_SNAPSHOT = {};
 let dailyRequestCount = 0;
@@ -756,6 +777,7 @@ app.post('/api/admin/approve/:id', requireAuth, (req, res) => {
     if (!id) return res.status(400).json({ error: 'Missing ID' });
 
     APPROVED_IDS.add(id);
+    saveApprovals(); // Persist
     log.info(`[ADMIN] Approved signal: ${id}`);
 
     res.json({ success: true, message: 'Signal approved', id });
