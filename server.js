@@ -741,8 +741,14 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
+    // 1. Return Cache if available
     if (!forceUpdate && DAILY_ANALYSIS_CACHE && DAILY_ANALYSIS_TIMESTAMP === today) {
         return res.json({ success: true, fromCache: true, data: filterResults(DAILY_ANALYSIS_CACHE) });
+    }
+
+    // 2. SAFETY: If not forcing and no cache, DO NOT RUN. (Prevents auto-scan on Admin load)
+    if (!forceUpdate) {
+        return res.json({ success: true, data: {}, message: 'No analysis generated for today. Click "Analiz Et" to start.' });
     }
 
     try {
