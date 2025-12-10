@@ -496,7 +496,41 @@ OUTPUT STRICTLY AS JSON:
             if (text.endsWith('```')) text = text.slice(0, -3);
             text = text.trim();
 
-            const result = JSON.parse(text);
+            // Try to extract JSON from response using regex (handles partial/malformed responses)
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (parseError) {
+                // Try to extract JSON object using regex
+                const jsonMatch = text.match(/\{[\s\S]*?\}/);
+                if (jsonMatch) {
+                    try {
+                        result = JSON.parse(jsonMatch[0]);
+                    } catch (e) {
+                        // Manual extraction as last resort
+                        const verdictMatch = text.match(/"verdict"\s*:\s*"(PLAY|SKIP)"/i);
+                        const confidenceMatch = text.match(/"confidence"\s*:\s*(\d+)/);
+                        const reasonMatch = text.match(/"reason"\s*:\s*"([^"]+)"/);
+
+                        result = {
+                            verdict: verdictMatch ? verdictMatch[1].toUpperCase() : 'SKIP',
+                            confidence: confidenceMatch ? parseInt(confidenceMatch[1]) : candidate.confidencePercent,
+                            reason: reasonMatch ? reasonMatch[1] : 'AI analysis incomplete'
+                        };
+                        log.warn(`[Gemini] Extracted partial JSON: ${JSON.stringify(result)}`);
+                    }
+                } else {
+                    // Check if response contains PLAY or SKIP keywords
+                    const hasPlay = text.toUpperCase().includes('PLAY');
+                    const hasSkip = text.toUpperCase().includes('SKIP');
+                    result = {
+                        verdict: hasPlay && !hasSkip ? 'PLAY' : 'SKIP',
+                        confidence: candidate.confidencePercent,
+                        reason: 'AI returned non-JSON response'
+                    };
+                    log.warn(`[Gemini] Non-JSON response, inferred: ${result.verdict}`);
+                }
+            }
 
             // Validate LLM output to prevent prompt injection
             const ALLOWED_VERDICTS = ['PLAY', 'SKIP'];
