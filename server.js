@@ -600,20 +600,39 @@ async function processMatches() {
 // ============================================
 // 🌐 API Endpoints
 // ============================================
-app.get('/api/signals', (req, res) => {
-    const iySignals = CACHED_DATA.signals.filter(s => s.strategyCode === 'IY_05').length;
-    const msSignals = CACHED_DATA.signals.filter(s => s.strategyCode === 'MS_GOL').length;
+app.get('/api/signals', optionalAuth, (req, res) => {
+    const userRole = req.user ? req.user.role : 'free';
+
+    // FREE Users: Access Denied
+    if (userRole === 'free') {
+        return res.status(403).json({ success: false, error: 'Upgrade to PRO to view signals.' });
+    }
+
+    let signals = CACHED_DATA.signals.map(s => ({
+        ...s,
+        isApproved: APPROVED_IDS.has(s.id)
+    }));
+
+    // PRO Users: Filter for Approved
+    if (userRole === 'pro') {
+        signals = signals.filter(s => s.isApproved);
+    }
+
+    // Calculate counts based on VISIBLE signals
+    const iySignals = signals.filter(s => s.strategyCode === 'IY_05').length;
+    const msSignals = signals.filter(s => s.strategyCode === 'MS_GOL').length;
 
     res.json({
         success: true,
-        data: CACHED_DATA.signals,
+        data: signals,
         meta: {
-            lastUpdated: CACHED_DATA.lastUpdated,
+            updatedAt: CACHED_DATA.lastUpdated,
+            // Only show quota info to admins? Or generic info is fine.
             quotaRemaining: CACHED_DATA.quotaRemaining,
             quotaLimit: CACHED_DATA.quotaLimit,
             quotaPercent: Math.round((CACHED_DATA.quotaRemaining / CACHED_DATA.quotaLimit) * 100),
             isLive: CACHED_DATA.isLive,
-            totalSignals: CACHED_DATA.signals.length,
+            totalSignals: signals.length,
             iySignals,
             msSignals
         }
@@ -661,29 +680,85 @@ app.get('/api/performance', (req, res) => {
 let DAILY_ANALYSIS_CACHE = null;
 let DAILY_ANALYSIS_TIMESTAMP = null;
 
-app.get('/api/daily-analysis', async (req, res) => {
+app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
+    const userRole = req.user ? req.user.role : 'free';
+
+    // FREE Users: Access Denied
+    if (userRole === 'free') {
+        return res.status(403).json({ success: false, error: 'Upgrade to PRO to access Daily Analyst.' });
+    }
+
+    const { force, limit } = req.query;
+    const forceUpdate = force === 'true';
+    const customLimit = limit ? parseInt(limit) : 100;
+
+    // Helper to filter results based on role & approval
+    const filterResults = (results) => {
+        const categories = ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35'];
+        const filtered = {};
+
+        categories.forEach(cat => {
+            if (!results[cat]) return;
+            // Ensure IDs exist and check approval
+            const list = results[cat].map(m => {
+                // Generate consistent ID if missing (e.g. from cache)
+                const mid = m.id || `${m.event_key || m.match_id}_${cat}`;
+                return { ...m, id: mid, isApproved: APPROVED_IDS.has(mid) };
+            });
+
+            if (userRole === 'pro') {
+                filtered[cat] = list.filter(m => m.isApproved);
+            } else {
+                filtered[cat] = list; // Admin sees all (with isApproved flag)
+            }
+        });
+        return filtered;
+    };
+
+    // Cache Check
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    if (!forceUpdate && DAILY_ANALYSIS_CACHE && DAILY_ANALYSIS_TIMESTAMP === today) {
+        return res.json({ success: true, fromCache: true, data: filterResults(DAILY_ANALYSIS_CACHE) });
+    }
+
     try {
-        const now = new Date();
-        const today = now.toISOString().split('T')[0];
-
-        // Return cache if valid and from today (and not forced)
-        if (DAILY_ANALYSIS_CACHE && DAILY_ANALYSIS_TIMESTAMP === today && req.query.force !== 'true') {
-            return res.json({ success: true, data: DAILY_ANALYSIS_CACHE, cached: true });
-        }
-
-        // Run Analysis (This takes time, ideally run in background)
-        const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
         log.info('Running Daily Pre-Match Analysis...');
-        const results = await runDailyAnalysis(log, limit);
+        const results = await runDailyAnalysis(log, customLimit);
 
-        DAILY_ANALYSIS_CACHE = results;
+        // Post-processing: Assign IDs immediately for consistency
+        const processedResults = { ...results };
+        ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35'].forEach(cat => {
+            if (processedResults[cat]) {
+                processedResults[cat].forEach(m => {
+                    m.id = `${m.event_key || m.match_id}_${cat}`;
+                });
+            }
+        });
+
+        DAILY_ANALYSIS_CACHE = processedResults;
         DAILY_ANALYSIS_TIMESTAMP = today;
 
-        res.json({ success: true, data: results, cached: false });
+        res.json({ success: true, data: filterResults(processedResults) });
     } catch (error) {
         log.error(`Daily Analyst Error: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
     }
+});
+
+app.post('/api/admin/approve/:id', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'Missing ID' });
+
+    APPROVED_IDS.add(id);
+    log.info(`[ADMIN] Approved signal: ${id}`);
+
+    res.json({ success: true, message: 'Signal approved', id });
 });
 
 // ============================================
