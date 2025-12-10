@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_URL } from '../../config';
+import { API_URL } from '../config';
 
 export default function AnalysisTerminal({ onComplete }) {
     const [logs, setLogs] = useState([]);
@@ -150,8 +150,8 @@ export default function AnalysisTerminal({ onComplete }) {
                     onClick={startAnalysis}
                     disabled={isRunning}
                     className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${isRunning
-                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-lg hover:shadow-cyan-500/25'
+                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-lg hover:shadow-cyan-500/25'
                         }`}
                 >
                     {isRunning ? (
