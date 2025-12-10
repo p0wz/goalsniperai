@@ -287,47 +287,185 @@ function AdminSidebar({ logout }) {
 }
 
 function UsersView({ users, stats, updatePlan, deleteUser }) {
+    // Mock System Health
+    const [cpu, setCpu] = useState(30);
+    const [memory, setMemory] = useState(45);
+    const [activeConn, setActiveConn] = useState(124);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCpu(Math.floor(Math.random() * 40) + 20);
+            setMemory(Math.floor(Math.random() * 20) + 40);
+            setActiveConn(prev => prev + (Math.random() > 0.5 ? 1 : -1));
+        }, 2000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const proUsers = users.filter(u => u.plan === 'pro').length;
+    const freeUsers = users.filter(u => u.plan === 'free').length;
+    const totalRevenue = proUsers * 29.99; // Mock calculation
+
     return (
-        <div>
-            {/* User Stats Grid */}
-            <div className="grid grid-cols-4 gap-4 mb-8">
-                <Card className="p-4"><div className="text-sm text-muted-foreground">Users</div><div className="text-2xl">{users.length}</div></Card>
-                <Card className="p-4"><div className="text-sm text-muted-foreground">Revenue</div><div className="text-2xl">${stats.revenue}</div></Card>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* 1. System Health Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="p-4 relative overflow-hidden border-l-4 border-l-blue-500">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="text-sm text-muted-foreground">Server Load</div>
+                        <div className="font-mono text-xl font-bold">{cpu}%</div>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${cpu}%` }} />
+                    </div>
+                </Card>
+                <Card className="p-4 relative overflow-hidden border-l-4 border-l-purple-500">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="text-sm text-muted-foreground">Memory Usage</div>
+                        <div className="font-mono text-xl font-bold">{memory}%</div>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-purple-500 transition-all duration-500" style={{ width: `${memory}%` }} />
+                    </div>
+                </Card>
+                <Card className="p-4 relative overflow-hidden border-l-4 border-l-green-500">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="text-sm text-muted-foreground">Active Sessions</div>
+                        <div className="font-mono text-xl font-bold">{activeConn}</div>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 transition-all duration-500" style={{ width: '85%' }} />
+                    </div>
+                </Card>
             </div>
 
-            <div className="bg-card rounded-xl border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b border-border bg-muted/50">
-                            <th className="p-3 text-left">Email</th>
-                            <th className="p-3 text-left">Role</th>
-                            <th className="p-3 text-left">Plan</th>
-                            <th className="p-3 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {users.map(user => (
-                            <tr key={user.id} className="border-b border-border hover:bg-muted/20">
-                                <td className="p-3">{user.email}</td>
-                                <td className="p-3">{user.role}</td>
-                                <td className="p-3">
-                                    <select
-                                        value={user.plan}
-                                        onChange={(e) => updatePlan(user.id, e.target.value)}
-                                        className="bg-transparent border rounded p-1"
-                                    >
-                                        <option value="free">Free</option>
-                                        <option value="pro">Pro</option>
-                                        <option value="premium">Premium</option>
-                                    </select>
-                                </td>
-                                <td className="p-3 text-right">
-                                    <button onClick={() => deleteUser(user.id)} className="text-red-500 hover:text-red-400">🗑️</button>
-                                </td>
-                            </tr>
+            {/* 2. Business Metrics & Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Revenue Chart */}
+                <Card className="lg:col-span-2 p-6">
+                    <h3 className="font-semibold mb-6 flex items-center gap-2">
+                        <span>💰</span> Aylık Gelir Grafiği
+                    </h3>
+                    <div className="h-48 flex items-end gap-2 justify-between px-2">
+                        {[45, 60, 75, 50, 80, 95, 85, 100, 110, 105, 120, 135].map((h, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                                <div
+                                    className="w-full bg-accent/20 rounded-t-sm group-hover:bg-accent/40 transition-colors relative"
+                                    style={{ height: `${h}%` }}
+                                >
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        ${h * 10}
+                                    </div>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">{i + 1}. Ay</span>
+                            </div>
                         ))}
-                    </tbody>
-                </table>
+                    </div>
+                </Card>
+
+                {/* Quick Actions */}
+                <Card className="p-6 flex flex-col h-full">
+                    <h3 className="font-semibold mb-6 flex items-center gap-2">
+                        <span>⚡</span> Hızlı İşlemler
+                    </h3>
+                    <div className="flex-1 grid grid-cols-1 gap-3">
+                        <Button variant="outline" className="justify-start gap-3 h-auto py-4 hover:bg-accent hover:text-white group">
+                            <span className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition-colors">🧹</span>
+                            <div className="text-left">
+                                <div className="font-semibold">Önbelleği Temizle</div>
+                                <div className="text-[10px] text-muted-foreground group-hover:text-blue-100">API yanıtlarını sıfırlar</div>
+                            </div>
+                        </Button>
+                        <Button variant="outline" className="justify-start gap-3 h-auto py-4 hover:bg-accent hover:text-white group">
+                            <span className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500 group-hover:text-white transition-colors">🔄</span>
+                            <div className="text-left">
+                                <div className="font-semibold">Analizi Zorla</div>
+                                <div className="text-[10px] text-muted-foreground group-hover:text-purple-100">AI motorunu tetikler</div>
+                            </div>
+                        </Button>
+                        <Button variant="outline" className="justify-start gap-3 h-auto py-4 hover:bg-accent hover:text-white group">
+                            <span className="p-2 bg-orange-500/10 rounded-lg group-hover:bg-orange-500 group-hover:text-white transition-colors">⚠️</span>
+                            <div className="text-left">
+                                <div className="font-semibold">Bakım Modu</div>
+                                <div className="text-[10px] text-muted-foreground group-hover:text-orange-100">Siteyi geçici kapatır</div>
+                            </div>
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+
+            {/* 3. Enhanced User Table */}
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+                <div className="p-6 border-b border-border flex justify-between items-center bg-muted/20">
+                    <div>
+                        <h3 className="font-semibold text-lg">Kullanıcı Yönetimi</h3>
+                        <p className="text-xs text-muted-foreground">{users.length} Kayıtlı Kullanıcı • {proUsers} Pro</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="secondary" className="h-8 text-xs">Excel İndir</Button>
+                        <Button className="h-8 text-xs">Yeni Ekle</Button>
+                    </div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                            <tr className="text-xs uppercase text-muted-foreground border-b border-border">
+                                <th className="p-4 text-left font-medium">Kullanıcı</th>
+                                <th className="p-4 text-left font-medium">Üyelik Durumu</th>
+                                <th className="p-4 text-left font-medium">Katılma Tarihi</th>
+                                <th className="p-4 text-left font-medium">Son Giriş</th>
+                                <th className="p-4 text-right font-medium">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {users.map(user => (
+                                <tr key={user.id} className="hover:bg-muted/30 transition-colors group">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg ${user.plan === 'pro' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gradient-to-br from-gray-500 to-gray-700'
+                                                }`}>
+                                                {user.name ? user.name.substring(0, 1).toUpperCase() : user.email.substring(0, 1).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold text-foreground">{user.name || 'İsimsiz Kullanıcı'}</div>
+                                                <div className="text-xs text-muted-foreground">{user.email}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${user.plan === 'pro'
+                                                ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
+                                                : 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                            }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${user.plan === 'pro' ? 'bg-indigo-500' : 'bg-gray-500'}`}></span>
+                                            {user.plan === 'pro' ? 'PRO PLAN' : 'FREE PLAN'}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-muted-foreground text-xs font-mono">
+                                        {new Date(user.created_at || Date.now()).toLocaleDateString()}
+                                    </td>
+                                    <td className="p-4 text-muted-foreground text-xs">
+                                        Az önce
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <select
+                                                value={user.plan}
+                                                onChange={(e) => updatePlan(user.id, e.target.value)}
+                                                className="bg-background border border-border rounded text-xs p-1 focus:ring-accent outline-none"
+                                            >
+                                                <option value="free">Free</option>
+                                                <option value="pro">Pro</option>
+                                            </select>
+                                            <button onClick={() => deleteUser(user.id)} className="p-1.5 hover:bg-red-500/10 rounded text-red-500 transition-colors">
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     )
