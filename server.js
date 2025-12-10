@@ -643,9 +643,7 @@ app.post('/api/scan', async (req, res) => {
     }
 });
 
-res.status(500).json({ success: false, error: error.message });
-    }
-});
+
 
 app.get('/api/performance', (req, res) => {
     const stats = betTracker.getPerformanceStats();
