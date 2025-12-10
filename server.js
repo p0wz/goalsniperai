@@ -452,8 +452,14 @@ function detectMomentum(matchId, currentStats) {
 // 📱 Telegram Notifications
 // ============================================
 async function sendTelegramNotification(signal) {
+    log.info(`[Telegram] ═══════════════════════════════════════`);
+    log.info(`[Telegram] 📱 Attempting to send notification...`);
+    log.info(`[Telegram] Bot Token: ${TELEGRAM_BOT_TOKEN ? '✅ Configured (' + TELEGRAM_BOT_TOKEN.substring(0, 10) + '...)' : '❌ NOT SET'}`);
+    log.info(`[Telegram] Chat ID: ${TELEGRAM_CHAT_ID ? '✅ ' + TELEGRAM_CHAT_ID : '❌ NOT SET'}`);
+
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-        return; // Telegram not configured
+        log.warn(`[Telegram] ⚠️ Skipping - Telegram not configured`);
+        return;
     }
 
     try {
@@ -481,16 +487,26 @@ ${signal.geminiReason || 'Analiz yok'}
 ⏰ ${new Date().toLocaleTimeString('tr-TR')}
         `.trim();
 
-        await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        log.info(`[Telegram] 📝 Message preview: ${signal.home} vs ${signal.away} (${signal.strategy})`);
+        log.info(`[Telegram] 🔄 Sending to Telegram API...`);
+
+        const response = await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             chat_id: TELEGRAM_CHAT_ID,
             text: message,
             parse_mode: 'Markdown'
         });
 
-        log.info(`[Telegram] Signal sent: ${signal.home} vs ${signal.away}`);
+        log.success(`[Telegram] ✅ Message sent successfully!`);
+        log.info(`[Telegram] Response: ok=${response.data?.ok}, message_id=${response.data?.result?.message_id}`);
     } catch (error) {
+        log.error(`[Telegram] ❌ FAILED to send message`);
         log.error(`[Telegram] Error: ${error.message}`);
+        if (error.response) {
+            log.error(`[Telegram] Status: ${error.response.status}`);
+            log.error(`[Telegram] Data: ${JSON.stringify(error.response.data)}`);
+        }
     }
+    log.info(`[Telegram] ═══════════════════════════════════════`);
 }
 // ============================================
 // 🧠 AI Analyst (DeepSeek)
