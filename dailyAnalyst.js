@@ -304,8 +304,7 @@ Stats:
 - Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate.toFixed(0)}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored.toFixed(2)}
 - Away @ Away: Scored in ${match.filterStats.awayAwayStats.scoringRate.toFixed(0)}% of games, Avg Conceded ${match.filterStats.awayAwayStats.avgConceded.toFixed(2)}
 
-Is this bet solid?
-Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "Short reason" }`;
+RESPOND WITH ONLY JSON. NO TEXT BEFORE OR AFTER: {"verdict": "PLAY", "confidence": 75, "reason": "Your reason"}`;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {

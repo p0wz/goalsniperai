@@ -549,12 +549,8 @@ Consider:
 4. Time remaining in strategic window
 5. Odds movement indicating market sentiment
 
-OUTPUT STRICTLY AS JSON:
-{
-  "verdict": "PLAY" or "SKIP",
-  "confidence": (0-100),
-  "reason": "Detailed 1-2 sentence analysis."
-}`;
+RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
+{"verdict": "PLAY", "confidence": 75, "reason": "Your analysis here"}`;
 
     const MAX_RETRIES = 3;
 
