@@ -292,41 +292,69 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation with Retry
-async function validateWithGemini(match, retries = 3) {
-    if (!GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
+// 4. AI Validation with Retry (Groq / Gemini Fallback)
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-live" });
+async function validateWithAI(match, retries = 3) {
+    if (!GROQ_API_KEY && !GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
 
-    const prompt = `
-    Analyze this football match for market: ${match.market}.
-    Match: ${match.event_home_team} vs ${match.event_away_team}
-    Stats: 
-    - Home Form (Last 5): Over 1.5 Rate ${match.filterStats.homeForm.over15Rate}%, Avg Scored ${match.filterStats.homeForm.avgScored}
-    - Away Form (Last 5): Over 1.5 Rate ${match.filterStats.awayForm.over15Rate}%, Avg Scored ${match.filterStats.awayForm.avgScored}
-    - Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored}
-    - Away @ Away: Scored in ${match.filterStats.awayAwayStats.scoringRate}% of games, Avg Conceded ${match.filterStats.awayAwayStats.avgConceded}
-    
-    Is this bet solid?
-    Respond in JSON: { "verdict": "PLAY", "confidence": 90, "reason": "Short reason" }
-    `;
+    const prompt = `Analyze this football match for market: ${match.market}.
+Match: ${match.event_home_team} vs ${match.event_away_team}
+Stats: 
+- Home Form (Last 5): Over 1.5 Rate ${match.filterStats.homeForm.over15Rate.toFixed(0)}%, Avg Scored ${match.filterStats.homeForm.avgScored.toFixed(2)}
+- Away Form (Last 5): Over 1.5 Rate ${match.filterStats.awayForm.over15Rate.toFixed(0)}%, Avg Scored ${match.filterStats.awayForm.avgScored.toFixed(2)}
+- Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate.toFixed(0)}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored.toFixed(2)}
+- Away @ Away: Scored in ${match.filterStats.awayAwayStats.scoringRate.toFixed(0)}% of games, Avg Conceded ${match.filterStats.awayAwayStats.avgConceded.toFixed(2)}
+
+Is this bet solid?
+Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "Short reason" }`;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text().replace(/```json|```/g, '').trim();
+            let text = '';
+
+            // Try Groq first (14,400 RPD limit)
+            if (GROQ_API_KEY) {
+                const response = await axios.post(
+                    'https://api.groq.com/openai/v1/chat/completions',
+                    {
+                        model: 'llama-3.1-70b-versatile',
+                        messages: [{ role: 'user', content: prompt }],
+                        temperature: 0.2,
+                        max_tokens: 200,
+                        response_format: { type: 'json_object' }
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${GROQ_API_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 15000
+                    }
+                );
+                text = response.data?.choices?.[0]?.message?.content || '{}';
+            }
+            // Fallback to Gemini
+            else if (GEMINI_API_KEY) {
+                const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                text = response.text().replace(/```json|```/g, '').trim();
+            }
+
             return JSON.parse(text);
         } catch (e) {
+            const isRateLimited = e.message?.includes('429') || e.message?.includes('quota');
             const isOverloaded = e.message?.includes('503') || e.message?.includes('overloaded');
-            if (isOverloaded && attempt < retries) {
-                const delay = attempt * 2000; // 2s, 4s, 6s
-                console.log(`[Gemini] 503 - Retrying in ${delay / 1000}s (${attempt}/${retries})...`);
+
+            if ((isRateLimited || isOverloaded) && attempt < retries) {
+                const delay = attempt * 2000;
+                console.log(`[AI] ${isRateLimited ? '429' : '503'} - Retrying in ${delay / 1000}s (${attempt}/${retries})...`);
                 await sleep(delay);
                 continue;
             }
-            console.error('Gemini Error:', e.message);
+            console.error('AI Error:', e.message);
             return { verdict: 'SKIP', reason: 'AI Error' };
         }
     }
@@ -388,7 +416,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
             log.info(`\n   [AI ${aiCount}] ${match.event_home_team} vs ${match.event_away_team}`);
             log.info(`          Market: ${match.market}`);
 
-            const aiRes = await validateWithGemini(match);
+            const aiRes = await validateWithAI(match);
 
             // Log AI Response Details
             if (aiRes.verdict === 'PLAY') {
