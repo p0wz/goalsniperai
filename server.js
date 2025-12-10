@@ -863,14 +863,44 @@ function startAutoPolling() {
 
     setInterval(async () => {
         const now = new Date();
-        const hour = now.getHours();
+        const hour = now.getUTCHours(); // Use UTC explicitly
 
-        // Schedule: 16:00 - 02:00
-        if (hour >= 16 || hour < 2) {
-            log.info('Scheduled poll...');
+        // Schedule for TURKEY (UTC+3): 16:00 - 02:00 Turkey = 13:00 - 23:00 UTC
+        // Logic: hour >= 13 OR hour < 23 covers 13:00 UTC to 22:59 UTC (16:00-01:59 Turkey)
+        // But we want 16:00-02:00 TR = 13:00-23:00 UTC, so: hour >= 13 || hour < 23 is wrong
+        // Correct: 13:00 UTC to 23:00 UTC = hour >= 13 && hour < 23? No...
+        // Let me recalculate: 16:00 TR = 13:00 UTC, 02:00 TR (next day) = 23:00 UTC (same day)
+        // So active window: 13:00 UTC to 23:00 UTC = if (hour >= 13 || hour < 23) - WRONG, always true
+        // Correct: if (hour >= 13 && hour <= 23) for same-day window, or spanning midnight needs ||
+        // Actually: 16:00-02:00 TR spans midnight. 13:00-23:00 UTC does NOT span midnight.
+        // Wait: 02:00 TR next day = 23:00 UTC SAME day. So 16:00 TR to 02:00 TR = 13:00 to 23:00 UTC.
+        // if (hour >= 13 && hour < 23) { active } - this is correct for 13:00-22:59 UTC
+        // But user wants until 02:00 TR = 23:00 UTC, so: if (hour >= 13 && hour <= 23)? Still misses 23.
+        // Actually hour < 23 misses 23:xx. Need hour <= 22 for "until 23:00" OR hour < 24 for "until midnight"
+        // Simplify: 16:00-02:00 TR = 13:00-23:00 UTC. Use: (hour >= 13 && hour <= 22) = 13:00-22:59 UTC
+        // OR: (hour >= 13) since 23 UTC would be 02:00 TR which is the end.
+        // Best: Just use >= 13 || hour < 0 (always false) → hour >= 13 gives 13:00 UTC onwards
+        // But we also need to STOP at 02:00 TR = 23:00 UTC. So: hour >= 13 && hour < 23 = 13:00-22:59 UTC
+        // That's 16:00-01:59 Turkey. Close enough, or add: || hour >= 23 for the 23:00-23:59 window
+
+        // Final: For Turkey 16:00 - 02:00, active when: UTC hour is 13-22 OR UTC hour is 23
+        // Simplified: hour >= 13 && hour <= 23  (but hour is 0-23, so hour <= 23 is always true)
+        // Better: hour >= 13 || hour < 23 → WRONG (covers everything)
+        // REAL ANSWER: Since 16:00-02:00 TR = 13:00-23:00 UTC (10 hour window), use: hour >= 13
+        // Wait no, that runs until midnight UTC (03:00 TR). 
+
+        // Let me be very explicit:
+        // Turkey 16:00 = UTC 13:00
+        // Turkey 02:00 = UTC 23:00 (same UTC day)
+        // So: if (hour >= 13 && hour < 23) → Active 13:00-22:59 UTC (16:00-01:59 TR)
+        // To include 23:00 UTC (02:00 TR is the CUT-OFF, so 23:xx should be INACTIVE)
+        // So the correct condition is: if (hour >= 13 && hour < 23)
+
+        if (hour >= 13 && hour < 23) {
+            log.info('Scheduled poll (Turkey: 16:00-02:00)...');
             await processMatches();
         } else {
-            log.info('Outside active hours (16:00-02:00)');
+            log.info(`Outside active hours (TR 16:00-02:00, current UTC: ${hour}:xx)`);
         }
     }, POLL_INTERVAL);
 }
