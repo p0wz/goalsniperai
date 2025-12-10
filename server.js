@@ -535,18 +535,30 @@ async function fetchLiveMatches() {
 // 🔄 Process All Tournaments & Matches
 // ============================================
 async function processMatches() {
+    log.info('═══════════════════════════════════════════════════════');
+    log.info('🔄 LIVE BOT SCAN STARTED');
+    log.info('═══════════════════════════════════════════════════════');
+
     const { tournaments, quotaRemaining } = await fetchLiveMatches();
     const signals = [];
 
+    log.info(`📊 API Quota: ${quotaRemaining}/${DAILY_LIMIT} remaining`);
+
     if (tournaments.length === 0) {
-        log.info('No live matches found');
+        log.warn('⚠️ No live matches found at this time');
         CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
         return signals;
     }
 
+    log.info(`🏆 Found ${tournaments.length} tournaments with live matches`);
+
     // Flatten all matches
     const allMatches = [];
     for (const tournament of tournaments) {
+        const matchCount = tournament.matches?.length || 0;
+        if (matchCount > 0) {
+            log.info(`   └─ ${tournament.name}: ${matchCount} match(es)`);
+        }
         for (const match of tournament.matches || []) {
             allMatches.push({
                 ...match,
@@ -557,7 +569,8 @@ async function processMatches() {
         }
     }
 
-    log.info(`Processing ${allMatches.length} total matches`);
+    log.info(`───────────────────────────────────────────────────────`);
+    log.info(`📋 Total Live Matches: ${allMatches.length}`);
 
     // Filter candidates first
     const candidates = allMatches.filter(m => {
@@ -572,18 +585,34 @@ async function processMatches() {
         return isIYCandidate || isMSCandidate;
     });
 
-    log.info(`Found ${candidates.length} candidates, fetching detailed stats...`);
+    log.info(`🎯 Candidates Matching Criteria: ${candidates.length}/${allMatches.length}`);
+
+    if (candidates.length === 0) {
+        log.info('ℹ️ No matches meet IY 0.5 (15-40\', 0-0) or MS (60-85\', diff≤2) criteria');
+        CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
+        return signals;
+    }
+
+    log.info(`───────────────────────────────────────────────────────`);
+    log.info(`🔍 ANALYZING CANDIDATES:`);
 
     for (const match of candidates) {
         const elapsed = parseElapsedTime(match.stage);
         const matchId = match.match_id;
+        const homeName = match.home_team?.name || 'Unknown';
+        const awayName = match.away_team?.name || 'Unknown';
+        const score = `${match.home_team?.score || 0}-${match.away_team?.score || 0}`;
+
+        log.info(`\n   🏟️ ${homeName} vs ${awayName} (${score}, ${elapsed}')`);
 
         // Fetch stats
         const statsData = await fetchMatchStats(matchId);
         const stats = statsData ? parseMatchStats(statsData) : null;
 
         if (stats) {
-            log.info(`Stats for ${match.home_team?.name}: Shots ${stats.shots.home + stats.shots.away}, SoT ${stats.shotsOnTarget.home + stats.shotsOnTarget.away}`);
+            log.info(`      📈 Stats: Shots ${stats.shots.home + stats.shots.away} | SoT ${stats.shotsOnTarget.home + stats.shotsOnTarget.away} | Corners ${stats.corners.home + stats.corners.away} | DA ${stats.dangerousAttacks.home + stats.dangerousAttacks.away}`);
+        } else {
+            log.warn(`      ⚠️ Could not fetch stats for this match`);
         }
 
         // Run scout filters
@@ -592,10 +621,15 @@ async function processMatches() {
             candidate = analyzeLateGameMomentum(match, elapsed, stats);
         }
 
-        if (!candidate) continue;
+        if (!candidate) {
+            log.info(`      ❌ Failed scout filter criteria`);
+            continue;
+        }
+
+        log.info(`      ✓ Passed ${candidate.strategyCode} filter (${candidate.confidencePercent}% base)`);
 
         // Send to Gemini for AI validation
-        log.gemini(`Analyzing: ${candidate.home} vs ${candidate.away}`);
+        log.gemini(`      🤖 Asking Gemini AI...`);
         const geminiResult = await askGeminiAnalyst(candidate);
 
         // Update candidate with Gemini results
@@ -606,13 +640,11 @@ async function processMatches() {
 
         // Only add PLAY signals
         if (candidate.verdict === 'PLAY') {
-            // UNIQUE ID for Approval: MatchID_Strategy
             candidate.id = `${matchId}_${candidate.strategyCode}`;
-
-            log.signal(`[${candidate.strategyCode}] ${candidate.home} vs ${candidate.away} (${candidate.confidencePercent}%)`);
+            log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
             signals.push(candidate);
         } else {
-            log.info(`SKIP: ${candidate.home} vs ${candidate.away} - ${geminiResult.reason}`);
+            log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
         }
 
         // Small delay between API calls
@@ -627,6 +659,10 @@ async function processMatches() {
         quotaLimit: DAILY_LIMIT,
         isLive: true
     };
+
+    log.info(`───────────────────────────────────────────────────────`);
+    log.success(`📊 SCAN COMPLETE: ${signals.length} signals found`);
+    log.info(`═══════════════════════════════════════════════════════\n`);
 
     return signals;
 }

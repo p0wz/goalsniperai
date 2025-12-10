@@ -9,13 +9,13 @@ export default function AnalysisTerminal({ onComplete }) {
     const [currentMatch, setCurrentMatch] = useState('');
     const terminalRef = useRef(null);
 
-    const startAnalysis = async () => {
+    const startAnalysis = async (limit = 50) => {
         setLogs([]);
         setProgress(0);
         setIsRunning(true);
 
         try {
-            const eventSource = new EventSource(`${API_URL}/api/daily-analysis/stream?limit=50`, {
+            const eventSource = new EventSource(`${API_URL}/api/daily-analysis/stream?limit=${limit}`, {
                 withCredentials: true
             });
 
@@ -146,26 +146,38 @@ export default function AnalysisTerminal({ onComplete }) {
                 <div className="text-xs text-gray-500">
                     {logs.filter(l => l.type === 'success').length} sinyal bulundu
                 </div>
-                <button
-                    onClick={startAnalysis}
-                    disabled={isRunning}
-                    className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${isRunning
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-lg hover:shadow-cyan-500/25'
-                        }`}
-                >
-                    {isRunning ? (
-                        <span className="flex items-center gap-2">
-                            <motion.span
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                            >⚙️</motion.span>
-                            Analiz Ediliyor...
-                        </span>
-                    ) : (
-                        '🚀 Analizi Başlat'
-                    )}
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => startAnalysis(1)}
+                        disabled={isRunning}
+                        className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${isRunning
+                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                            : 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                            }`}
+                    >
+                        🧪 Test (1 Maç)
+                    </button>
+                    <button
+                        onClick={() => startAnalysis(50)}
+                        disabled={isRunning}
+                        className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${isRunning
+                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-lg hover:shadow-cyan-500/25'
+                            }`}
+                    >
+                        {isRunning ? (
+                            <span className="flex items-center gap-2">
+                                <motion.span
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                >⚙️</motion.span>
+                                Analiz Ediliyor...
+                            </span>
+                        ) : (
+                            '🚀 Tam Analiz (50)'
+                        )}
+                    </button>
+                </div>
             </div>
         </motion.div>
     );
