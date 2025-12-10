@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, StatusBadge } from '../components/ui';
-import AnalysisTerminal from '../components/AnalysisTerminal';
 
 export default function Dashboard() {
     const [user, setUser] = useState(null);
@@ -157,8 +156,12 @@ export default function Dashboard() {
                     {/* DAILY TAB */}
                     {activeTab === 'daily' && (
                         <div className="space-y-8">
-                            {/* Analysis Terminal */}
-                            <AnalysisTerminal onComplete={(results) => setDailySignals(results)} />
+                            {/* Info Banner */}
+                            <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    💡 Yeni analiz başlatmak için <span className="text-accent font-semibold">Admin Panel → Analiz</span> sekmesine gidin.
+                                </p>
+                            </div>
 
                             {/* Results */}
                             {Object.entries(dailySignals).map(([cat, list]) => (

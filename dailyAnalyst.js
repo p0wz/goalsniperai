@@ -307,9 +307,12 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
         if (!candidates[cat]) continue;
         for (const match of candidates[cat].slice(0, 3)) {
             aiCount++;
-            log.info(`[DailyAnalyst] Asking Gemini: ${match.event_home_team} vs ${match.event_away_team}`);
+            log.info(`[Gemini] 🔍 Analyzing: ${match.event_home_team} vs ${match.event_away_team} (${match.market})`);
             const aiRes = await validateWithGemini(match);
+
+            // Log AI Response Details
             if (aiRes.verdict === 'PLAY') {
+                log.success(`[Gemini] ✅ PLAY - ${aiRes.confidence}% - ${aiRes.reason}`);
                 betTracker.recordBet({
                     match_id: match.event_key || match.match_id,
                     home_team: match.event_home_team,
@@ -325,6 +328,8 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
                     stats: match.filterStats,
                     aiAnalysis: aiRes
                 });
+            } else {
+                log.warn(`[Gemini] ⏭️ SKIP - ${aiRes.reason || 'No reason'}`);
             }
         }
     }

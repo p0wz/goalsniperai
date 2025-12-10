@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
+import AnalysisTerminal from '../components/AnalysisTerminal';
 
 export default function Admin() {
     const [signals, setSignals] = useState([]);
@@ -142,6 +143,7 @@ export default function Admin() {
                     <div className="flex gap-2">
                         <Button variant={activeTab === 'users' ? 'primary' : 'secondary'} onClick={() => setActiveTab('users')}>Kullanıcılar</Button>
                         <Button variant={activeTab === 'signals' ? 'primary' : 'secondary'} onClick={() => setActiveTab('signals')}>Sinyal Onayı</Button>
+                        <Button variant={activeTab === 'analysis' ? 'primary' : 'secondary'} onClick={() => setActiveTab('analysis')}>🤖 Analiz</Button>
                     </div>
                 </div>
 
@@ -202,6 +204,16 @@ export default function Admin() {
                         scanning={scanning}
                         analyzing={analyzing}
                     />
+                )}
+
+                {activeTab === 'analysis' && (
+                    <div className="space-y-6">
+                        <div className="bg-card p-4 rounded-xl border border-border">
+                            <h2 className="text-xl font-bold mb-2">🤖 Canlı Analiz Terminali</h2>
+                            <p className="text-sm text-muted-foreground">Gerçek zamanlı maç analizi başlatın ve Gemini AI yanıtlarını canlı olarak izleyin.</p>
+                        </div>
+                        <AnalysisTerminal onComplete={(results) => setDailySignals(results)} />
+                    </div>
                 )}
             </main>
         </div>
