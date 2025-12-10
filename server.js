@@ -139,6 +139,8 @@ let CACHED_DATA = {
     isLive: false
 };
 
+const APPROVED_IDS = new Set();
+
 let PREVIOUS_SNAPSHOT = {};
 let dailyRequestCount = 0;
 const DAILY_LIMIT = 1000;
@@ -570,6 +572,9 @@ async function processMatches() {
 
         // Only add PLAY signals
         if (candidate.verdict === 'PLAY') {
+            // UNIQUE ID for Approval: MatchID_Strategy
+            candidate.id = `${matchId}_${candidate.strategyCode}`;
+
             log.signal(`[${candidate.strategyCode}] ${candidate.home} vs ${candidate.away} (${candidate.confidencePercent}%)`);
             signals.push(candidate);
         } else {
