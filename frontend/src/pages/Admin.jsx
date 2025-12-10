@@ -121,7 +121,17 @@ export default function Admin() {
     const [loading, setLoading] = useState(true);
     const [scanning, setScanning] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
+    const [logFilter, setLogFilter] = useState('all'); // all, error, signal, gemini
     const navigate = useNavigate();
+
+    // Log Logic
+    const filteredLogs = logs.filter(l => {
+        if (logFilter === 'all') return true;
+        if (logFilter === 'error') return l.level === 'error' || l.level === 'warn';
+        if (logFilter === 'signal') return l.level === 'signal';
+        if (logFilter === 'gemini') return l.level === 'gemini';
+        return true;
+    });
 
     return (
         <div className="min-h-screen bg-background flex">
@@ -136,7 +146,50 @@ export default function Admin() {
                 </div>
 
                 {activeTab === 'users' && (
-                    <UsersView users={users} stats={stats} updatePlan={updatePlan} deleteUser={deleteUser} />
+                    <div className="space-y-8">
+                        {/* Users & Stats */}
+                        <UsersView users={users} stats={stats} updatePlan={updatePlan} deleteUser={deleteUser} />
+
+                        {/* System Logs with Filters */}
+                        <Card hover={false} className="p-0 overflow-hidden flex flex-col h-[500px]">
+                            <div className="bg-black/90 p-3 border-b border-white/10 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                                    <span className="ml-2 text-xs font-mono text-muted-foreground">system_logs.log</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setLogFilter('all')} className={`text-xs ${logFilter === 'all' ? 'text-white font-bold' : 'text-muted-foreground'}`}>ALL</button>
+                                    <button onClick={() => setLogFilter('error')} className={`text-xs ${logFilter === 'error' ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>ERRORS</button>
+                                    <button onClick={() => setLogFilter('signal')} className={`text-xs ${logFilter === 'signal' ? 'text-blue-400 font-bold' : 'text-muted-foreground'}`}>SIGNALS</button>
+                                    <button onClick={() => setLogFilter('gemini')} className={`text-xs ${logFilter === 'gemini' ? 'text-purple-400 font-bold' : 'text-muted-foreground'}`}>AI</button>
+                                    <div className="w-px h-4 bg-white/20 mx-2" />
+                                    <button onClick={loadData} className="text-xs text-accent hover:text-white transition-colors">
+                                        🔄 Yenile
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex-1 bg-black/95 p-4 overflow-y-auto font-mono text-xs space-y-1 scrollbar-hide">
+                                {filteredLogs.length === 0 && (
+                                    <div className="text-muted-foreground italic">Kayıt bulunamadı ({logFilter})...</div>
+                                )}
+                                {filteredLogs.map((log) => (
+                                    <div key={log.id} className="flex gap-2">
+                                        <span className="text-gray-500 shrink-0">[{new Date(log.created_at).toLocaleTimeString()}]</span>
+                                        <span className={`uppercase font-bold shrink-0 w-16 ${log.level === 'error' ? 'text-red-500' :
+                                            log.level === 'warn' ? 'text-yellow-500' :
+                                                log.level === 'success' ? 'text-green-500' :
+                                                    log.level === 'gemini' ? 'text-purple-400' :
+                                                        log.level === 'signal' ? 'text-blue-400' :
+                                                            'text-gray-300'
+                                            }`}>{log.level}</span>
+                                        <span className="text-gray-300 break-all">{log.message}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </div>
                 )}
 
                 {activeTab === 'signals' && (
@@ -156,16 +209,29 @@ export default function Admin() {
 }
 
 function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDailyScan, scanning, analyzing }) {
+    const [sort, setSort] = useState('newest'); // newest, confidence
+
+    const sortedSignals = [...signals].sort((a, b) => {
+        if (sort === 'confidence') return (b.aiAnalysis?.confidence || 0) - (a.aiAnalysis?.confidence || 0);
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
+
     return (
         <div className="space-y-8">
             {/* Live Signals */}
             <section>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Canlı Sinyaller</h2>
-                    <Button onClick={handleScan} disabled={scanning}>{scanning ? 'Taranıyor...' : 'Yeni Tara'}</Button>
+                    <div className="flex gap-2">
+                        <select className="bg-muted text-xs p-1 rounded border border-border" value={sort} onChange={e => setSort(e.target.value)}>
+                            <option value="newest">En Yeni</option>
+                            <option value="confidence">Güven Skoru</option>
+                        </select>
+                        <Button onClick={handleScan} disabled={scanning}>{scanning ? 'Taranıyor...' : 'Yeni Tara'}</Button>
+                    </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                    {signals.map((s, i) => (
+                    {sortedSignals.map((s, i) => (
                         <AdminSignalCard key={i} signal={s} onApprove={onApprove} />
                     ))}
                 </div>
