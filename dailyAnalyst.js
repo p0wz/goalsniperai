@@ -309,6 +309,9 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
                 results[cat].push({
                     match: `${match.event_home_team} vs ${match.event_away_team}`,
+                    event_home_team: match.event_home_team,
+                    event_away_team: match.event_away_team,
+                    id: `${match.event_key || match.match_id}_${cat}`,
                     startTime: match.event_start_time,
                     stats: match.filterStats,
                     aiAnalysis: aiRes
