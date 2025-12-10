@@ -231,19 +231,51 @@ function StatCard({ label, value, accent }) {
 function SignalCard({ signal, index }) {
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
-            <Card className="overflow-hidden h-full flex flex-col">
+            <Card className="overflow-hidden h-full flex flex-col border-l-4 border-l-accent">
                 <div className="flex justify-between items-center mb-4">
-                    <Badge>{signal.strategy}</Badge>
-                    <span className="text-xs text-accent animate-pulse">● Canlı {signal.elapsed}'</span>
+                    <Badge variant="secondary" className="font-mono text-xs">{signal.strategy}</Badge>
+                    <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        <span className="text-xs font-bold text-red-500">{signal.elapsed}'</span>
+                    </div>
                 </div>
-                <div className="flex-1 flex items-center justify-between text-center mb-4">
-                    <div className="flex-1 font-medium text-sm">{signal.home}</div>
-                    <div className="px-3 py-1 bg-accent/10 rounded font-display text-lg mx-2">{signal.score}</div>
-                    <div className="flex-1 font-medium text-sm">{signal.away}</div>
+
+                <div className="flex-1 flex items-center justify-between text-center mb-6 relative">
+                    {/* Vs Line */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground z-0">VS</div>
+
+                    <div className="flex-1 z-10">
+                        <div className="font-bold text-lg leading-tight">{signal.home}</div>
+                    </div>
+                    <div className="px-4 py-2 bg-accent/5 rounded-xl font-display text-2xl mx-2 z-10 min-w-[60px] border border-accent/10">
+                        {signal.score}
+                    </div>
+                    <div className="flex-1 z-10">
+                        <div className="font-bold text-lg leading-tight">{signal.away}</div>
+                    </div>
                 </div>
-                <div className="bg-muted p-3 rounded text-xs text-muted-foreground">
-                    <div className="flex justify-between mb-1"><span>Verdict</span><span className="font-bold text-accent">{signal.verdict}</span></div>
-                    <div className="flex justify-between"><span>Confidence</span><span>{signal.confidencePercent}%</span></div>
+
+                <div className="bg-muted/50 p-3 rounded-lg text-xs space-y-2 border border-border/50">
+                    <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Analiz</span>
+                        <span className="font-bold text-foreground">{signal.verdict}</span>
+                    </div>
+                    <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                            <span>Confidence</span>
+                            <span>{signal.confidencePercent}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-background rounded-full overflow-hidden">
+                            <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${signal.confidencePercent}%` }}
+                                className={`h-full rounded-full ${signal.confidencePercent > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            />
+                        </div>
+                    </div>
                 </div>
             </Card>
         </motion.div>
@@ -251,22 +283,57 @@ function SignalCard({ signal, index }) {
 }
 
 function DailyCard({ match, category, index }) {
+    const confidence = match.aiAnalysis?.confidence || 0;
+
     return (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.02 }}>
-            <Card className="h-full">
-                <div className="text-xs text-muted-foreground mb-2 flex justify-between">
-                    <span>{match.event_date || 'Today'}</span>
-                    <Badge variant="outline" className="text-[10px]">{category}</Badge>
-                </div>
-                <div className="text-center font-medium mb-3">
-                    {match.event_home_team} <span className="text-muted-foreground">vs</span> {match.event_away_team}
-                </div>
-                {match.aiAnalysis && (
-                    <div className="text-xs bg-muted p-2 rounded">
-                        <span className="font-bold">AI:</span> {match.aiAnalysis.reason}
+            <div className="relative group hover:-translate-y-1 transition-transform duration-300">
+                {/* Ticket Style Dashed Top/Bottom */}
+                <div className="absolute -left-1.5 top-[70%] w-3 h-3 rounded-full bg-background z-20" />
+                <div className="absolute -right-1.5 top-[70%] w-3 h-3 rounded-full bg-background z-20" />
+
+                <Card className="h-full border-2 border-dashed border-border group-hover:border-accent/30 transition-colors">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    <div className="text-xs text-muted-foreground mb-4 flex justify-between items-center">
+                        <div className="flex items-center gap-1">
+                            <span className="text-lg">📅</span>
+                            <span className="font-mono">{match.event_date || 'Today'}</span>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{category}</Badge>
                     </div>
-                )}
-            </Card>
+
+                    <div className="text-center mb-6">
+                        <div className="font-display text-lg leading-6 mb-1">{match.event_home_team}</div>
+                        <div className="text-xs text-muted-foreground uppercase tracking-widest my-1">vs</div>
+                        <div className="font-display text-lg leading-6">{match.event_away_team}</div>
+                    </div>
+
+                    <div className="border-t-2 border-dashed border-border pt-4 pb-2">
+                        {match.aiAnalysis ? (
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-muted-foreground">AI Skoru</span>
+                                    <span className={`font-bold ${confidence > 80 ? 'text-green-500' : 'text-yellow-500'}`}>{confidence}/100</span>
+                                </div>
+                                <div className="h-2 w-full bg-muted rounded-full">
+                                    <div
+                                        className={`h-full rounded-full ${confidence > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}
+                                        style={{ width: `${confidence}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 italic">
+                                    "{match.aiAnalysis.reason}"
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="text-center text-xs text-muted-foreground py-2">
+                                Analiz bekleniyor...
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            </div>
         </motion.div>
     )
 }
