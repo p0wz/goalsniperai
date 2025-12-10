@@ -622,6 +622,12 @@ async function processMatches() {
 // ============================================
 // 🌐 API Endpoints
 // ============================================
+
+// Public Health Check (for UptimeRobot)
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 app.get('/api/signals', optionalAuth, (req, res) => {
     const userRole = req.user ? req.user.role : 'free';
 
