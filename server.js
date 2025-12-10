@@ -193,7 +193,25 @@ function parseMatchStats(statsData) {
         xG: { home: 0, away: 0 }
     };
 
-    const statsList = statsData['1st-half'] || statsData['all-match'] || [];
+    // Prefer all-match, fallback to 1st-half, then try other keys
+    let statsList = statsData['all-match'] || statsData['ALL'] || statsData['1st-half'] || [];
+
+    // If still empty, try to find any array in the response
+    if (statsList.length === 0 && typeof statsData === 'object') {
+        for (const key of Object.keys(statsData)) {
+            if (Array.isArray(statsData[key]) && statsData[key].length > 0) {
+                log.info(`[StatsDebug] Using key: ${key}`);
+                statsList = statsData[key];
+                break;
+            }
+        }
+    }
+
+    // Debug: Log available stat names
+    const availableStats = statsList.map(s => s.name).filter(Boolean);
+    if (availableStats.length > 0) {
+        log.info(`[StatsDebug] Available: ${availableStats.join(', ')}`);
+    }
 
     for (const stat of statsList) {
         const name = stat.name?.toLowerCase() || '';
@@ -204,23 +222,25 @@ function parseMatchStats(statsData) {
             stats.possession.home = parseInt(home) || 50;
             stats.possession.away = parseInt(away) || 50;
         }
-        if (name === 'total shots') {
+        if (name === 'total shots' || name === 'shots total') {
             stats.shots.home = parseInt(home) || 0;
             stats.shots.away = parseInt(away) || 0;
         }
-        if (name === 'shots on target') {
+        if (name === 'shots on target' || name.includes('on target')) {
             stats.shotsOnTarget.home = parseInt(home) || 0;
             stats.shotsOnTarget.away = parseInt(away) || 0;
         }
-        if (name === 'corner kicks') {
+        if (name === 'corner kicks' || name === 'corners') {
             stats.corners.home = parseInt(home) || 0;
             stats.corners.away = parseInt(away) || 0;
         }
-        if (name.includes('expected goals')) {
+        if (name.includes('expected goals') || name.includes('xg')) {
             stats.xG.home = parseFloat(home) || 0;
             stats.xG.away = parseFloat(away) || 0;
         }
-        if (name.includes('big chances')) {
+        // Check multiple possible names for Dangerous Attacks
+        if (name.includes('dangerous attacks') || name.includes('dangerous attack') ||
+            name.includes('big chances') || name === 'attacks') {
             stats.dangerousAttacks.home = parseInt(home) || 0;
             stats.dangerousAttacks.away = parseInt(away) || 0;
         }
