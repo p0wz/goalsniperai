@@ -73,7 +73,14 @@ async function validateWithGemini(match) {
 // Main Runner
 async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     // 1. Fetch
-    let matches = await fetchTodaysFixtures(log);
+    // Try Day 0 (Today) First - User Request
+    let matches = await fetchDay(0, log);
+
+    // Fallback to Day 1 (Tomorrow) if Today is empty
+    if (matches.length === 0) {
+        log.warn('[DailyAnalyst] Day 0 returned 0 matches. Trying Day 1 (Tomorrow)...');
+        matches = await fetchDay(1, log);
+    }
 
     // Fallback: If 0 matches, maybe day '1' is tomorrow and today is empty?
     if (matches.length === 0) {
