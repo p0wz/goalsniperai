@@ -232,24 +232,42 @@ function parseMatchStats(statsData) {
         xG: { home: 0, away: 0 }
     };
 
-    // Prefer all-match, fallback to 1st-half, then try other keys
-    let statsList = statsData['all-match'] || statsData['ALL'] || statsData['1st-half'] || [];
+    // Try keys in order of preference, checking for non-empty arrays
+    let statsList = [];
+    let usedKey = 'none';
 
-    // If still empty, try to find any array in the response
+    // Log all available keys first
+    const allKeys = Object.keys(statsData || {});
+    log.info(`[StatsDebug] API response keys: ${allKeys.join(', ') || 'empty'}`);
+
+    // Priority order: all-match > ALL > 2nd-half > 1st-half > any other
+    const priorityKeys = ['all-match', 'ALL', 'all', 'full-match', '2nd-half', '2nd half', '1st-half', '1st half'];
+
+    for (const key of priorityKeys) {
+        if (statsData[key] && Array.isArray(statsData[key]) && statsData[key].length > 0) {
+            statsList = statsData[key];
+            usedKey = key;
+            break;
+        }
+    }
+
+    // If still empty, try any array in the response
     if (statsList.length === 0 && typeof statsData === 'object') {
         for (const key of Object.keys(statsData)) {
             if (Array.isArray(statsData[key]) && statsData[key].length > 0) {
-                log.info(`[StatsDebug] Using key: ${key}`);
                 statsList = statsData[key];
+                usedKey = key;
                 break;
             }
         }
     }
 
+    log.info(`[StatsDebug] Using key: "${usedKey}" (${statsList.length} stats)`);
+
     // Debug: Log available stat names
     const availableStats = statsList.map(s => s.name).filter(Boolean);
     if (availableStats.length > 0) {
-        log.info(`[StatsDebug] Available: ${availableStats.join(', ')}`);
+        log.info(`[StatsDebug] Stats: ${availableStats.join(', ')}`);
     }
 
     for (const stat of statsList) {
