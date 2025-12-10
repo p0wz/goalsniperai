@@ -541,12 +541,30 @@ OUTPUT STRICTLY AS JSON:
                     // Check if response contains PLAY or SKIP keywords
                     const hasPlay = text.toUpperCase().includes('PLAY');
                     const hasSkip = text.toUpperCase().includes('SKIP');
+
+                    // Try to extract confidence from text (e.g., "85%" or "confidence: 85")
+                    const confMatch = text.match(/(\d{2,3})\s*%/) || text.match(/confidence[:\s]+(\d{2,3})/i);
+                    const extractedConf = confMatch ? parseInt(confMatch[1]) : null;
+
+                    // If high base confidence and no explicit SKIP, default to PLAY
+                    let inferredVerdict;
+                    if (hasPlay && !hasSkip) {
+                        inferredVerdict = 'PLAY';
+                    } else if (hasSkip) {
+                        inferredVerdict = 'SKIP';
+                    } else if (candidate.confidencePercent >= 70 || (extractedConf && extractedConf >= 70)) {
+                        // High confidence without explicit verdict = likely PLAY
+                        inferredVerdict = 'PLAY';
+                    } else {
+                        inferredVerdict = 'SKIP';
+                    }
+
                     result = {
-                        verdict: hasPlay && !hasSkip ? 'PLAY' : 'SKIP',
-                        confidence: candidate.confidencePercent,
-                        reason: 'AI returned non-JSON response'
+                        verdict: inferredVerdict,
+                        confidence: extractedConf || candidate.confidencePercent,
+                        reason: 'AI returned non-JSON response (inferred from context)'
                     };
-                    log.warn(`[Gemini] Non-JSON response, inferred: ${result.verdict}`);
+                    log.warn(`[Gemini] Non-JSON response, inferred: ${result.verdict} (conf: ${result.confidence}%)`);
                 }
             }
 
