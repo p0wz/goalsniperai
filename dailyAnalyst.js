@@ -326,7 +326,14 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
                     timeout: 15000
                 }
             );
-            const text = response.data?.choices?.[0]?.message?.content || '{}';
+            let text = response.data?.choices?.[0]?.message?.content || '{}';
+
+            // Clean up markdown formatting from Groq response
+            text = text.trim();
+            if (text.startsWith('```json')) text = text.slice(7);
+            if (text.startsWith('```')) text = text.slice(3);
+            if (text.endsWith('```')) text = text.slice(0, -3);
+            text = text.trim();
 
             return JSON.parse(text);
         } catch (e) {
