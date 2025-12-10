@@ -175,18 +175,34 @@ async function settleBets() {
         const matchResult = resultMap[bet.api_fixture_id];
 
         if (matchResult) {
-            // Already filtered for non-null scores in fetchFinishedMatches
-            const homeScore = matchResult.home_team.score;
-            const awayScore = matchResult.away_team.score;
+            // SAFEGUARD: The API list endpoint often lacks a specific 'Finished' status string.
+            // To prevent settling LIVE matches (e.g., min 10, score 1-0) as finished,
+            // we enforce a "3-Hour Rule": Only process if current time > match_start + 3 hours.
+            const matchTime = parseInt(matchResult.timestamp) * 1000;
+            const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
 
-            const isWin = checkWinCondition(bet.market, homeScore, awayScore);
+            if (matchTime > threeHoursAgo) {
+                // Match started less than 3 hours ago, likely still playing or just finished.
+                // Skip to be safe.
+                return;
+            }
 
-            if (isWin !== null) {
-                bet.status = isWin ? 'WON' : 'LOST';
-                bet.result_score = `${homeScore}-${awayScore}`;
-                bet.settled_at = new Date().toISOString();
-                settledCount++;
-                console.log(`[BetTracker] 🏁 Settled: ${bet.match} [${bet.market}] -> ${bet.status} (${bet.result_score})`);
+            // In new format, we check if scores exist
+            if (matchResult.home_team.score !== null && matchResult.away_team.score !== null) {
+                // NOTE: We use 'score' (Regular Time) instead of 'score_after' (Penalties/ET).
+                // Standard betting markets (O1.5, BTTS) settle on 90 mins.
+                const homeScore = matchResult.home_team.score;
+                const awayScore = matchResult.away_team.score;
+
+                const isWin = checkWinCondition(bet.market, homeScore, awayScore);
+
+                if (isWin !== null) {
+                    bet.status = isWin ? 'WON' : 'LOST';
+                    bet.result_score = `${homeScore}-${awayScore}`;
+                    bet.settled_at = new Date().toISOString();
+                    settledCount++;
+                    console.log(`[BetTracker] 🏁 Settled: ${bet.match} [${bet.market}] -> ${bet.status} (${bet.result_score})`);
+                }
             }
         }
     });
