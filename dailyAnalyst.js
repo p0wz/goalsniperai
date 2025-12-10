@@ -233,7 +233,8 @@ async function validateWithGemini(match) {
     if (!GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // 'gemini-pro' and 'gemini-1.5-flash' returned 404s. Using 'gemini-flash-latest' from checked list.
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
     const prompt = `
     Analyze this football match for market: ${match.market}.
@@ -261,13 +262,15 @@ async function validateWithGemini(match) {
 
 // Main Runner
 async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
-    // Try Day 0 (Today) First
-    let matches = await fetchDay(0, log);
+    // 1. Fetch
+    // User Update: Day 1 = Today in this API version
+    log.info('[DailyAnalyst] Fetching Day 1 (Target: Today)...');
+    let matches = await fetchDay(1, log);
 
-    // Fallback to Day 1 (Tomorrow) if Today is empty
+    // Fallback to Day 2 (Tomorrow) if Today is empty
     if (matches.length === 0) {
-        log.warn('[DailyAnalyst] Day 0 returned 0 matches. Trying Day 1 (Tomorrow)...');
-        matches = await fetchDay(1, log);
+        log.warn('[DailyAnalyst] Day 1 returned 0 matches. Trying Day 2 (Tomorrow)...');
+        matches = await fetchDay(2, log);
     }
 
     if (matches.length === 0) {
