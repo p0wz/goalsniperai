@@ -67,7 +67,7 @@ export default function Pricing() {
                                 { text: 'Tüm stratejiler', included: true },
                                 { text: 'Detaylı istatistikler', included: true },
                                 { text: 'Gerçek zamanlı veri', included: true },
-                                { text: 'Yapay zeka analizi', included: false },
+                                { text: 'Yapay zeka analizi', included: true },
                             ]}
                             buttonText="Pro'ya geçin"
                             buttonVariant="primary"

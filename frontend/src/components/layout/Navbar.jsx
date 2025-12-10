@@ -5,14 +5,37 @@ import { Button } from '../ui';
 
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
+    const [user, setUser] = useState(null);
     const location = useLocation();
     const isHome = location.pathname === '/';
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 50);
         window.addEventListener('scroll', handleScroll);
+
+        // Check Auth
+        checkUser();
+
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    const checkUser = async () => {
+        try {
+            // Assumes API_URL is accessible or using relative path proxy if set up. 
+            // Using relative path for simplicity if proxy exists, else might need config.
+            // Admin.jsx used API_URL from ../config. Let's try to grab it or use relative.
+            // Ideally we need API_URL. I will check if I can import it.
+            // For now, I'll use a relative fetch assuming Vite proxy or same origin. 
+            // If strictly needed, I'll add the import.
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/me`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) setUser(data.user);
+            }
+        } catch (e) {
+            console.error("Auth check failed", e);
+        }
+    };
 
     return (
         <motion.nav
@@ -49,12 +72,22 @@ export function Navbar() {
 
             {/* CTA Buttons */}
             <div className="flex items-center gap-3">
-                <Link to="/login">
-                    <Button variant="ghost">Giriş</Button>
-                </Link>
-                <Link to="/register">
-                    <Button variant="primary">Başlayın</Button>
-                </Link>
+                {user ? (
+                    <Link to="/dashboard">
+                        <Button variant="primary" className="shadow-accent">
+                            Dashboard <span className="ml-2">→</span>
+                        </Button>
+                    </Link>
+                ) : (
+                    <>
+                        <Link to="/login">
+                            <Button variant="ghost">Giriş</Button>
+                        </Link>
+                        <Link to="/register">
+                            <Button variant="primary">Başlayın</Button>
+                        </Link>
+                    </>
+                )}
             </div>
         </motion.nav>
     );

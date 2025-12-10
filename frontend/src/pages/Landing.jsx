@@ -271,7 +271,7 @@ export default function Landing() {
                             whileInView="visible"
                             viewport={{ once: true, amount: 0.2 }}
                             variants={stagger}
-                            className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto"
+                            className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto"
                         >
                             <PricingCard
                                 name="Başlangıç"
@@ -297,24 +297,10 @@ export default function Landing() {
                                     { text: 'Tüm stratejiler', included: true },
                                     { text: 'Detaylı istatistikler', included: true },
                                     { text: 'Gerçek zamanlı veri', included: true },
-                                    { text: 'Yapay zeka analizi', included: false },
+                                    { text: 'Yapay zeka analizi', included: true },
                                 ]}
                                 buttonText="Pro'ya geçin"
                                 buttonVariant="primary"
-                            />
-                            <PricingCard
-                                name="Premium"
-                                price="199₺"
-                                period="aylık"
-                                features={[
-                                    { text: 'Tüm Pro özellikleri', included: true },
-                                    { text: 'Gemini AI analizi', included: true },
-                                    { text: 'Öncelikli sinyaller', included: true },
-                                    { text: 'Detaylı AI raporları', included: true },
-                                    { text: 'Öncelikli destek', included: true },
-                                ]}
-                                buttonText="Premium al"
-                                buttonVariant="secondary"
                             />
                         </motion.div>
                     </div>
