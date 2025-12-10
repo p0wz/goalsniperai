@@ -497,7 +497,7 @@ OUTPUT STRICTLY AS JSON:
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const response = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-live:generateContent?key=${GEMINI_API_KEY}`,
                 {
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: { temperature: 0.2, maxOutputTokens: 200 }
