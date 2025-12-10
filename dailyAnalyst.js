@@ -46,10 +46,17 @@ async function fetchDay(day, log = console) {
         const data = response.data;
         const parsed = [];
         const list = Array.isArray(data) ? data : Object.values(data);
+        const now = Date.now();
 
         list.forEach(tournament => {
             if (tournament.matches && Array.isArray(tournament.matches)) {
                 tournament.matches.forEach(match => {
+                    // Filter: Skip matches that have already started or finished
+                    const matchTime = match.timestamp ? match.timestamp * 1000 : 0; // API is seconds, JS is ms
+                    if (matchTime < now) {
+                        return; // Skip this match
+                    }
+
                     parsed.push({
                         event_key: match.match_id,
                         match_id: match.match_id,
@@ -61,7 +68,7 @@ async function fetchDay(day, log = console) {
                 });
             }
         });
-        log.info(`[DailyAnalyst] Parsed ${parsed.length} matches from Day ${day}.`);
+        log.info(`[DailyAnalyst] Parsed ${parsed.length} UPCOMING matches from Day ${day}.`);
         return parsed;
     } catch (e) {
         log.error(`[DailyAnalyst] Failed to fetch day ${day}: ${e.message}`);
