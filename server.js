@@ -127,7 +127,7 @@ const FLASHSCORE_API = {
     }
 };
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 // Telegram Bot Configuration
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -509,12 +509,12 @@ ${signal.geminiReason || 'Analiz yok'}
     log.info(`[Telegram] ═══════════════════════════════════════`);
 }
 // ============================================
-// 🧠 AI Analyst (DeepSeek)
+// 🧠 AI Analyst (Groq - Llama 3 70B)
 // ============================================
 async function askAIAnalyst(candidate) {
-    if (!DEEPSEEK_API_KEY) {
-        log.warn('[AI] DEEPSEEK_API_KEY not configured, using local analysis');
-        return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Local analysis (DeepSeek not configured)' };
+    if (!GROQ_API_KEY) {
+        log.warn('[AI] GROQ_API_KEY not configured, using local analysis');
+        return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Local analysis (Groq not configured)' };
     }
 
     const prompt = `You are an elite football betting analyst with 15+ years of experience.
@@ -562,18 +562,18 @@ OUTPUT STRICTLY AS JSON:
         try {
             let text = '';
 
-            // DeepSeek API
+            // Groq API
             const response = await axios.post(
-                'https://api.deepseek.com/v1/chat/completions',
+                'https://api.groq.com/openai/v1/chat/completions',
                 {
-                    model: 'deepseek-chat',
+                    model: 'llama3-70b-8192',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.2,
                     max_tokens: 200
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+                        'Authorization': `Bearer ${GROQ_API_KEY}`,
                         'Content-Type': 'application/json'
                     },
                     timeout: 15000

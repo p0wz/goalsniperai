@@ -290,11 +290,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation with Retry (DeepSeek)
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+// 4. AI Validation with Retry (Groq - Llama 3 70B)
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 async function validateWithAI(match, retries = 3) {
-    if (!DEEPSEEK_API_KEY) return { verdict: 'SKIP', reason: 'DEEPSEEK_API_KEY not configured' };
+    if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
 
     const prompt = `Analyze this football match for market: ${match.market}.
 Match: ${match.event_home_team} vs ${match.event_away_team}
@@ -309,18 +309,18 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            // DeepSeek API
+            // Groq API
             const response = await axios.post(
-                'https://api.deepseek.com/v1/chat/completions',
+                'https://api.groq.com/openai/v1/chat/completions',
                 {
-                    model: 'deepseek-chat',
+                    model: 'llama3-70b-8192',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.2,
                     max_tokens: 200
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+                        'Authorization': `Bearer ${GROQ_API_KEY}`,
                         'Content-Type': 'application/json'
                     },
                     timeout: 15000
