@@ -17,6 +17,56 @@ const FLASHSCORE_API = {
 
 const MATCH_LIMIT = 50; // Quota safe limit
 
+// Allowed Leagues Filter (Only analyze these leagues)
+const ALLOWED_LEAGUES = [
+    'UEFA Champions League',
+    'UEFA Europa League',
+    'UEFA Conference League',
+    'England Premier League',
+    'England Championship',
+    'Spain La Liga',
+    'Germany Bundesliga',
+    'Germany Bundesliga 2',
+    'Italy Serie A',
+    'France Ligue 1',
+    'Turkey Süper Lig',
+    'Netherlands Eredivisie',
+    'Portugal Liga Portugal',
+    'Belgium Pro League',
+    'Brazil Serie A',
+    'Argentina Liga Profesional',
+    'Chile Primera Division',
+    'USA MLS',
+    'Mexico Liga MX',
+    'Australia A-League',
+    'Japan J1 League',
+    'South Korea K-League 1',
+    'Saudi Pro League',
+    'Scotland Premiership',
+    'Austria Bundesliga',
+    'Switzerland Super League',
+    'Switzerland Challenge League',
+    'Denmark Superliga',
+    'Sweden Allsvenskan',
+    'Norway Eliteserien',
+    'Finland Veikkausliiga',
+    'Ireland Premier Division',
+    'Czech Republic 1. Liga',
+    'Poland Ekstraklasa',
+    'Greece Super League 1',
+    'Romania Liga I'
+];
+
+// Helper: Check if league is allowed
+function isLeagueAllowed(leagueName) {
+    if (!leagueName) return false;
+    const lowerLeague = leagueName.toLowerCase();
+    return ALLOWED_LEAGUES.some(allowed =>
+        lowerLeague.includes(allowed.toLowerCase()) ||
+        allowed.toLowerCase().includes(lowerLeague)
+    );
+}
+
 // Helper: Delay
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -48,6 +98,13 @@ async function fetchDay(day, log = console) {
 
         list.forEach(tournament => {
             if (tournament.matches && Array.isArray(tournament.matches)) {
+                const leagueName = tournament.name || 'Unknown League';
+
+                // Filter: Skip leagues not in allowed list
+                if (!isLeagueAllowed(leagueName)) {
+                    return; // Skip this tournament
+                }
+
                 tournament.matches.forEach(match => {
                     // Filter: Skip matches that have already started or finished
                     const matchTime = match.timestamp ? match.timestamp * 1000 : 0; // API is seconds, JS is ms
@@ -61,7 +118,7 @@ async function fetchDay(day, log = console) {
                         event_start_time: match.timestamp,
                         event_home_team: match.home_team?.name || 'Unknown Home',
                         event_away_team: match.away_team?.name || 'Unknown Away',
-                        league_name: tournament.name || 'Unknown League'
+                        league_name: leagueName
                     });
                 });
             }
