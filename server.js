@@ -163,7 +163,46 @@ const saveApprovals = () => {
     }
 };
 
-let PREVIOUS_SNAPSHOT = {};
+// ============================================
+// 📊 Match History Buffer (Dynamic Lookback)
+// ============================================
+// Structure: { matchId: [{ timestamp, stats }] }
+// Max history: 4 snapshots (~12 minutes at 3-min intervals)
+const MATCH_HISTORY = {};
+const MAX_HISTORY_LENGTH = 4;
+const MAX_LOOKBACK_MS = 12 * 60 * 1000; // 12 minutes
+
+function recordMatchStats(matchId, stats) {
+    if (!MATCH_HISTORY[matchId]) {
+        MATCH_HISTORY[matchId] = [];
+    }
+
+    MATCH_HISTORY[matchId].push({
+        timestamp: Date.now(),
+        stats: { ...stats }
+    });
+
+    // Keep only last N snapshots
+    if (MATCH_HISTORY[matchId].length > MAX_HISTORY_LENGTH) {
+        MATCH_HISTORY[matchId].shift();
+    }
+}
+
+function getMatchHistory(matchId) {
+    return MATCH_HISTORY[matchId] || [];
+}
+
+function cleanOldHistory() {
+    const now = Date.now();
+    for (const matchId of Object.keys(MATCH_HISTORY)) {
+        // Remove matches with no recent activity
+        const lastEntry = MATCH_HISTORY[matchId][MATCH_HISTORY[matchId].length - 1];
+        if (lastEntry && (now - lastEntry.timestamp) > MAX_LOOKBACK_MS * 2) {
+            delete MATCH_HISTORY[matchId];
+        }
+    }
+}
+
 let dailyRequestCount = 0;
 const DAILY_LIMIT = 1000;
 
@@ -247,6 +286,90 @@ function parseMatchStats(statsData) {
     }
 
     return stats;
+}
+
+// ============================================
+// 🎯 Dynamic Momentum Detection (Lookback)
+// ============================================
+// Thresholds for momentum triggers
+const MOMENTUM_THRESHOLDS = {
+    CORNER_SIEGE: 2,        // +2 corners
+    SHOT_SURGE: 2,          // +2 shots
+    SOT_THREAT: 1,          // +1 shot on target
+    DA_PRESSURE: 5          // +5 dangerous attacks (if available)
+};
+
+function detectMomentum(matchId, currentStats) {
+    const history = getMatchHistory(matchId);
+    const now = Date.now();
+
+    if (history.length === 0) {
+        return { detected: false, trigger: null, timeframe: null };
+    }
+
+    // Get totals from current stats
+    const currentCorners = (currentStats?.corners?.home || 0) + (currentStats?.corners?.away || 0);
+    const currentShots = (currentStats?.shots?.home || 0) + (currentStats?.shots?.away || 0);
+    const currentSoT = (currentStats?.shotsOnTarget?.home || 0) + (currentStats?.shotsOnTarget?.away || 0);
+    const currentDA = (currentStats?.dangerousAttacks?.home || 0) + (currentStats?.dangerousAttacks?.away || 0);
+
+    // Check each historical snapshot (most recent first)
+    for (let i = history.length - 1; i >= 0; i--) {
+        const snapshot = history[i];
+        const timeDiffMs = now - snapshot.timestamp;
+        const timeDiffMins = Math.round(timeDiffMs / 60000);
+
+        // Skip if older than max lookback
+        if (timeDiffMs > MAX_LOOKBACK_MS) continue;
+
+        const oldCorners = (snapshot.stats?.corners?.home || 0) + (snapshot.stats?.corners?.away || 0);
+        const oldShots = (snapshot.stats?.shots?.home || 0) + (snapshot.stats?.shots?.away || 0);
+        const oldSoT = (snapshot.stats?.shotsOnTarget?.home || 0) + (snapshot.stats?.shotsOnTarget?.away || 0);
+        const oldDA = (snapshot.stats?.dangerousAttacks?.home || 0) + (snapshot.stats?.dangerousAttacks?.away || 0);
+
+        const deltaCorners = currentCorners - oldCorners;
+        const deltaShots = currentShots - oldShots;
+        const deltaSoT = currentSoT - oldSoT;
+        const deltaDA = currentDA - oldDA;
+
+        // Trigger 1: Corner Siege
+        if (deltaCorners >= MOMENTUM_THRESHOLDS.CORNER_SIEGE) {
+            return {
+                detected: true,
+                trigger: 'CORNER_SIEGE',
+                reason: `Corner Siege (+${deltaCorners} corners in ~${timeDiffMins} mins)`,
+                timeframe: timeDiffMins,
+                deltas: { corners: deltaCorners, shots: deltaShots, sot: deltaSoT }
+            };
+        }
+
+        // Trigger 2: Shooting Threat (OR Logic)
+        if (deltaShots >= MOMENTUM_THRESHOLDS.SHOT_SURGE || deltaSoT >= MOMENTUM_THRESHOLDS.SOT_THREAT) {
+            const triggerType = deltaSoT >= 1 ? 'SHOOTING_THREAT_SOT' : 'SHOOTING_THREAT';
+            return {
+                detected: true,
+                trigger: triggerType,
+                reason: deltaSoT >= 1
+                    ? `Shooting Threat (+${deltaSoT} on target in ~${timeDiffMins} mins)`
+                    : `Shot Surge (+${deltaShots} shots in ~${timeDiffMins} mins)`,
+                timeframe: timeDiffMins,
+                deltas: { corners: deltaCorners, shots: deltaShots, sot: deltaSoT }
+            };
+        }
+
+        // Trigger 3: Attacking Pressure (DA, if available)
+        if (currentDA > 0 && deltaDA >= MOMENTUM_THRESHOLDS.DA_PRESSURE) {
+            return {
+                detected: true,
+                trigger: 'ATTACKING_PRESSURE',
+                reason: `Attacking Pressure (+${deltaDA} DA in ~${timeDiffMins} mins)`,
+                timeframe: timeDiffMins,
+                deltas: { corners: deltaCorners, shots: deltaShots, sot: deltaSoT, da: deltaDA }
+            };
+        }
+    }
+
+    return { detected: false, trigger: null, timeframe: null };
 }
 
 // ============================================
@@ -377,13 +500,20 @@ async function fetchMatchStats(matchId) {
 }
 
 // ============================================
-// 🎯 Module A: "First Half Sniper" (IY 0.5 Üst)
+// 🎯 Strategy A: "First Half" (Time 20'-45', Score Diff <= 1)
 // ============================================
-function analyzeFirstHalfSniper(match, elapsed, stats) {
+function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
     const homeScore = match.home_team?.score || 0;
     const awayScore = match.away_team?.score || 0;
+    const scoreDiff = Math.abs(homeScore - awayScore);
 
-    if (elapsed < 15 || elapsed > 40 || homeScore !== 0 || awayScore !== 0) {
+    // Updated time range: 20' - 45', score diff <= 1
+    if (elapsed < 20 || elapsed > 45 || scoreDiff > 1) {
+        return null;
+    }
+
+    // Require momentum trigger (Dynamic Lookback)
+    if (!momentum || !momentum.detected) {
         return null;
     }
 
@@ -394,23 +524,21 @@ function analyzeFirstHalfSniper(match, elapsed, stats) {
     const totalSoT = (stats?.shotsOnTarget?.home || 0) + (stats?.shotsOnTarget?.away || 0);
     const totalCorners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
     const totalxG = (stats?.xG?.home || 0) + (stats?.xG?.away || 0);
-    const totalDA = (stats?.dangerousAttacks?.home || 0) + (stats?.dangerousAttacks?.away || 0);
-    const daPerMin = elapsed > 0 ? totalDA / elapsed : 0;
 
-    // Trigger (Gevşetilmiş Mod): Total Shots >= 3 AND DA/min >= 0.7
-    if (totalShots < 3 || daPerMin < 0.7) {
-        return null;
-    }
+    // Build confidence from momentum and stats
+    let confidencePercent = 55;
+    const reasons = [momentum.reason];
 
-    let criteriasMet = 0;
-    const reasons = [];
+    // Bonus confidence for strong stats
+    if (totalSoT >= 3) { confidencePercent += 8; reasons.push(`${totalSoT} SoT`); }
+    if (totalShots >= 5) { confidencePercent += 5; reasons.push(`${totalShots} shots`); }
+    if (totalCorners >= 3) { confidencePercent += 5; reasons.push(`${totalCorners} corners`); }
+    if (totalxG > 0.5) { confidencePercent += 7; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
 
-    if (totalSoT >= 2) { criteriasMet++; reasons.push(`${totalSoT} shots on target`); }
-    if (daPerMin > 1.0) { criteriasMet++; reasons.push(`DA/min: ${daPerMin.toFixed(2)}`); }
-    if (totalxG > 0.5) { criteriasMet++; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
-    if (totalCorners >= 3) { criteriasMet++; reasons.push(`${totalCorners} corners`); }
+    // Bonus for short timeframe momentum (more urgent)
+    if (momentum.timeframe <= 3) { confidencePercent += 10; }
+    else if (momentum.timeframe <= 6) { confidencePercent += 5; }
 
-    let confidencePercent = 60 + (criteriasMet * 10);
     if (confidencePercent > 95) confidencePercent = 95;
 
     return {
@@ -421,22 +549,24 @@ function analyzeFirstHalfSniper(match, elapsed, stats) {
         awayLogo: match.away_team?.image_path || '',
         score: `${homeScore}-${awayScore}`,
         elapsed,
-        strategy: 'IY 0.5 Ust',
-        strategyCode: 'IY_05',
+        strategy: 'First Half Goal',
+        strategyCode: 'FIRST_HALF',
+        phase: 'First Half',
         confidence: 'PENDING',
         confidencePercent,
         verdict: 'PENDING',
-        reason: reasons.join('. ') + '.',
+        reason: reasons.join(' | '),
+        momentumTrigger: momentum.trigger,
+        momentumTimeframe: momentum.timeframe,
         stats: {
             shots: totalShots,
             shots_on_target: totalSoT,
             corners: totalCorners,
-            dangerous_attacks: totalDA,
-            da_per_min: daPerMin.toFixed(2),
             xG: totalxG.toFixed(2),
             possession: `${stats?.possession?.home || 50}%-${stats?.possession?.away || 50}%`,
             homeOdds: homeOdds.toFixed(2),
-            awayOdds: awayOdds.toFixed(2)
+            awayOdds: awayOdds.toFixed(2),
+            deltas: momentum.deltas || {}
         },
         league: match.league_name || 'Unknown',
         leagueLogo: match.league_logo || '',
@@ -445,14 +575,20 @@ function analyzeFirstHalfSniper(match, elapsed, stats) {
 }
 
 // ============================================
-// 🔥 Module B: "Late Game Momentum" (MS Gol)
+// 🔥 Strategy B: "Late Game" (Time 60'-85', Score Diff <= 2)
 // ============================================
-function analyzeLateGameMomentum(match, elapsed, stats) {
+function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     const homeScore = match.home_team?.score || 0;
     const awayScore = match.away_team?.score || 0;
     const goalDiff = Math.abs(homeScore - awayScore);
 
+    // Time 60' - 85', score diff <= 2
     if (elapsed < 60 || elapsed > 85 || goalDiff > 2) {
+        return null;
+    }
+
+    // Require momentum trigger (Dynamic Lookback)
+    if (!momentum || !momentum.detected) {
         return null;
     }
 
@@ -463,25 +599,28 @@ function analyzeLateGameMomentum(match, elapsed, stats) {
     const totalShots = (stats?.shots?.home || 0) + (stats?.shots?.away || 0);
     const totalSoT = (stats?.shotsOnTarget?.home || 0) + (stats?.shotsOnTarget?.away || 0);
     const totalxG = (stats?.xG?.home || 0) + (stats?.xG?.away || 0);
-    const totalDA = (stats?.dangerousAttacks?.home || 0) + (stats?.dangerousAttacks?.away || 0);
     const totalCorners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
-    const daPerMin = elapsed > 0 ? totalDA / elapsed : 0;
 
-    // Trigger (Gevşetilmiş Mod): Shots >= 10 AND DA/min >= 0.8 AND Corners >= 3
-    if (totalShots < 10 || daPerMin < 0.8 || totalCorners < 3) {
-        return null;
-    }
+    // Build confidence from momentum and stats
+    let confidencePercent = 50;
+    const reasons = [momentum.reason];
 
-    let criteriasMet = 0;
-    const reasons = [];
+    // Bonus confidence for strong stats
+    if (totalSoT >= 5) { confidencePercent += 10; reasons.push(`${totalSoT} SoT`); }
+    if (totalShots >= 10) { confidencePercent += 8; reasons.push(`${totalShots} shots`); }
+    if (totalCorners >= 5) { confidencePercent += 5; reasons.push(`${totalCorners} corners`); }
+    if (totalxG > 1.0) { confidencePercent += 7; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
 
-    if (daPerMin > 0.9) { criteriasMet++; reasons.push(`DA/min: ${daPerMin.toFixed(2)}`); }
-    if (totalShots > 13) { criteriasMet++; reasons.push(`${totalShots} total shots`); }
-    if (totalSoT >= 4) { criteriasMet++; reasons.push(`${totalSoT} on target`); }
-    if (elapsed >= 65 && elapsed <= 78) { criteriasMet++; reasons.push(`Peak timing: ${elapsed}'`); }
-    if (goalDiff <= 1) { criteriasMet++; reasons.push(`Close game: ${homeScore}-${awayScore}`); }
+    // Bonus for close game (more likely to push for goal)
+    if (goalDiff <= 1) { confidencePercent += 8; reasons.push(`Close: ${homeScore}-${awayScore}`); }
 
-    let confidencePercent = 55 + (criteriasMet * 10);
+    // Bonus for peak timing (65-78 mins is prime scoring time)
+    if (elapsed >= 65 && elapsed <= 78) { confidencePercent += 7; reasons.push(`Peak: ${elapsed}'`); }
+
+    // Bonus for short timeframe momentum
+    if (momentum.timeframe <= 3) { confidencePercent += 10; }
+    else if (momentum.timeframe <= 6) { confidencePercent += 5; }
+
     if (confidencePercent > 95) confidencePercent = 95;
 
     return {
@@ -492,23 +631,25 @@ function analyzeLateGameMomentum(match, elapsed, stats) {
         awayLogo: match.away_team?.image_path || '',
         score: `${homeScore}-${awayScore}`,
         elapsed,
-        strategy: 'MS Gol',
-        strategyCode: 'MS_GOL',
+        strategy: 'Late Game Goal',
+        strategyCode: 'LATE_GAME',
+        phase: 'Late Game',
         confidence: 'PENDING',
         confidencePercent,
         verdict: 'PENDING',
-        reason: reasons.join('. ') + '.',
+        reason: reasons.join(' | '),
+        momentumTrigger: momentum.trigger,
+        momentumTimeframe: momentum.timeframe,
         stats: {
             shots: totalShots,
             shots_on_target: totalSoT,
             corners: totalCorners,
-            dangerous_attacks: totalDA,
-            da_per_min: daPerMin.toFixed(2),
             xG: totalxG.toFixed(2),
             possession: `${stats?.possession?.home || 50}%-${stats?.possession?.away || 50}%`,
             homeOdds: homeOdds.toFixed(2),
             awayOdds: awayOdds.toFixed(2),
-            drawOdds: drawOdds.toFixed(2)
+            drawOdds: drawOdds.toFixed(2),
+            deltas: momentum.deltas || {}
         },
         league: match.league_name || 'Unknown',
         leagueLogo: match.league_logo || '',
@@ -592,29 +733,32 @@ async function processMatches() {
     log.info(`───────────────────────────────────────────────────────`);
     log.info(`📋 Total Live Matches: ${allMatches.length}`);
 
-    // Filter candidates first
+    // Filter candidates by time ranges (20-45 for First Half, 60-85 for Late Game)
     const candidates = allMatches.filter(m => {
         const elapsed = parseElapsedTime(m.stage);
         const homeScore = m.home_team?.score || 0;
         const awayScore = m.away_team?.score || 0;
-        const goalDiff = Math.abs(homeScore - awayScore);
+        const scoreDiff = Math.abs(homeScore - awayScore);
 
-        const isIYCandidate = elapsed >= 15 && elapsed <= 40 && homeScore === 0 && awayScore === 0;
-        const isMSCandidate = elapsed >= 60 && elapsed <= 85 && goalDiff <= 2;
+        const isFirstHalfCandidate = elapsed >= 20 && elapsed <= 45 && scoreDiff <= 1;
+        const isLateGameCandidate = elapsed >= 60 && elapsed <= 85 && scoreDiff <= 2;
 
-        return isIYCandidate || isMSCandidate;
+        return isFirstHalfCandidate || isLateGameCandidate;
     });
 
-    log.info(`🎯 Candidates Matching Criteria: ${candidates.length}/${allMatches.length}`);
+    log.info(`🎯 Candidates Matching Time/Score: ${candidates.length}/${allMatches.length}`);
 
     if (candidates.length === 0) {
-        log.info('ℹ️ No matches meet IY 0.5 (15-40\', 0-0) or MS (60-85\', diff≤2) criteria');
+        log.info('ℹ️ No matches meet First Half (20-45\', diff≤1) or Late Game (60-85\', diff≤2) criteria');
         CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
         return signals;
     }
 
+    // Periodically clean old history entries
+    cleanOldHistory();
+
     log.info(`───────────────────────────────────────────────────────`);
-    log.info(`🔍 ANALYZING CANDIDATES:`);
+    log.info(`🔍 ANALYZING CANDIDATES (Momentum-Based):`);
 
     for (const match of candidates) {
         const elapsed = parseElapsedTime(match.stage);
@@ -630,23 +774,40 @@ async function processMatches() {
         const stats = statsData ? parseMatchStats(statsData) : null;
 
         if (stats) {
-            log.info(`      📈 Stats: Shots ${stats.shots.home + stats.shots.away} | SoT ${stats.shotsOnTarget.home + stats.shotsOnTarget.away} | Corners ${stats.corners.home + stats.corners.away} | DA ${stats.dangerousAttacks.home + stats.dangerousAttacks.away}`);
+            const totalShots = stats.shots.home + stats.shots.away;
+            const totalSoT = stats.shotsOnTarget.home + stats.shotsOnTarget.away;
+            const totalCorners = stats.corners.home + stats.corners.away;
+            log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
+
+            // Record to history buffer for momentum tracking
+            recordMatchStats(matchId, stats);
         } else {
             log.warn(`      ⚠️ Could not fetch stats for this match`);
+            continue; // Skip if no stats
         }
 
-        // Run scout filters
-        let candidate = analyzeFirstHalfSniper(match, elapsed, stats);
+        // Detect momentum (Dynamic Lookback)
+        const momentum = detectMomentum(matchId, stats);
+
+        if (momentum.detected) {
+            log.info(`      🔥 MOMENTUM: ${momentum.reason}`);
+        } else {
+            log.info(`      ⏸️ No momentum trigger yet (waiting for delta)`);
+            continue; // Skip if no momentum - this is the key filter!
+        }
+
+        // Run scout filters with momentum
+        let candidate = analyzeFirstHalfSniper(match, elapsed, stats, momentum);
         if (!candidate) {
-            candidate = analyzeLateGameMomentum(match, elapsed, stats);
+            candidate = analyzeLateGameMomentum(match, elapsed, stats, momentum);
         }
 
         if (!candidate) {
-            log.info(`      ❌ Failed scout filter criteria`);
+            log.info(`      ❌ Failed phase criteria (time/score mismatch)`);
             continue;
         }
 
-        log.info(`      ✓ Passed ${candidate.strategyCode} filter (${candidate.confidencePercent}% base)`);
+        log.info(`      ✓ ${candidate.phase}: ${candidate.strategyCode} (${candidate.confidencePercent}% base)`);
 
         // Send to Gemini for AI validation
         log.gemini(`      🤖 Asking Gemini AI...`);
