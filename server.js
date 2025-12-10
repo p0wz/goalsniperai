@@ -590,15 +590,25 @@ OUTPUT STRICTLY AS JSON:
             return result;
 
         } catch (error) {
-            const isOverloaded = error.response?.status === 503 || error.message?.includes('overloaded');
-            if (isOverloaded && attempt < MAX_RETRIES) {
-                const delay = attempt * 2000;
-                log.warn(`[Gemini] 503 - Retrying in ${delay / 1000}s (${attempt}/${MAX_RETRIES})...`);
+            const status = error.response?.status;
+            const isOverloaded = status === 503 || error.message?.includes('overloaded');
+            const isRateLimited = status === 429 || error.message?.includes('429') || error.message?.includes('quota');
+
+            if ((isOverloaded || isRateLimited) && attempt < MAX_RETRIES) {
+                // Longer delays for rate limit (5s, 10s, 15s)
+                const delay = isRateLimited ? attempt * 5000 : attempt * 2000;
+                const errType = isRateLimited ? '429 Rate Limit' : '503 Overloaded';
+                log.warn(`[Gemini] ${errType} - Retrying in ${delay / 1000}s (${attempt}/${MAX_RETRIES})...`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
             }
             log.error(`Gemini API error: ${error.message}`);
-            return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Gemini unavailable, using local analysis' };
+            // On error, use local analysis with high confidence if candidate has good stats
+            return {
+                verdict: candidate.confidencePercent >= 65 ? 'PLAY' : 'SKIP',
+                confidence: candidate.confidencePercent,
+                reason: 'Gemini unavailable, using local analysis'
+            };
         }
     }
     return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Max retries exceeded' };
