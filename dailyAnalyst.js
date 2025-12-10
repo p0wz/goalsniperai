@@ -290,11 +290,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation with Retry (Groq Llama 3.1 70B)
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+// 4. AI Validation with Retry (DeepSeek)
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
 
 async function validateWithAI(match, retries = 3) {
-    if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
+    if (!DEEPSEEK_API_KEY) return { verdict: 'SKIP', reason: 'DEEPSEEK_API_KEY not configured' };
 
     const prompt = `Analyze this football match for market: ${match.market}.
 Match: ${match.event_home_team} vs ${match.event_away_team}
@@ -309,18 +309,18 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            // Groq API (14,400 RPD limit)
+            // DeepSeek API
             const response = await axios.post(
-                'https://api.groq.com/openai/v1/chat/completions',
+                'https://api.deepseek.com/v1/chat/completions',
                 {
-                    model: 'llama-3.3-70b-versatile',
+                    model: 'deepseek-chat',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.2,
                     max_tokens: 200
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${GROQ_API_KEY}`,
+                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
                         'Content-Type': 'application/json'
                     },
                     timeout: 15000
@@ -329,16 +329,16 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
             let text = response.data?.choices?.[0]?.message?.content || '{}';
 
             // Log raw response
-            console.log(`[Groq Raw] ${text.substring(0, 200)}...`);
+            console.log(`[DeepSeek Raw] ${text.substring(0, 200)}...`);
 
-            // Clean up markdown formatting from Groq response
+            // Clean up markdown formatting
             text = text.trim();
             if (text.startsWith('```json')) text = text.slice(7);
             if (text.startsWith('```')) text = text.slice(3);
             if (text.endsWith('```')) text = text.slice(0, -3);
             text = text.trim();
 
-            console.log(`[Groq Clean] ${text}`);
+            console.log(`[DeepSeek Clean] ${text}`);
 
             return JSON.parse(text);
         } catch (e) {
