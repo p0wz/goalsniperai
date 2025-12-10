@@ -57,14 +57,31 @@ const ALLOWED_LEAGUES = [
     'Romania Liga I'
 ];
 
-// Helper: Check if league is allowed
+// Helper: Normalize Turkish/special characters
+function normalizeText(text) {
+    return text
+        .toLowerCase()
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ç/g, 'c')
+        .replace(/ı/g, 'i')
+        .replace(/ğ/g, 'g')
+        .replace(/ö/g, 'o')
+        .replace(/é/g, 'e')
+        .replace(/á/g, 'a')
+        .replace(/ñ/g, 'n')
+        .replace(/[^a-z0-9\s]/g, ''); // Remove other special chars
+}
+
+// Helper: Check if league is allowed (fuzzy match with normalization)
 function isLeagueAllowed(leagueName) {
     if (!leagueName) return false;
-    const lowerLeague = leagueName.toLowerCase();
-    return ALLOWED_LEAGUES.some(allowed =>
-        lowerLeague.includes(allowed.toLowerCase()) ||
-        allowed.toLowerCase().includes(lowerLeague)
-    );
+    const normalizedInput = normalizeText(leagueName);
+    return ALLOWED_LEAGUES.some(allowed => {
+        const normalizedAllowed = normalizeText(allowed);
+        return normalizedInput.includes(normalizedAllowed) ||
+            normalizedAllowed.includes(normalizedInput);
+    });
 }
 
 // Helper: Delay
