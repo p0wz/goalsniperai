@@ -17,7 +17,7 @@ const FLASHSCORE_API = {
 };
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MATCH_LIMIT = 50; // Reduced to save quota
+const MATCH_LIMIT = 50; // Quota safe limit
 
 // Helper: Delay
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -36,14 +36,203 @@ async function fetchWithRetry(url, options, retries = 2, delay = 1000) {
     }
 }
 
-// ... (fetchTodaysFixtures remains same)
+// Helper: Fetch Day
+async function fetchDay(day, log = console) {
+    try {
+        log.info(`[DailyAnalyst] Fetching day ${day}...`);
+        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/${day}/0`, {
+            headers: FLASHSCORE_API.headers
+        });
+        const data = response.data;
+        const parsed = [];
+        const list = Array.isArray(data) ? data : Object.values(data);
+
+        list.forEach(tournament => {
+            if (tournament.matches && Array.isArray(tournament.matches)) {
+                tournament.matches.forEach(match => {
+                    parsed.push({
+                        event_key: match.match_id,
+                        match_id: match.match_id,
+                        event_start_time: match.timestamp,
+                        event_home_team: match.home_team?.name || 'Unknown Home',
+                        event_away_team: match.away_team?.name || 'Unknown Away',
+                        league_name: tournament.name || 'Unknown League'
+                    });
+                });
+            }
+        });
+        log.info(`[DailyAnalyst] Parsed ${parsed.length} matches from Day ${day}.`);
+        return parsed;
+    } catch (e) {
+        log.error(`[DailyAnalyst] Failed to fetch day ${day}: ${e.message}`);
+        return [];
+    }
+}
+
+// 2. Fetch H2H
+async function fetchMatchH2H(matchId) {
+    try {
+        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`, {
+            headers: FLASHSCORE_API.headers
+        });
+        return response.data;
+    } catch (error) {
+        return null;
+    }
+}
+
+// Helper: Calculate Stats
+function calculateAdvancedStats(history, teamName) {
+    if (!history || !Array.isArray(history) || history.length === 0) return null;
+
+    let totalMatches = 0;
+    let totalGoals = 0;
+    let goalsScored = 0;
+    let goalsConceded = 0;
+    let over15Count = 0;
+    let under35Count = 0;
+    let bttsCount = 0;
+    let cleanSheetCount = 0;
+    let failedToScoreCount = 0;
+    let wins = 0;
+    let draws = 0;
+    let losses = 0;
+
+    for (const m of history) {
+        let s1 = 0, s2 = 0;
+        if (m.home_team?.score !== undefined && m.away_team?.score !== undefined) {
+            s1 = parseInt(m.home_team.score);
+            s2 = parseInt(m.away_team.score);
+        } else continue;
+
+        if (isNaN(s1) || isNaN(s2)) continue;
+
+        totalMatches++;
+        const total = s1 + s2;
+        totalGoals += total;
+
+        const isHome = m.home_team?.name === teamName;
+        const myScore = isHome ? s1 : s2;
+        const oppScore = isHome ? s2 : s1;
+
+        goalsScored += myScore;
+        goalsConceded += oppScore;
+
+        if (total > 1.5) over15Count++;
+        if (total <= 3.5) under35Count++;
+        if (s1 > 0 && s2 > 0) bttsCount++;
+        if (oppScore === 0) cleanSheetCount++;
+        if (myScore === 0) failedToScoreCount++;
+
+        if (myScore > oppScore) wins++;
+        else if (myScore === oppScore) draws++;
+        else losses++;
+    }
+
+    if (totalMatches === 0) return null;
+
+    return {
+        matches: totalMatches,
+        avgTotalGoals: totalGoals / totalMatches,
+        avgScored: goalsScored / totalMatches,
+        avgConceded: goalsConceded / totalMatches,
+        over15Rate: (over15Count / totalMatches) * 100,
+        under35Rate: (under35Count / totalMatches) * 100,
+        bttsRate: (bttsCount / totalMatches) * 100,
+        scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
+        winRate: (wins / totalMatches) * 100,
+        lossCount: losses
+    };
+}
+
+// 3. Process & Filter
+async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
+    const candidates = {
+        over15: [],
+        btts: [],
+        doubleChance: [],
+        homeOver15: [],
+        under35: []
+    };
+
+    let processed = 0;
+    let consecutiveErrors = 0;
+
+    for (const m of matches) {
+        if (processed >= limit) break;
+        if (consecutiveErrors >= 3) {
+            log.error('[DailyAnalyst] Circuit Breaker: Too many consecutive errors. Aborting.');
+            break;
+        }
+
+        const mid = m.event_key || m.match_id;
+        if (!mid) continue;
+
+        await sleep(800);
+
+        const h2hData = await fetchMatchH2H(mid);
+        if (!h2hData) {
+            consecutiveErrors++;
+            continue;
+        }
+
+        const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+
+        // Filter History
+        const homeAllHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team)).slice(0, 5);
+        const awayAllHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team)).slice(0, 5);
+        const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
+        const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
+        const mutualH2H = sections.filter(x =>
+            (x.home_team?.name === m.event_home_team && x.away_team?.name === m.event_away_team) ||
+            (x.home_team?.name === m.event_away_team && x.away_team?.name === m.event_home_team)
+        ).slice(0, 3);
+
+        const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
+        const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
+        const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
+        const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
+
+        if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
+            consecutiveErrors = 0;
+            continue;
+        }
+
+        consecutiveErrors = 0;
+        processed++;
+        const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
+        const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
+
+        // Logic A: Over 1.5
+        if (proxyLeagueAvg >= 2.5 && homeForm.over15Rate >= 60 && awayForm.over15Rate >= 60) {
+            candidates.over15.push({ ...m, filterStats: stats, market: 'Over 1.5 Goals' });
+        }
+        // Logic B: BTTS
+        if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
+            candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
+        }
+        // Logic C: 1X
+        if (homeHomeStats.lossCount <= 2 && awayAwayStats.winRate < 35) {
+            candidates.doubleChance.push({ ...m, filterStats: stats, market: '1X Double Chance' });
+        }
+        // Logic D: Home Over 1.5
+        if (homeHomeStats.avgScored >= 1.4 && awayAwayStats.avgConceded >= 1.2) {
+            candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
+        }
+        // Logic E: Under 3.5
+        let h2hSafe = mutualH2H.every(g => (parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0)) <= 4);
+        if (proxyLeagueAvg < 2.4 && homeForm.under35Rate >= 80 && awayForm.under35Rate >= 80 && h2hSafe) {
+            candidates.under35.push({ ...m, filterStats: stats, market: 'Under 3.5 Goals' });
+        }
+    }
+    return candidates;
+}
 
 // 4. AI Validation
 async function validateWithGemini(match) {
     if (!GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // Switched to 'gemini-pro' as 'gemini-1.5-flash' returned 404 for this library version
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `
@@ -72,8 +261,7 @@ async function validateWithGemini(match) {
 
 // Main Runner
 async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
-    // 1. Fetch
-    // Try Day 0 (Today) First - User Request
+    // Try Day 0 (Today) First
     let matches = await fetchDay(0, log);
 
     // Fallback to Day 1 (Tomorrow) if Today is empty
@@ -82,7 +270,6 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
         matches = await fetchDay(1, log);
     }
 
-    // Fallback: If 0 matches, maybe day '1' is tomorrow and today is empty?
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
         return { over15: [], btts: [], doubleChance: [], homeOver15: [], under35: [] };
@@ -90,28 +277,20 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
     log.info(`[DailyAnalyst] Found ${matches.length} raw fixtures. Processing top ${customLimit}...`);
 
-    // 2. Filter
     const candidates = await processAndFilter(matches, log, customLimit);
 
     const results = {
-        over15: [],
-        btts: [],
-        doubleChance: [],
-        homeOver15: [],
-        under35: []
+        over15: [], btts: [], doubleChance: [], homeOver15: [], under35: []
     };
 
-    // 3. AI Validate (Limit to top 3 per category)
     let aiCount = 0;
     for (const cat of Object.keys(candidates)) {
-        if (!candidates[cat]) continue; // Safety check
+        if (!candidates[cat]) continue;
         for (const match of candidates[cat].slice(0, 3)) {
             aiCount++;
             log.info(`[DailyAnalyst] Asking Gemini: ${match.event_home_team} vs ${match.event_away_team}`);
             const aiRes = await validateWithGemini(match);
             if (aiRes.verdict === 'PLAY') {
-
-                // Record Bet for Tracking
                 betTracker.recordBet({
                     match_id: match.event_key || match.match_id,
                     home_team: match.event_home_team,
