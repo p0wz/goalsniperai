@@ -14,6 +14,7 @@ const hpp = require('hpp');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 
 // Database & Auth
 const { initDatabase } = require('./database');
