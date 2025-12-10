@@ -127,7 +127,6 @@ const FLASHSCORE_API = {
     }
 };
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 // ============================================
@@ -446,13 +445,12 @@ function detectMomentum(matchId, currentStats) {
 }
 
 // ============================================
-// 🧠 AI Analyst (Groq Llama 3.1 / Gemini Fallback)
+// 🧠 AI Analyst (Groq Llama 3.1 70B)
 // ============================================
 async function askAIAnalyst(candidate) {
-    // Prefer Groq (14,400 RPD) over Gemini (20 RPD)
-    if (!GROQ_API_KEY && !GEMINI_API_KEY) {
-        log.warn('No AI API key configured, using local analysis');
-        return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Local analysis (AI disabled)' };
+    if (!GROQ_API_KEY) {
+        log.warn('[AI] GROQ_API_KEY not configured, using local analysis');
+        return { verdict: 'PLAY', confidence: candidate.confidencePercent, reason: 'Local analysis (Groq not configured)' };
     }
 
     const prompt = `You are an elite football betting analyst with 15+ years of experience.
@@ -500,40 +498,25 @@ OUTPUT STRICTLY AS JSON:
         try {
             let text = '';
 
-            // Try Groq first (14,400 RPD limit)
-            if (GROQ_API_KEY) {
-                const response = await axios.post(
-                    'https://api.groq.com/openai/v1/chat/completions',
-                    {
-                        model: 'llama-3.1-70b-versatile',
-                        messages: [{ role: 'user', content: prompt }],
-                        temperature: 0.2,
-                        max_tokens: 200,
-                        response_format: { type: 'json_object' }
+            // Groq API (14,400 RPD limit)
+            const response = await axios.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                {
+                    model: 'llama-3.1-70b-versatile',
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.2,
+                    max_tokens: 200
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${GROQ_API_KEY}`,
+                        'Content-Type': 'application/json'
                     },
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${GROQ_API_KEY}`,
-                            'Content-Type': 'application/json'
-                        },
-                        timeout: 15000
-                    }
-                );
-                text = response.data?.choices?.[0]?.message?.content || '{}';
-                log.info(`[Groq] Response received`);
-            }
-            // Fallback to Gemini
-            else if (GEMINI_API_KEY) {
-                const response = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-                    {
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.2, maxOutputTokens: 200 }
-                    },
-                    { timeout: 15000 }
-                );
-                text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-            }
+                    timeout: 15000
+                }
+            );
+            text = response.data?.choices?.[0]?.message?.content || '{}';
+            log.info(`[Groq] Response received`);
 
             // Clean up markdown formatting
             text = text.trim();

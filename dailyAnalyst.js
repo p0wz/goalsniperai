@@ -3,7 +3,6 @@
  * "The Daily Pre-Match Analyst" - Real Data Implementation
  */
 const axios = require('axios');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const betTracker = require('./betTracker');
 require('dotenv').config();
 
@@ -16,7 +15,6 @@ const FLASHSCORE_API = {
     }
 };
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MATCH_LIMIT = 50; // Quota safe limit
 
 // Helper: Delay
@@ -292,15 +290,15 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     return candidates;
 }
 
-// 4. AI Validation with Retry (Groq / Gemini Fallback)
+// 4. AI Validation with Retry (Groq Llama 3.1 70B)
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 async function validateWithAI(match, retries = 3) {
-    if (!GROQ_API_KEY && !GEMINI_API_KEY) return { verdict: 'SKIP', reason: 'No API Key' };
+    if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
 
     const prompt = `Analyze this football match for market: ${match.market}.
 Match: ${match.event_home_team} vs ${match.event_away_team}
-Stats: 
+Stats:
 - Home Form (Last 5): Over 1.5 Rate ${match.filterStats.homeForm.over15Rate.toFixed(0)}%, Avg Scored ${match.filterStats.homeForm.avgScored.toFixed(2)}
 - Away Form (Last 5): Over 1.5 Rate ${match.filterStats.awayForm.over15Rate.toFixed(0)}%, Avg Scored ${match.filterStats.awayForm.avgScored.toFixed(2)}
 - Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate.toFixed(0)}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored.toFixed(2)}
@@ -311,37 +309,24 @@ Respond in JSON: { "verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            let text = '';
-
-            // Try Groq first (14,400 RPD limit)
-            if (GROQ_API_KEY) {
-                const response = await axios.post(
-                    'https://api.groq.com/openai/v1/chat/completions',
-                    {
-                        model: 'llama-3.1-70b-versatile',
-                        messages: [{ role: 'user', content: prompt }],
-                        temperature: 0.2,
-                        max_tokens: 200,
-                        response_format: { type: 'json_object' }
+            // Groq API (14,400 RPD limit)
+            const response = await axios.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                {
+                    model: 'llama-3.1-70b-versatile',
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.2,
+                    max_tokens: 200
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${GROQ_API_KEY}`,
+                        'Content-Type': 'application/json'
                     },
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${GROQ_API_KEY}`,
-                            'Content-Type': 'application/json'
-                        },
-                        timeout: 15000
-                    }
-                );
-                text = response.data?.choices?.[0]?.message?.content || '{}';
-            }
-            // Fallback to Gemini
-            else if (GEMINI_API_KEY) {
-                const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                text = response.text().replace(/```json|```/g, '').trim();
-            }
+                    timeout: 15000
+                }
+            );
+            const text = response.data?.choices?.[0]?.message?.content || '{}';
 
             return JSON.parse(text);
         } catch (e) {
