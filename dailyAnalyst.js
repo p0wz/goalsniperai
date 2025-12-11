@@ -371,28 +371,42 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         // Check each filter
         const passedFilters = [];
 
-        // Logic A: Over 1.5
-        if (proxyLeagueAvg >= 2.5 && homeForm.over15Rate >= 60 && awayForm.over15Rate >= 60) {
+        // Logic A: Over 1.5 (IMPROVED)
+        // Lig ort ≥2.5, Her iki takım O1.5 ≥70%, Her iki takım scoringRate ≥70%
+        if (proxyLeagueAvg >= 2.5 &&
+            homeForm.over15Rate >= 70 && awayForm.over15Rate >= 70 &&
+            homeForm.scoringRate >= 70 && awayForm.scoringRate >= 70) {
             candidates.over15.push({ ...m, filterStats: stats, market: 'Over 1.5 Goals' });
             passedFilters.push('Over 1.5');
         }
-        // Logic B: Over 2.5
-        if (proxyLeagueAvg >= 2.8 && homeForm.over25Rate >= 60 && awayForm.over25Rate >= 60) {
+
+        // Logic B: Over 2.5 (IMPROVED)
+        // Lig ort ≥3.0, Her iki takım O2.5 ≥70%, Ev avgScored ≥1.5
+        if (proxyLeagueAvg >= 3.0 &&
+            homeForm.over25Rate >= 70 && awayForm.over25Rate >= 70 &&
+            homeHomeStats.avgScored >= 1.5) {
             candidates.over25.push({ ...m, filterStats: stats, market: 'Over 2.5 Goals' });
             passedFilters.push('Over 2.5');
         }
+
         // Logic C: BTTS - REMOVED
         // if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
         //     candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
         //     passedFilters.push('BTTS');
         // }
-        // Logic C: 1X
-        if (homeHomeStats.lossCount <= 2 && awayAwayStats.winRate < 35) {
+
+        // Logic D: 1X Double Chance (IMPROVED)
+        // Ev mağlubiyet ≤1, Dep kazanma <30%, Ev winRate ≥50%, Ev scoringRate ≥75%
+        if (homeHomeStats.lossCount <= 1 && awayAwayStats.winRate < 30 &&
+            homeHomeStats.winRate >= 50 && homeHomeStats.scoringRate >= 75) {
             candidates.doubleChance.push({ ...m, filterStats: stats, market: '1X Double Chance' });
             passedFilters.push('1X DC');
         }
-        // Logic D: Home Over 1.5
-        if (homeHomeStats.avgScored >= 1.4 && awayAwayStats.avgConceded >= 1.2) {
+
+        // Logic E: Home Over 1.5 (IMPROVED)
+        // Ev avgScored ≥1.6, Dep avgConceded ≥1.4, Ev scoringRate ≥80%, Ev over15Rate ≥60%
+        if (homeHomeStats.avgScored >= 1.6 && awayAwayStats.avgConceded >= 1.4 &&
+            homeHomeStats.scoringRate >= 80 && homeForm.over15Rate >= 60) {
             candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
             passedFilters.push('Home O1.5');
         }
