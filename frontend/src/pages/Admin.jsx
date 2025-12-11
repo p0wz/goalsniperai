@@ -67,15 +67,8 @@ export default function Admin() {
                 if (!res.ok) throw new Error('Approval failed');
             }
 
-            // Optimistic UI update
-            setSignals(s => s.map(x => x.id === id ? { ...x, isApproved: true } : x));
-
-            // For daily signals, deep update
-            const newDaily = { ...dailySignals };
-            Object.keys(newDaily).forEach(cat => {
-                newDaily[cat] = newDaily[cat].map(x => x.id === id ? { ...x, isApproved: true } : x);
-            });
-            setDailySignals(newDaily);
+            // Refresh data from server to get accurate state
+            await loadData();
         } catch (e) {
             alert("Error approving: " + e.message);
         }
@@ -274,8 +267,8 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
                     <div key={cat} className="mb-6">
                         <h3 className="font-semibold capitalize mb-2">{cat}</h3>
                         <div className="grid grid-cols-3 gap-4">
-                            {list && list.map((s, i) => (
-                                <AdminSignalCard key={i} signal={s} onApprove={onApprove} isDaily category={cat} />
+                            {list && list.map((s) => (
+                                <AdminSignalCard key={s.id} signal={s} onApprove={onApprove} isDaily category={cat} />
                             ))}
                         </div>
                     </div>
