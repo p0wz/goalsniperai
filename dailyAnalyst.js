@@ -281,7 +281,7 @@ function calculateAdvancedStats(history, teamName) {
 async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     const candidates = {
         over15: [],
-        btts: [],
+        // btts: [], // REMOVED
         doubleChance: [],
         homeOver15: [],
         under35: []
@@ -372,11 +372,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             candidates.over15.push({ ...m, filterStats: stats, market: 'Over 1.5 Goals' });
             passedFilters.push('Over 1.5');
         }
-        // Logic B: BTTS
-        if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
-            candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
-            passedFilters.push('BTTS');
-        }
+        // Logic B: BTTS - REMOVED
+        // if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
+        //     candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
+        //     passedFilters.push('BTTS');
+        // }
         // Logic C: 1X
         if (homeHomeStats.lossCount <= 2 && awayAwayStats.winRate < 35) {
             candidates.doubleChance.push({ ...m, filterStats: stats, market: '1X Double Chance' });
@@ -408,7 +408,7 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`   • Skipped (No H2H): ${skippedNoH2H}`);
     log.info(`   • Skipped (No Stats): ${skippedNoStats}`);
     log.info(`   • Over 1.5 candidates: ${candidates.over15.length}`);
-    log.info(`   • BTTS candidates: ${candidates.btts.length}`);
+    // log.info(`   • BTTS candidates: ${candidates.btts.length}`); // REMOVED
     log.info(`   • 1X DC candidates: ${candidates.doubleChance.length}`);
     log.info(`   • Home O1.5 candidates: ${candidates.homeOver15.length}`);
     log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
