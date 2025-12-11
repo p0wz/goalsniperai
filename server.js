@@ -206,13 +206,14 @@ function recordSignal(matchId, strategyCode) {
     log.info(`[SignalLimiter] Recorded signal: ${key} (count: ${DAILY_SIGNAL_COUNTS[key]}/${MAX_SIGNALS_PER_MATCH_STRATEGY})`);
 }
 
-function recordMatchStats(matchId, stats) {
+function recordMatchStats(matchId, stats, score = '0-0') {
     if (!MATCH_HISTORY[matchId]) {
         MATCH_HISTORY[matchId] = [];
     }
 
     MATCH_HISTORY[matchId].push({
         timestamp: Date.now(),
+        score: score,
         stats: { ...stats }
     });
 
@@ -418,7 +419,7 @@ const MOMENTUM_THRESHOLDS = {
     XG_SPIKE: 0.3           // +0.3 xG increase
 };
 
-function detectMomentum(matchId, currentStats) {
+function detectMomentum(matchId, currentStats, currentScore = '0-0') {
     const history = getMatchHistory(matchId);
     const now = Date.now();
 
@@ -436,6 +437,15 @@ function detectMomentum(matchId, currentStats) {
     // Check each historical snapshot (most recent first)
     for (let i = history.length - 1; i >= 0; i--) {
         const snapshot = history[i];
+
+        // CRITICAL: Stop if score changed (Goal reset momentum)
+        if (snapshot.score && snapshot.score !== currentScore) {
+            // A goal happened between this snapshot and now.
+            // We do not want to compare against stats BEFORE the goal, 
+            // as the goal event itself spikes the stats (momentum resolved).
+            break;
+        }
+
         const timeDiffMs = now - snapshot.timestamp;
         const timeDiffMins = Math.round(timeDiffMs / 60000);
 
@@ -1082,10 +1092,10 @@ async function processMatches() {
         log.info(`      ✅ ${baseCheck.reason}`);
 
         // Record to history AFTER base activity check passes
-        recordMatchStats(matchId, stats);
+        recordMatchStats(matchId, stats, score);
 
         // STEP 2: Detect Momentum (Dynamic Lookback)
-        const momentum = detectMomentum(matchId, stats);
+        const momentum = detectMomentum(matchId, stats, score);
 
         if (momentum.detected) {
             log.info(`      🔥 MOMENTUM: ${momentum.reason}`);
