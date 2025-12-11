@@ -176,9 +176,14 @@ async function fetchDay(day, log = console) {
                         return; // Skip this match
                     }
 
+                    // Generate a unique match ID (fallback if API doesn't provide one)
+                    const apiMatchId = match.match_id || match.id || match.eventId;
+                    const fallbackId = `${match.timestamp}_${(match.home_team?.name || '').substring(0, 4)}`;
+                    const uniqueMatchId = apiMatchId || fallbackId;
+
                     parsed.push({
-                        event_key: match.match_id,
-                        match_id: match.match_id,
+                        event_key: uniqueMatchId,
+                        match_id: uniqueMatchId,
                         event_start_time: match.timestamp,
                         event_home_team: match.home_team?.name || 'Unknown Home',
                         event_away_team: match.away_team?.name || 'Unknown Away',
@@ -557,11 +562,12 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
         log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates)`);
 
         for (const match of candidates[cat]) {
+            const generatedId = `${match.event_key || match.match_id}_${cat}`;
             results[cat].push({
                 match: `${match.event_home_team} vs ${match.event_away_team}`,
                 event_home_team: match.event_home_team,
                 event_away_team: match.event_away_team,
-                id: `${match.event_key || match.match_id}_${cat}`,
+                id: generatedId,
                 matchId: match.event_key || match.match_id,
                 startTime: match.event_start_time,
                 league: match.league_name,
@@ -569,7 +575,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
                 stats: match.filterStats,
                 status: 'PENDING_APPROVAL' // Admin needs to approve
             });
-            log.info(`   ✅ ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
+            log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
         }
     }
 
