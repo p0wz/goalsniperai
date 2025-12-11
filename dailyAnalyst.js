@@ -18,43 +18,83 @@ const FLASHSCORE_API = {
 const MATCH_LIMIT = 50; // Quota safe limit
 
 // Allowed Leagues Filter (Only analyze these leagues)
+// Format matches Flashscore API: "COUNTRY: League Name"
 const ALLOWED_LEAGUES = [
-    'UEFA Champions League',
-    'UEFA Europa League',
-    'UEFA Conference League',
-    'England Premier League',
-    'England Championship',
-    'Spain La Liga',
-    'Germany Bundesliga',
-    'Germany Bundesliga 2',
-    'Italy Serie A',
-    'France Ligue 1',
-    'Turkey Süper Lig',
-    'Netherlands Eredivisie',
-    'Portugal Liga Portugal',
-    'Belgium Pro League',
-    'Brazil Serie A',
-    'Argentina Liga Profesional',
-    'Chile Primera Division',
-    'USA MLS',
-    'Mexico Liga MX',
-    'Australia A-League',
-    'Japan J1 League',
-    'South Korea K-League 1',
-    'Saudi Pro League',
-    'Scotland Premiership',
-    'Austria Bundesliga',
-    'Switzerland Super League',
-    'Switzerland Challenge League',
-    'Denmark Superliga',
-    'Sweden Allsvenskan',
-    'Norway Eliteserien',
-    'Finland Veikkausliiga',
-    'Ireland Premier Division',
-    'Czech Republic 1. Liga',
-    'Poland Ekstraklasa',
-    'Greece Super League 1',
-    'Romania Liga I'
+    // UEFA
+    'Champions League',
+    'Europa League',
+    'Conference League',
+    // England
+    'Premier League',
+    'Championship',
+    // Spain
+    'La Liga',
+    'LaLiga',
+    // Germany
+    'Bundesliga',
+    // Italy
+    'Serie A',
+    // France
+    'Ligue 1',
+    // Turkey
+    'Super Lig',
+    'Süper Lig',
+    // Netherlands
+    'Eredivisie',
+    // Portugal
+    'Liga Portugal',
+    'Primeira Liga',
+    // Belgium
+    'Pro League',
+    'Jupiler',
+    // Brazil
+    'Serie A',
+    'Brasileirao',
+    // Argentina
+    'Liga Profesional',
+    'Primera Division',
+    // Chile
+    'Primera Division',
+    // USA
+    'MLS',
+    // Mexico
+    'Liga MX',
+    // Australia
+    'A-League',
+    // Japan
+    'J1 League',
+    'J. League',
+    // South Korea
+    'K League',
+    // Saudi Arabia
+    'Pro League',
+    'Saudi Professional',
+    // Scotland
+    'Premiership',
+    // Austria
+    'Bundesliga',
+    // Switzerland
+    'Super League',
+    'Challenge League',
+    // Denmark
+    'Superliga',
+    // Sweden
+    'Allsvenskan',
+    // Norway
+    'Eliteserien',
+    // Finland
+    'Veikkausliiga',
+    // Ireland
+    'Premier Division',
+    // Czech
+    'Liga',
+    // Poland
+    'Ekstraklasa',
+    // Greece
+    'Super League',
+    // Romania
+    'Liga I',
+    'Liga 1'
 ];
 
 // Helper: Normalize Turkish/special characters
@@ -454,16 +494,9 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     // 1. Fetch
     log.info(`\n📅 STEP 1: Fetching Match List`);
 
-    // Fetch both Day 1 (Today) and Day 2 (Tomorrow)
+    // Fetch Day 1 (Today) only
     log.info('[DailyAnalyst] Fetching Day 1 (Today)...');
-    const day1Matches = await fetchDay(1, log);
-
-    log.info('[DailyAnalyst] Fetching Day 2 (Tomorrow)...');
-    const day2Matches = await fetchDay(2, log);
-
-    // Merge both days
-    let matches = [...day1Matches, ...day2Matches];
-    log.info(`[DailyAnalyst] Combined: ${day1Matches.length} (today) + ${day2Matches.length} (tomorrow) = ${matches.length} total matches`);
+    let matches = await fetchDay(1, log);
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
