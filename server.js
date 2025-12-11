@@ -939,15 +939,22 @@ async function processMatches() {
     log.info(`───────────────────────────────────────────────────────`);
     log.info(`📋 Total Live Matches: ${allMatches.length}`);
 
-    // Filter candidates by time ranges (20-45 for First Half, 60-85 for Late Game)
+    // Filter candidates by time ranges (12-38 for First Half, 55-82 for Late Game)
     const candidates = allMatches.filter(m => {
         const elapsed = parseElapsedTime(m.stage);
         const homeScore = m.home_team?.score || 0;
         const awayScore = m.away_team?.score || 0;
         const scoreDiff = Math.abs(homeScore - awayScore);
+        const stageStr = (m.stage || '').toString().toUpperCase();
 
-        const isFirstHalfCandidate = elapsed >= 20 && elapsed <= 45 && scoreDiff <= 1;
-        const isLateGameCandidate = elapsed >= 60 && elapsed <= 85 && scoreDiff <= 2;
+        // Skip finished matches
+        const isFinished = stageStr.includes('FT') || stageStr.includes('AET') ||
+            stageStr.includes('PEN') || stageStr.includes('FINISHED') ||
+            elapsed >= 90;
+        if (isFinished) return false;
+
+        const isFirstHalfCandidate = elapsed >= 12 && elapsed <= 38 && scoreDiff <= 1;
+        const isLateGameCandidate = elapsed >= 55 && elapsed <= 82 && scoreDiff <= 2;
 
         return isFirstHalfCandidate || isLateGameCandidate;
     });
@@ -955,7 +962,7 @@ async function processMatches() {
     log.info(`🎯 Candidates Matching Time/Score: ${candidates.length}/${allMatches.length}`);
 
     if (candidates.length === 0) {
-        log.info('ℹ️ No matches meet First Half (20-45\', diff≤1) or Late Game (60-85\', diff≤2) criteria');
+        log.info('ℹ️ No matches meet First Half (12-38\', diff≤1) or Late Game (55-82\', diff≤2) criteria');
         CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
         return signals;
     }
