@@ -178,7 +178,10 @@ async function fetchDay(day, log = console) {
 
                     // Generate a unique match ID (fallback if API doesn't provide one)
                     const apiMatchId = match.match_id || match.id || match.eventId;
-                    const fallbackId = `${match.timestamp}_${(match.home_team?.name || '').substring(0, 4)}`;
+                    // Fallback: timestamp + first 3 chars of home + first 3 chars of away
+                    const homePart = (match.home_team?.name || 'UNK').substring(0, 3).toUpperCase();
+                    const awayPart = (match.away_team?.name || 'UNK').substring(0, 3).toUpperCase();
+                    const fallbackId = `${match.timestamp}_${homePart}_${awayPart}`;
                     const uniqueMatchId = apiMatchId || fallbackId;
 
                     parsed.push({
