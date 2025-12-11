@@ -246,11 +246,23 @@ const DAILY_LIMIT = 1000;
 function parseElapsedTime(stage) {
     if (!stage) return 0;
     const stageStr = String(stage).toLowerCase();
+
+    // Try to extract actual minute number first (handles "2nd half 65'", "65'", "65")
+    const minuteMatch = stageStr.match(/(\d+)/);
+    if (minuteMatch) {
+        const mins = parseInt(minuteMatch[1]);
+        // Sanity check: if we have a valid minute in football range
+        if (mins >= 1 && mins <= 120) {
+            return mins;
+        }
+    }
+
+    // Fallback for text-only stages
+    if (stageStr.includes('halftime') || stageStr.includes('ht')) return 45;
     if (stageStr.includes('2nd half')) return 60;
     if (stageStr.includes('1st half')) return 25;
-    if (stageStr.includes('halftime')) return 45;
-    const num = parseInt(stage);
-    return isNaN(num) ? 0 : num;
+
+    return 0;
 }
 
 // ============================================
