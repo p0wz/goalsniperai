@@ -888,6 +888,13 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     // Bonus for peak timing (65-78 mins is prime scoring time)
     if (elapsed >= 65 && elapsed <= 78) { confidencePercent += 7; reasons.push(`Peak: ${elapsed}'`); }
 
+    // Bonus for trailing team (losing team pushes harder for goals)
+    if (goalDiff >= 1 && goalDiff <= 2) {
+        confidencePercent += 6;
+        const trailing = homeScore < awayScore ? 'Home' : 'Away';
+        reasons.push(`⚡ ${trailing} chasing`);
+    }
+
     // Bonus for short timeframe momentum
     if (momentum.timeframe <= 3) { confidencePercent += 10; }
     else if (momentum.timeframe <= 6) { confidencePercent += 5; }
