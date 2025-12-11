@@ -781,15 +781,15 @@ function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
 }
 
 // ============================================
-// 🔥 Strategy B: "Late Game" (Time 60'-85', Score Diff <= 2)
+// 🔥 Strategy B: "Late Game" (Time 55'-82', Score Diff <= 2)
 // ============================================
 function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     const homeScore = match.home_team?.score || 0;
     const awayScore = match.away_team?.score || 0;
     const goalDiff = Math.abs(homeScore - awayScore);
 
-    // Time 60' - 85', score diff <= 2
-    if (elapsed < 60 || elapsed > 85 || goalDiff > 2) {
+    // Time 55' - 82', score diff <= 2
+    if (elapsed < 55 || elapsed > 82 || goalDiff > 2) {
         return null;
     }
 
