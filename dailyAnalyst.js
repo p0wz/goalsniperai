@@ -528,12 +528,18 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     for (const cat of Object.keys(candidates)) {
         if (!candidates[cat] || candidates[cat].length === 0) continue;
 
-        log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates, max 3 to AI)`);
+        const maxPerCategory = 10; // Increased from 3
+        log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates, max ${maxPerCategory} to AI)`);
 
-        for (const match of candidates[cat].slice(0, 3)) {
+        for (const match of candidates[cat].slice(0, maxPerCategory)) {
             aiCount++;
             log.info(`\n   [AI ${aiCount}] ${match.event_home_team} vs ${match.event_away_team}`);
             log.info(`          Market: ${match.market}`);
+
+            // Rate limit protection: 1.5s delay between AI calls
+            if (aiCount > 1) {
+                await sleep(1500);
+            }
 
             const aiRes = await validateWithAI(match);
 
