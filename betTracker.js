@@ -51,7 +51,7 @@ function saveDb(data) {
  * @param {String} strategyCode - Code for the strategy used
  * @param {Number} confidence - Confidence score
  */
-function recordBet(matchData, market, strategyCode, confidence) {
+function recordBet(matchData, market, strategyCode, confidence, source = 'live') {
     const db = loadDb();
 
     // Prevent Duplicates: Check if we already have a bet for this match & market
@@ -71,6 +71,7 @@ function recordBet(matchData, market, strategyCode, confidence) {
         market: market,
         strategy: strategyCode,
         confidence: confidence,
+        source: source, // 'live' or 'daily'
         status: 'PENDING', // PENDING, WON, LOST, VOID
         result_score: null,
         settled_at: null
@@ -78,7 +79,7 @@ function recordBet(matchData, market, strategyCode, confidence) {
 
     db.push(newBet);
     saveDb(db);
-    console.log(`[BetTracker] 📝 Bet Recorded: ${newBet.match} - ${market}`);
+    console.log(`[BetTracker] 📝 Bet Recorded [${source.toUpperCase()}]: ${newBet.match} - ${market}`);
 }
 
 // ============================================

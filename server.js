@@ -1392,7 +1392,7 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
                 match_id: matchData.matchId,
                 home_team: matchData.home_team,
                 away_team: matchData.away_team
-            }, market, category, confidence || 85);
+            }, market, category, confidence || 85, 'daily');
         }
 
         log.success(`Daily candidate approved: ${id}`);

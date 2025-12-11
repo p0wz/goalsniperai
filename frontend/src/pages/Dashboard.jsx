@@ -156,7 +156,8 @@ export default function Dashboard() {
                             <div className="flex gap-4">
                                 <TabBtn active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon="⚡">Canlı Bot</TabBtn>
                                 <TabBtn active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} icon="📅">Maç Önü Analiz</TabBtn>
-                                <TabBtn active={activeTab === 'history'} onClick={() => { setActiveTab('history'); fetchBetHistory(); }} icon="📊">Geçmiş</TabBtn>
+                                <TabBtn active={activeTab === 'liveHistory'} onClick={() => { setActiveTab('liveHistory'); fetchBetHistory(); }} icon="📊">Canlı Geçmiş</TabBtn>
+                                <TabBtn active={activeTab === 'dailyHistory'} onClick={() => { setActiveTab('dailyHistory'); fetchBetHistory(); }} icon="📋">Daily Geçmiş</TabBtn>
                             </div>
                         </div>
                         {activeTab === 'live' && (
@@ -220,65 +221,119 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {/* HISTORY TAB */}
-                    {activeTab === 'history' && (
-                        <div className="space-y-6">
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-4 gap-4">
-                                <StatCard label="Toplam Bahis" value={betStats.totalBets} accent />
-                                <StatCard label="Kazanma Oranı" value={betStats.winRate} />
-                                <StatCard label="Kar/Zarar" value={betStats.profit > 0 ? `+${betStats.profit}` : betStats.profit} />
-                                <StatCard label="Bekleyen" value={betHistory.filter(b => b.status === 'PENDING').length} />
-                            </div>
-
-                            {/* Market Breakdown */}
-                            {Object.keys(betStats.markets || {}).length > 0 && (
-                                <div className="bg-card border border-border rounded-xl p-4">
-                                    <h3 className="font-semibold mb-3">Market Bazlı Performans</h3>
-                                    <div className="flex flex-wrap gap-3">
-                                        {Object.entries(betStats.markets || {}).map(([market, rate]) => (
-                                            <Badge key={market} variant="outline">{market}: {rate}</Badge>
-                                        ))}
+                    {/* LIVE HISTORY TAB */}
+                    {activeTab === 'liveHistory' && (() => {
+                        const liveBets = betHistory.filter(b => b.source === 'live' || !b.source);
+                        const liveStats = {
+                            total: liveBets.length,
+                            won: liveBets.filter(b => b.status === 'WON').length,
+                            lost: liveBets.filter(b => b.status === 'LOST').length,
+                            pending: liveBets.filter(b => b.status === 'PENDING').length
+                        };
+                        liveStats.winRate = liveStats.won + liveStats.lost > 0
+                            ? Math.round((liveStats.won / (liveStats.won + liveStats.lost)) * 100) + '%'
+                            : '-';
+                        return (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-4 gap-4">
+                                    <StatCard label="Toplam" value={liveStats.total} accent />
+                                    <StatCard label="Kazanma Oranı" value={liveStats.winRate} />
+                                    <StatCard label="Kazandı" value={liveStats.won} />
+                                    <StatCard label="Bekleyen" value={liveStats.pending} />
+                                </div>
+                                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                                    <div className="p-4 border-b border-border">
+                                        <h3 className="font-semibold">⚡ Canlı Bot Geçmişi ({liveBets.length})</h3>
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Bet List */}
-                            <div className="bg-card border border-border rounded-xl overflow-hidden">
-                                <div className="p-4 border-b border-border">
-                                    <h3 className="font-semibold">Tahmin Geçmişi ({betHistory.length})</h3>
-                                </div>
-                                <div className="divide-y divide-border">
-                                    {betHistory.length === 0 ? (
-                                        <div className="p-8 text-center text-muted-foreground">Henüz tahmin kaydı yok.</div>
-                                    ) : (
-                                        betHistory.slice(0, 50).map((bet, i) => (
-                                            <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
-                                                <div className="flex-1">
-                                                    <div className="font-medium">{bet.match}</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                    <div className="divide-y divide-border">
+                                        {liveBets.length === 0 ? (
+                                            <div className="p-8 text-center text-muted-foreground">Henüz canlı bot kaydı yok.</div>
+                                        ) : (
+                                            liveBets.slice(0, 50).map((bet) => (
+                                                <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium">{bet.match}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {bet.strategy} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {bet.status === 'PENDING' ? (
+                                                            <>
+                                                                <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅</button>
+                                                                <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌</button>
+                                                            </>
+                                                        ) : (
+                                                            <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
+                                                                {bet.status === 'WON' ? '✅' : '❌'}
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {bet.status === 'PENDING' ? (
-                                                        <>
-                                                            <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅ Kazandı</button>
-                                                            <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌ Kaybetti</button>
-                                                        </>
-                                                    ) : (
-                                                        <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
-                                                            {bet.status === 'WON' ? '✅ Kazandı' : '❌ Kaybetti'}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
+
+                    {/* DAILY HISTORY TAB */}
+                    {activeTab === 'dailyHistory' && (() => {
+                        const dailyBets = betHistory.filter(b => b.source === 'daily');
+                        const dailyStats = {
+                            total: dailyBets.length,
+                            won: dailyBets.filter(b => b.status === 'WON').length,
+                            lost: dailyBets.filter(b => b.status === 'LOST').length,
+                            pending: dailyBets.filter(b => b.status === 'PENDING').length
+                        };
+                        dailyStats.winRate = dailyStats.won + dailyStats.lost > 0
+                            ? Math.round((dailyStats.won / (dailyStats.won + dailyStats.lost)) * 100) + '%'
+                            : '-';
+                        return (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-4 gap-4">
+                                    <StatCard label="Toplam" value={dailyStats.total} accent />
+                                    <StatCard label="Kazanma Oranı" value={dailyStats.winRate} />
+                                    <StatCard label="Kazandı" value={dailyStats.won} />
+                                    <StatCard label="Bekleyen" value={dailyStats.pending} />
+                                </div>
+                                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                                    <div className="p-4 border-b border-border">
+                                        <h3 className="font-semibold">📅 Daily Analyst Geçmişi ({dailyBets.length})</h3>
+                                    </div>
+                                    <div className="divide-y divide-border">
+                                        {dailyBets.length === 0 ? (
+                                            <div className="p-8 text-center text-muted-foreground">Henüz daily analyst kaydı yok.</div>
+                                        ) : (
+                                            dailyBets.slice(0, 50).map((bet) => (
+                                                <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium">{bet.match}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {bet.status === 'PENDING' ? (
+                                                            <>
+                                                                <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅</button>
+                                                                <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌</button>
+                                                            </>
+                                                        ) : (
+                                                            <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
+                                                                {bet.status === 'WON' ? '✅' : '❌'}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                 </motion.div>
             </main>
