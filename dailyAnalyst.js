@@ -18,83 +18,86 @@ const FLASHSCORE_API = {
 const MATCH_LIMIT = 50; // Quota safe limit
 
 // Allowed Leagues Filter (Only analyze these leagues)
-// Format matches Flashscore API: "COUNTRY: League Name"
+// Format: "COUNTRY: League" - matches API format exactly
 const ALLOWED_LEAGUES = [
-    // UEFA
-    'Champions League',
-    'Europa League',
-    'Conference League',
+    // UEFA - EUROPE prefix
+    'EUROPE: Champions League',
+    'EUROPE: Europa League',
+    'EUROPE: Conference League',
     // England
-    'Premier League',
-    'Championship',
+    'ENGLAND: Premier League',
+    'ENGLAND: Championship',
     // Spain
-    'La Liga',
-    'LaLiga',
+    'SPAIN: La Liga',
+    'SPAIN: LaLiga',
     // Germany
-    'Bundesliga',
+    'GERMANY: Bundesliga',
+    'GERMANY: 2. Bundesliga',
     // Italy
-    'Serie A',
+    'ITALY: Serie A',
     // France
-    'Ligue 1',
+    'FRANCE: Ligue 1',
     // Turkey
-    'Super Lig',
-    'Süper Lig',
+    'TURKEY: Super Lig',
+    'TURKIYE: Super Lig',
     // Netherlands
-    'Eredivisie',
+    'NETHERLANDS: Eredivisie',
     // Portugal
-    'Liga Portugal',
-    'Primeira Liga',
+    'PORTUGAL: Liga Portugal',
+    'PORTUGAL: Primeira Liga',
     // Belgium
-    'Pro League',
-    'Jupiler',
+    'BELGIUM: Pro League',
+    'BELGIUM: Jupiler',
     // Brazil
-    'Serie A',
-    'Brasileirao',
+    'BRAZIL: Serie A',
+    'BRAZIL: Brasileirao',
     // Argentina
-    'Liga Profesional',
-    'Primera Division',
+    'ARGENTINA: Liga Profesional',
+    'ARGENTINA: Primera Division',
     // Chile
-    'Primera Division',
+    'CHILE: Primera Division',
     // USA
-    'MLS',
+    'USA: MLS',
     // Mexico
-    'Liga MX',
+    'MEXICO: Liga MX',
     // Australia
-    'A-League',
+    'AUSTRALIA: A-League',
     // Japan
-    'J1 League',
-    'J. League',
+    'JAPAN: J1 League',
+    'JAPAN: J. League',
     // South Korea
-    'K League',
+    'SOUTH KOREA: K League',
+    'KOREA: K League',
     // Saudi Arabia
-    'Pro League',
-    'Saudi Professional',
+    'SAUDI ARABIA: Pro League',
+    'SAUDI ARABIA: Saudi Professional',
     // Scotland
-    'Premiership',
+    'SCOTLAND: Premiership',
     // Austria
-    'Bundesliga',
+    'AUSTRIA: Bundesliga',
     // Switzerland
-    'Super League',
-    'Challenge League',
+    'SWITZERLAND: Super League',
+    'SWITZERLAND: Challenge League',
     // Denmark
-    'Superliga',
+    'DENMARK: Superliga',
     // Sweden
-    'Allsvenskan',
+    'SWEDEN: Allsvenskan',
     // Norway
-    'Eliteserien',
+    'NORWAY: Eliteserien',
     // Finland
-    'Veikkausliiga',
+    'FINLAND: Veikkausliiga',
     // Ireland
-    'Premier Division',
-    // Czech
-    'Liga',
+    'IRELAND: Premier Division',
+    // Czech Republic
+    'CZECH REPUBLIC: 1. Liga',
+    'CZECHIA: 1. Liga',
     // Poland
-    'Ekstraklasa',
+    'POLAND: Ekstraklasa',
     // Greece
-    'Super League',
+    'GREECE: Super League',
     // Romania
-    'Liga I',
-    'Liga 1'
+    'ROMANIA: Liga I',
+    'ROMANIA: Liga 1'
 ];
 
 // Helper: Normalize Turkish/special characters
