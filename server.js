@@ -176,6 +176,36 @@ const MATCH_HISTORY = {};
 const MAX_HISTORY_LENGTH = 4;
 const MAX_LOOKBACK_MS = 12 * 60 * 1000; // 12 minutes
 
+// ============================================
+// 🔒 Daily Signal Limiter (Max 2 per match per strategy)
+// ============================================
+// Structure: { "YYYY-MM-DD": { "matchId_STRATEGY": count } }
+let DAILY_SIGNAL_COUNTS = {};
+let DAILY_SIGNAL_DATE = null;
+const MAX_SIGNALS_PER_MATCH_STRATEGY = 2;
+
+function checkSignalLimit(matchId, strategyCode) {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Reset daily counters if new day
+    if (DAILY_SIGNAL_DATE !== today) {
+        DAILY_SIGNAL_COUNTS = {};
+        DAILY_SIGNAL_DATE = today;
+        log.info(`[SignalLimiter] New day detected, counters reset`);
+    }
+
+    const key = `${matchId}_${strategyCode}`;
+    const count = DAILY_SIGNAL_COUNTS[key] || 0;
+
+    return count < MAX_SIGNALS_PER_MATCH_STRATEGY;
+}
+
+function recordSignal(matchId, strategyCode) {
+    const key = `${matchId}_${strategyCode}`;
+    DAILY_SIGNAL_COUNTS[key] = (DAILY_SIGNAL_COUNTS[key] || 0) + 1;
+    log.info(`[SignalLimiter] Recorded signal: ${key} (count: ${DAILY_SIGNAL_COUNTS[key]}/${MAX_SIGNALS_PER_MATCH_STRATEGY})`);
+}
+
 function recordMatchStats(matchId, stats) {
     if (!MATCH_HISTORY[matchId]) {
         MATCH_HISTORY[matchId] = [];
@@ -970,6 +1000,10 @@ async function processMatches() {
     // Periodically clean old history entries
     cleanOldHistory();
 
+    // Track signals sent per match per strategy (prevent duplicates)
+    // Structure: { matchId_strategyCode: true }
+    const sentSignals = new Set();
+
     log.info(`───────────────────────────────────────────────────────`);
     log.info(`🔍 ANALYZING CANDIDATES (Momentum-Based):`);
 
@@ -1029,6 +1063,12 @@ async function processMatches() {
             continue;
         }
 
+        // Check daily signal limit (max 2 per match per strategy)
+        if (!checkSignalLimit(matchId, candidate.strategyCode)) {
+            log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode} (max ${MAX_SIGNALS_PER_MATCH_STRATEGY}/day)`);
+            continue;
+        }
+
         // Include base activity in reason
         candidate.reason = `${baseCheck.reason} + ${candidate.reason}`;
 
@@ -1049,6 +1089,9 @@ async function processMatches() {
             candidate.id = `${matchId}_${candidate.strategyCode}`;
             log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
             signals.push(candidate);
+
+            // Record signal for daily limit tracking
+            recordSignal(matchId, candidate.strategyCode);
 
             // Auto-approve live signals (no admin approval needed)
             APPROVED_IDS.add(candidate.id);
