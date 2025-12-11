@@ -1139,11 +1139,15 @@ async function processMatches() {
             APPROVED_IDS.add(candidate.id);
 
             // 📝 Record bet to history (for Dashboard tracking)
+            const homeScore = match.home_team?.score || 0;
+            const awayScore = match.away_team?.score || 0;
+            const entryScore = `${homeScore}-${awayScore}`;
+
             await betTracker.recordBet({
                 match_id: matchId,
                 home_team: match.home_team?.name || 'Unknown',
                 away_team: match.away_team?.name || 'Unknown'
-            }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live');
+            }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live', entryScore);
 
             // Send Telegram notification
             await sendTelegramNotification(candidate);

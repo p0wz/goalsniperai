@@ -70,7 +70,7 @@ async function saveDb(data) {
 // ============================================
 // 📝 Record Bet
 // ============================================
-async function recordBet(matchData, market, strategyCode, confidence, source = 'live') {
+async function recordBet(matchData, market, strategyCode, confidence, source = 'live', entryScore = null) {
     const db = await loadDb();
 
     // Prevent Duplicates
@@ -91,6 +91,7 @@ async function recordBet(matchData, market, strategyCode, confidence, source = '
         strategy: strategyCode,
         confidence: confidence,
         source: source,
+        entry_score: entryScore, // Score when bet was placed (e.g., "1-0")
         status: 'PENDING',
         result_score: null,
         settled_at: null,
@@ -99,7 +100,7 @@ async function recordBet(matchData, market, strategyCode, confidence, source = '
 
     db.push(newBet);
     await saveDb(db);
-    console.log(`[BetTracker] 📝 Bet Recorded [${source.toUpperCase()}]: ${newBet.match} - ${market}`);
+    console.log(`[BetTracker] 📝 Bet Recorded [${source.toUpperCase()}]: ${newBet.match} @ ${entryScore || 'N/A'} - ${market}`);
 }
 
 // ============================================

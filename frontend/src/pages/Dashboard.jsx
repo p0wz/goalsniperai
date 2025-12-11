@@ -252,9 +252,9 @@ export default function Dashboard() {
                                             liveBets.slice(0, 50).map((bet) => (
                                                 <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
                                                     <div className="flex-1">
-                                                        <div className="font-medium">{bet.match}</div>
+                                                        <div className="font-medium">{bet.match} {bet.entry_score && <span className="text-accent ml-2">@ {bet.entry_score}</span>}</div>
                                                         <div className="text-sm text-muted-foreground">
-                                                            {bet.strategy} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                                            {bet.strategy} • {bet.date} {bet.result_score && `• Son: ${bet.result_score}`}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
