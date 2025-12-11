@@ -177,12 +177,12 @@ const MAX_HISTORY_LENGTH = 4;
 const MAX_LOOKBACK_MS = 12 * 60 * 1000; // 12 minutes
 
 // ============================================
-// 🔒 Daily Signal Limiter (Max 2 per match per strategy)
+// 🔒 Daily Signal Limiter (Max 1 per match per strategy)
 // ============================================
 // Structure: { "YYYY-MM-DD": { "matchId_STRATEGY": count } }
 let DAILY_SIGNAL_COUNTS = {};
 let DAILY_SIGNAL_DATE = null;
-const MAX_SIGNALS_PER_MATCH_STRATEGY = 2;
+const MAX_SIGNALS_PER_MATCH_STRATEGY = 1;
 
 function checkSignalLimit(matchId, strategyCode) {
     const today = new Date().toISOString().split('T')[0];
