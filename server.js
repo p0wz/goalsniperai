@@ -1138,6 +1138,13 @@ async function processMatches() {
             // Auto-approve live signals (no admin approval needed)
             APPROVED_IDS.add(candidate.id);
 
+            // 📝 Record bet to history (for Dashboard tracking)
+            await betTracker.recordBet({
+                match_id: matchId,
+                home_team: match.home_team?.name || 'Unknown',
+                away_team: match.away_team?.name || 'Unknown'
+            }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live');
+
             // Send Telegram notification
             await sendTelegramNotification(candidate);
         } else {
