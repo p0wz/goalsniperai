@@ -50,20 +50,32 @@ export default function Admin() {
         } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
-    const handleApprove = async (id) => {
+    const handleApprove = async (id, matchData = null, market = null, category = null) => {
         try {
-            const res = await fetch(`${API_URL}/api/admin/approve/${id}`, { method: 'POST', credentials: 'include' });
-            if (res.ok) {
-                // Optimistic UI update
-                setSignals(s => s.map(x => x.id === id ? { ...x, isApproved: true } : x));
-
-                // For daily signals, deep update
-                const newDaily = { ...dailySignals };
-                Object.keys(newDaily).forEach(cat => {
-                    newDaily[cat] = newDaily[cat].map(x => x.id === id ? { ...x, isApproved: true } : x);
+            // For daily signals, use the new approval endpoint
+            if (matchData) {
+                const res = await fetch(`${API_URL}/api/daily-analysis/approve/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ matchData, market, category, confidence: 85 })
                 });
-                setDailySignals(newDaily);
+                if (!res.ok) throw new Error('Approval failed');
+            } else {
+                // Legacy live signal approval
+                const res = await fetch(`${API_URL}/api/admin/approve/${id}`, { method: 'POST', credentials: 'include' });
+                if (!res.ok) throw new Error('Approval failed');
             }
+
+            // Optimistic UI update
+            setSignals(s => s.map(x => x.id === id ? { ...x, isApproved: true } : x));
+
+            // For daily signals, deep update
+            const newDaily = { ...dailySignals };
+            Object.keys(newDaily).forEach(cat => {
+                newDaily[cat] = newDaily[cat].map(x => x.id === id ? { ...x, isApproved: true } : x);
+            });
+            setDailySignals(newDaily);
         } catch (e) {
             alert("Error approving: " + e.message);
         }
@@ -263,7 +275,7 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
                         <h3 className="font-semibold capitalize mb-2">{cat}</h3>
                         <div className="grid grid-cols-3 gap-4">
                             {list && list.map((s, i) => (
-                                <AdminSignalCard key={i} signal={s} onApprove={onApprove} isDaily />
+                                <AdminSignalCard key={i} signal={s} onApprove={onApprove} isDaily category={cat} />
                             ))}
                         </div>
                     </div>
@@ -273,15 +285,33 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
     )
 }
 
-function AdminSignalCard({ signal, onApprove, isDaily }) {
+function AdminSignalCard({ signal, onApprove, isDaily, category }) {
+    const handleClick = () => {
+        if (isDaily) {
+            // Daily signal: pass match data for bet tracking
+            const matchData = {
+                matchId: signal.matchId,
+                home_team: signal.event_home_team,
+                away_team: signal.event_away_team
+            };
+            onApprove(signal.id, matchData, signal.market, category);
+        } else {
+            // Live signal: legacy approval
+            onApprove(signal.id);
+        }
+    };
+
     return (
         <div className={`relative p-4 rounded-xl border ${signal.isApproved ? 'bg-green-500/10 border-green-500/30' : 'bg-card border-border'}`}>
             <div className="flex justify-between mb-2">
                 <span className="font-bold text-sm">{isDaily ? signal.event_home_team : signal.home} vs {isDaily ? signal.event_away_team : signal.away}</span>
                 {signal.isApproved ? <span className="text-green-500 text-xs font-bold">ONAYLANDI</span> : <span className="text-yellow-500 text-xs font-bold">BEKLİYOR</span>}
             </div>
+            {isDaily && signal.market && (
+                <div className="text-xs text-muted-foreground mb-2">{signal.market} • {signal.league || ''}</div>
+            )}
             {!signal.isApproved && (
-                <Button className="w-full mt-2 bg-green-600 hover:bg-green-700 h-8 text-xs" onClick={() => onApprove(signal.id)}>
+                <Button className="w-full mt-2 bg-green-600 hover:bg-green-700 h-8 text-xs" onClick={handleClick}>
                     ONAYLA ✅
                 </Button>
             )}

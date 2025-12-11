@@ -539,62 +539,37 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`\n📈 STEP 2: H2H Analysis & Filtering`);
     const candidates = await processAndFilter(matches, log, customLimit);
 
+    // Count total candidates
+    const totalCandidates = Object.values(candidates).reduce((sum, arr) => sum + arr.length, 0);
+
+    // 3. Prepare results for admin approval (NO AI - direct return)
+    log.info(`\n📋 STEP 3: Preparing candidates for Admin Approval`);
+    log.info(`═══════════════════════════════════════════════════════`);
+
     const results = {
         over15: [], over25: [], doubleChance: [], homeOver15: [], under35: []
     };
 
-    // 3. AI Validation
-    const totalCandidates = Object.values(candidates).reduce((sum, arr) => sum + arr.length, 0);
-    log.info(`\n🤖 STEP 3: AI VALIDATION (${totalCandidates} candidates)`);
-    log.info(`═══════════════════════════════════════════════════════`);
-
-    let aiCount = 0;
-    let playCount = 0;
-    let skipCount = 0;
-
+    // Convert candidates to results format (no AI validation)
     for (const cat of Object.keys(candidates)) {
         if (!candidates[cat] || candidates[cat].length === 0) continue;
 
-        const maxPerCategory = 10; // Increased from 3
-        log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates, max ${maxPerCategory} to AI)`);
+        log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates)`);
 
-        for (const match of candidates[cat].slice(0, maxPerCategory)) {
-            aiCount++;
-            log.info(`\n   [AI ${aiCount}] ${match.event_home_team} vs ${match.event_away_team}`);
-            log.info(`          Market: ${match.market}`);
-
-            // Rate limit protection: 2.5s delay for Llama 4 Scout (30 RPM limit)
-            if (aiCount > 1) {
-                await sleep(2500);
-            }
-
-            const aiRes = await validateWithAI(match);
-
-            // Log AI Response Details
-            if (aiRes.verdict === 'PLAY') {
-                playCount++;
-                log.info(`          ✅ PLAY - ${aiRes.confidence}%`);
-                log.info(`          📝 ${aiRes.reason}`);
-
-                betTracker.recordBet({
-                    match_id: match.event_key || match.match_id,
-                    home_team: match.event_home_team,
-                    away_team: match.event_away_team
-                }, match.market, cat, aiRes.confidence);
-
-                results[cat].push({
-                    match: `${match.event_home_team} vs ${match.event_away_team}`,
-                    event_home_team: match.event_home_team,
-                    event_away_team: match.event_away_team,
-                    id: `${match.event_key || match.match_id}_${cat}`,
-                    startTime: match.event_start_time,
-                    stats: match.filterStats,
-                    aiAnalysis: aiRes
-                });
-            } else {
-                skipCount++;
-                log.info(`          ⏭️ SKIP - ${aiRes.reason || 'No reason'}`);
-            }
+        for (const match of candidates[cat]) {
+            results[cat].push({
+                match: `${match.event_home_team} vs ${match.event_away_team}`,
+                event_home_team: match.event_home_team,
+                event_away_team: match.event_away_team,
+                id: `${match.event_key || match.match_id}_${cat}`,
+                matchId: match.event_key || match.match_id,
+                startTime: match.event_start_time,
+                league: match.league_name,
+                market: match.market,
+                stats: match.filterStats,
+                status: 'PENDING_APPROVAL' // Admin needs to approve
+            });
+            log.info(`   ✅ ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
         }
     }
 
@@ -607,13 +582,11 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`╠═══════════════════════════════════════════════════════╣`);
     log.info(`║  Duration: ${duration}s                                    ║`);
     log.info(`║  Matches Scanned: ${customLimit}                               ║`);
-    log.info(`║  AI Validations: ${aiCount}                                  ║`);
-    log.info(`║  PLAY Signals: ${playCount}                                    ║`);
-    log.info(`║  SKIP Count: ${skipCount}                                      ║`);
+    log.info(`║  Candidates Found: ${totalCandidates}                             ║`);
     log.info(`╠═══════════════════════════════════════════════════════╣`);
     log.info(`║  Over 1.5: ${results.over15.length} | Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length}  ║`);
     log.info(`╚═══════════════════════════════════════════════════════╝`);
-    log.info(`\n`);
+    log.info(`\n⏳ Waiting for Admin Approval in Admin Panel...`);
 
     return results;
 }

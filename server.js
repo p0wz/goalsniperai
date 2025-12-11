@@ -1226,7 +1226,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
     // Helper to filter results based on role & approval
     const filterResults = (results) => {
-        const categories = ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35'];
+        const categories = ['over15', 'over25', 'doubleChance', 'homeOver15', 'under35'];
         const filtered = {};
 
         categories.forEach(cat => {
@@ -1281,6 +1281,38 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
         res.json({ success: true, data: filterResults(processedResults) });
     } catch (error) {
         log.error(`Daily Analyst Error: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// ✅ Approve Daily Candidate (Manual Approval)
+// ============================================
+app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+    const { matchData, market, category, confidence } = req.body;
+
+    try {
+        // Add to approved IDs
+        APPROVED_IDS.add(id);
+        saveApprovals();
+
+        // Record bet if match data provided
+        if (matchData) {
+            betTracker.recordBet({
+                match_id: matchData.matchId,
+                home_team: matchData.home_team,
+                away_team: matchData.away_team
+            }, market, category, confidence || 85);
+        }
+
+        log.success(`Daily candidate approved: ${id}`);
+        res.json({ success: true, id });
+    } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
