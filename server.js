@@ -25,7 +25,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { runDailyAnalysis } = require('./dailyAnalyst');
-const betTracker = require('./betTrackerMongo');
+const betTracker = require('./betTrackerRedis');
 
 const app = express();
 
