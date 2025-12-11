@@ -286,6 +286,8 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
 }
 
 function AdminSignalCard({ signal, onApprove, isDaily, category }) {
+    const [showPrompt, setShowPrompt] = useState(false);
+
     const handleClick = () => {
         if (isDaily) {
             // Daily signal: pass match data for bet tracking
@@ -301,6 +303,30 @@ function AdminSignalCard({ signal, onApprove, isDaily, category }) {
         }
     };
 
+    // Generate AI prompt from stats
+    const generatePrompt = () => {
+        if (!signal.stats) return 'İstatistik verisi yok.';
+        const s = signal.stats;
+        return `You are a professional football betting analyst. Analyze this match for market: ${signal.market}.
+
+Match: ${signal.event_home_team} vs ${signal.event_away_team}
+
+Statistics:
+- Home Form (Last 5): Over 1.5 Rate ${s.homeForm?.over15Rate?.toFixed(0) || 0}%, Avg Scored ${s.homeForm?.avgScored?.toFixed(2) || 0}
+- Away Form (Last 5): Over 1.5 Rate ${s.awayForm?.over15Rate?.toFixed(0) || 0}%, Avg Scored ${s.awayForm?.avgScored?.toFixed(2) || 0}
+- Home @ Home: Scored in ${s.homeHomeStats?.scoringRate?.toFixed(0) || 0}% of games, Avg Scored ${s.homeHomeStats?.avgScored?.toFixed(2) || 0}
+- Away @ Away: Scored in ${s.awayAwayStats?.scoringRate?.toFixed(0) || 0}% of games, Avg Conceded ${s.awayAwayStats?.avgConceded?.toFixed(2) || 0}
+
+IMPORTANT: These matches have ALREADY passed strict statistical filters. If you recommend PLAY, give confidence between 80-95%.
+
+RESPOND WITH ONLY JSON: {"verdict": "PLAY", "confidence": 85, "reason": "Brief reason"}`;
+    };
+
+    const copyPrompt = () => {
+        navigator.clipboard.writeText(generatePrompt());
+        alert('Prompt kopyalandı!');
+    };
+
     return (
         <div className={`relative p-4 rounded-xl border ${signal.isApproved ? 'bg-green-500/10 border-green-500/30' : 'bg-card border-border'}`}>
             <div className="flex justify-between mb-2">
@@ -310,6 +336,29 @@ function AdminSignalCard({ signal, onApprove, isDaily, category }) {
             {isDaily && signal.market && (
                 <div className="text-xs text-muted-foreground mb-2">{signal.market} • {signal.league || ''}</div>
             )}
+
+            {/* AI Prompt Toggle */}
+            {isDaily && !signal.isApproved && (
+                <button
+                    onClick={() => setShowPrompt(!showPrompt)}
+                    className="text-xs text-accent underline mb-2 block"
+                >
+                    {showPrompt ? 'Promptu Gizle' : '📋 AI Promptu Göster'}
+                </button>
+            )}
+
+            {/* AI Prompt Display */}
+            {showPrompt && (
+                <div className="mb-3">
+                    <div className="bg-muted/50 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto border border-border">
+                        {generatePrompt()}
+                    </div>
+                    <button onClick={copyPrompt} className="mt-2 text-xs bg-accent/20 text-accent px-3 py-1 rounded-lg hover:bg-accent/30 transition-colors">
+                        📋 Kopyala
+                    </button>
+                </div>
+            )}
+
             {!signal.isApproved && (
                 <Button className="w-full mt-2 bg-green-600 hover:bg-green-700 h-8 text-xs" onClick={handleClick}>
                     ONAYLA ✅
