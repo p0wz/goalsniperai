@@ -12,14 +12,17 @@ export default function Dashboard() {
     const [stats, setStats] = useState({ total: 0, iy: 0, ms: 0, quota: 500 });
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState('live'); // 'live' | 'daily'
-    const [dailySignals, setDailySignals] = useState({ over15: [], btts: [], doubleChance: [], homeOver15: [], under35: [] });
+    const [activeTab, setActiveTab] = useState('live'); // 'live' | 'daily' | 'history'
+    const [dailySignals, setDailySignals] = useState({ over15: [], over25: [], doubleChance: [], homeOver15: [], under35: [] });
+    const [betHistory, setBetHistory] = useState([]);
+    const [betStats, setBetStats] = useState({ totalBets: 0, winRate: '0%', profit: 0, markets: {} });
 
     useEffect(() => {
         const init = async () => {
             await checkAuth();
             fetchSignals();
             fetchDailySignals();
+            fetchBetHistory();
         }
         init();
 
@@ -65,7 +68,34 @@ export default function Dashboard() {
             if (res.status === 403) return;
             const data = await res.json();
             if (data.success) {
-                setDailySignals(data.data || { over15: [], btts: [], doubleChance: [], homeOver15: [], under35: [] });
+                setDailySignals(data.data || { over15: [], over25: [], doubleChance: [], homeOver15: [], under35: [] });
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchBetHistory = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/bet-history`, { credentials: 'include' });
+            if (res.status === 403) return;
+            const data = await res.json();
+            if (data.success) {
+                setBetHistory(data.data || []);
+                setBetStats(data.stats || { totalBets: 0, winRate: '0%', profit: 0, markets: {} });
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleSettle = async (betId, status) => {
+        try {
+            const res = await fetch(`${API_URL}/api/bet-history/${betId}/settle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ status })
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchBetHistory(); // Refresh
             }
         } catch (e) { console.error(e); }
     };
@@ -126,6 +156,7 @@ export default function Dashboard() {
                             <div className="flex gap-4">
                                 <TabBtn active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon="⚡">Canlı Bot</TabBtn>
                                 <TabBtn active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} icon="📅">Maç Önü Analiz</TabBtn>
+                                <TabBtn active={activeTab === 'history'} onClick={() => { setActiveTab('history'); fetchBetHistory(); }} icon="📊">Geçmiş</TabBtn>
                             </div>
                         </div>
                         {activeTab === 'live' && (
@@ -186,6 +217,66 @@ export default function Dashboard() {
                                     </div>
                                 </section>
                             ))}
+                        </div>
+                    )}
+
+                    {/* HISTORY TAB */}
+                    {activeTab === 'history' && (
+                        <div className="space-y-6">
+                            {/* Stats Cards */}
+                            <div className="grid grid-cols-4 gap-4">
+                                <StatCard label="Toplam Bahis" value={betStats.totalBets} accent />
+                                <StatCard label="Kazanma Oranı" value={betStats.winRate} />
+                                <StatCard label="Kar/Zarar" value={betStats.profit > 0 ? `+${betStats.profit}` : betStats.profit} />
+                                <StatCard label="Bekleyen" value={betHistory.filter(b => b.status === 'PENDING').length} />
+                            </div>
+
+                            {/* Market Breakdown */}
+                            {Object.keys(betStats.markets || {}).length > 0 && (
+                                <div className="bg-card border border-border rounded-xl p-4">
+                                    <h3 className="font-semibold mb-3">Market Bazlı Performans</h3>
+                                    <div className="flex flex-wrap gap-3">
+                                        {Object.entries(betStats.markets || {}).map(([market, rate]) => (
+                                            <Badge key={market} variant="outline">{market}: {rate}</Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Bet List */}
+                            <div className="bg-card border border-border rounded-xl overflow-hidden">
+                                <div className="p-4 border-b border-border">
+                                    <h3 className="font-semibold">Tahmin Geçmişi ({betHistory.length})</h3>
+                                </div>
+                                <div className="divide-y divide-border">
+                                    {betHistory.length === 0 ? (
+                                        <div className="p-8 text-center text-muted-foreground">Henüz tahmin kaydı yok.</div>
+                                    ) : (
+                                        betHistory.slice(0, 50).map((bet, i) => (
+                                            <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
+                                                <div className="flex-1">
+                                                    <div className="font-medium">{bet.match}</div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {bet.status === 'PENDING' ? (
+                                                        <>
+                                                            <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅ Kazandı</button>
+                                                            <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌ Kaybetti</button>
+                                                        </>
+                                                    ) : (
+                                                        <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
+                                                            {bet.status === 'WON' ? '✅ Kazandı' : '❌ Kaybetti'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
 

@@ -1163,6 +1163,50 @@ app.get('/api/performance', (req, res) => {
 });
 
 // ============================================
+// 📊 Bet History Endpoints
+// ============================================
+app.get('/api/bet-history', optionalAuth, (req, res) => {
+    try {
+        const bets = betTracker.getAllBets();
+        const stats = betTracker.getPerformanceStats();
+        res.json({
+            success: true,
+            data: bets,
+            stats: stats
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/bet-history/:id/settle', requireAuth, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, resultScore } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ success: false, error: 'Status required (WON/LOST/VOID)' });
+        }
+
+        const result = betTracker.manualSettle(id, status, resultScore);
+
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
+
+        // Return updated stats too
+        const stats = betTracker.getPerformanceStats();
+        res.json({
+            success: true,
+            bet: result.bet,
+            stats: stats
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
 // 📈 Daily Pre-Match Analyst Endpoint
 // ============================================
 let DAILY_ANALYSIS_CACHE = null;

@@ -270,9 +270,46 @@ function startTracking() {
     }, CHECK_INTERVAL_MINUTES * 60 * 1000);
 }
 
+// ============================================
+// 📋 Get All Bets (for Frontend)
+// ============================================
+function getAllBets() {
+    const db = loadDb();
+    // Sort by date descending (newest first)
+    return db.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+// ============================================
+// ✅ Manual Settlement (Won/Lost buttons)
+// ============================================
+function manualSettle(betId, status, resultScore = null) {
+    if (!['WON', 'LOST', 'VOID'].includes(status)) {
+        return { success: false, error: 'Invalid status' };
+    }
+
+    const db = loadDb();
+    const bet = db.find(b => b.id === betId);
+
+    if (!bet) {
+        return { success: false, error: 'Bet not found' };
+    }
+
+    bet.status = status;
+    bet.result_score = resultScore || bet.result_score;
+    bet.settled_at = new Date().toISOString();
+    bet.manual_settle = true;
+
+    saveDb(db);
+    console.log(`[BetTracker] ✅ Manual settle: ${bet.match} -> ${status}`);
+
+    return { success: true, bet };
+}
+
 module.exports = {
     recordBet,
     settleBets,
     getPerformanceStats,
-    startTracking
+    startTracking,
+    getAllBets,
+    manualSettle
 };
