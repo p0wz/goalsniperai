@@ -332,42 +332,41 @@ export default function Dashboard() {
                                             <button onClick={() => handleClearHistory('daily')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">🗑️ Temizle</button>
                                         )}
                                     </div>
-                                </div>
-                                <div className="divide-y divide-border">
-                                    {dailyBets.length === 0 ? (
-                                        <div className="p-8 text-center text-muted-foreground">Henüz daily analyst kaydı yok.</div>
-                                    ) : (
-                                        dailyBets.slice(0, 50).map((bet) => (
-                                            <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
-                                                <div className="flex-1">
-                                                    <div className="font-medium">{bet.match}</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                    <div className="divide-y divide-border">
+                                        {dailyBets.length === 0 ? (
+                                            <div className="p-8 text-center text-muted-foreground">Henüz daily analyst kaydı yok.</div>
+                                        ) : (
+                                            dailyBets.slice(0, 50).map((bet) => (
+                                                <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium">{bet.match}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {bet.status === 'PENDING' ? (
+                                                            <>
+                                                                <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅</button>
+                                                                <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌</button>
+                                                            </>
+                                                        ) : (
+                                                            <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
+                                                                {bet.status === 'WON' ? '✅' : '❌'}
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {bet.status === 'PENDING' ? (
-                                                        <>
-                                                            <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅</button>
-                                                            <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌</button>
-                                                        </>
-                                                    ) : (
-                                                        <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
-                                                            {bet.status === 'WON' ? '✅' : '❌'}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            </div>
-                );
+                        );
                     })()}
 
-            </motion.div>
-        </main>
+                </motion.div>
+            </main>
         </div >
     );
 }
