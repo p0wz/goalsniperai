@@ -432,15 +432,19 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 async function validateWithAI(match, retries = 3) {
     if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
 
-    const prompt = `Analyze this football match for market: ${match.market}.
+    const prompt = `You are a professional football betting analyst. Analyze this match for market: ${match.market}.
+
 Match: ${match.event_home_team} vs ${match.event_away_team}
-Stats:
+
+Statistics:
 - Home Form (Last 5): Over 1.5 Rate ${match.filterStats.homeForm.over15Rate.toFixed(0)}%, Avg Scored ${match.filterStats.homeForm.avgScored.toFixed(2)}
 - Away Form (Last 5): Over 1.5 Rate ${match.filterStats.awayForm.over15Rate.toFixed(0)}%, Avg Scored ${match.filterStats.awayForm.avgScored.toFixed(2)}
 - Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate.toFixed(0)}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored.toFixed(2)}
 - Away @ Away: Scored in ${match.filterStats.awayAwayStats.scoringRate.toFixed(0)}% of games, Avg Conceded ${match.filterStats.awayAwayStats.avgConceded.toFixed(2)}
 
-RESPOND WITH ONLY JSON. NO TEXT BEFORE OR AFTER: {"verdict": "PLAY", "confidence": 75, "reason": "Your reason"}`;
+IMPORTANT: These matches have ALREADY passed strict statistical filters. If you recommend PLAY, give confidence between 80-95%. Only use 70-79% if there are significant concerns.
+
+RESPOND WITH ONLY JSON: {"verdict": "PLAY", "confidence": 85, "reason": "Brief reason"}`;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
