@@ -402,7 +402,8 @@ const MOMENTUM_THRESHOLDS = {
     CORNER_SIEGE: 2,        // +2 corners
     SHOT_SURGE: 2,          // +2 shots
     SOT_THREAT: 1,          // +1 shot on target
-    DA_PRESSURE: 5          // +5 dangerous attacks (if available)
+    DA_PRESSURE: 5,         // +5 dangerous attacks (if available)
+    XG_SPIKE: 0.3           // +0.3 xG increase
 };
 
 function detectMomentum(matchId, currentStats) {
@@ -418,6 +419,7 @@ function detectMomentum(matchId, currentStats) {
     const currentShots = (currentStats?.shots?.home || 0) + (currentStats?.shots?.away || 0);
     const currentSoT = (currentStats?.shotsOnTarget?.home || 0) + (currentStats?.shotsOnTarget?.away || 0);
     const currentDA = (currentStats?.dangerousAttacks?.home || 0) + (currentStats?.dangerousAttacks?.away || 0);
+    const currentxG = (currentStats?.xG?.home || 0) + (currentStats?.xG?.away || 0);
 
     // Check each historical snapshot (most recent first)
     for (let i = history.length - 1; i >= 0; i--) {
@@ -432,11 +434,13 @@ function detectMomentum(matchId, currentStats) {
         const oldShots = (snapshot.stats?.shots?.home || 0) + (snapshot.stats?.shots?.away || 0);
         const oldSoT = (snapshot.stats?.shotsOnTarget?.home || 0) + (snapshot.stats?.shotsOnTarget?.away || 0);
         const oldDA = (snapshot.stats?.dangerousAttacks?.home || 0) + (snapshot.stats?.dangerousAttacks?.away || 0);
+        const oldxG = (snapshot.stats?.xG?.home || 0) + (snapshot.stats?.xG?.away || 0);
 
         const deltaCorners = currentCorners - oldCorners;
         const deltaShots = currentShots - oldShots;
         const deltaSoT = currentSoT - oldSoT;
         const deltaDA = currentDA - oldDA;
+        const deltaxG = currentxG - oldxG;
 
         // Trigger 1: Corner Siege
         if (deltaCorners >= MOMENTUM_THRESHOLDS.CORNER_SIEGE) {
@@ -471,6 +475,17 @@ function detectMomentum(matchId, currentStats) {
                 reason: `Attacking Pressure (+${deltaDA} DA in ~${timeDiffMins} mins)`,
                 timeframe: timeDiffMins,
                 deltas: { corners: deltaCorners, shots: deltaShots, sot: deltaSoT, da: deltaDA }
+            };
+        }
+
+        // Trigger 4: xG Spike (strong scoring threat)
+        if (currentxG > 0 && deltaxG >= MOMENTUM_THRESHOLDS.XG_SPIKE) {
+            return {
+                detected: true,
+                trigger: 'XG_SPIKE',
+                reason: `🔥 xG Spike (+${deltaxG.toFixed(2)} xG in ~${timeDiffMins} mins)`,
+                timeframe: timeDiffMins,
+                deltas: { corners: deltaCorners, shots: deltaShots, sot: deltaSoT, xg: deltaxG }
             };
         }
     }
