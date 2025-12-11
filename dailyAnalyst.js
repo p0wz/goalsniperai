@@ -536,9 +536,9 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
             log.info(`\n   [AI ${aiCount}] ${match.event_home_team} vs ${match.event_away_team}`);
             log.info(`          Market: ${match.market}`);
 
-            // Rate limit protection: 1.5s delay between AI calls
+            // Rate limit protection: 2.5s delay for Llama 4 Scout (30 RPM limit)
             if (aiCount > 1) {
-                await sleep(1500);
+                await sleep(2500);
             }
 
             const aiRes = await validateWithAI(match);
