@@ -25,7 +25,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { runDailyAnalysis } = require('./dailyAnalyst');
-const betTracker = require('./betTracker');
+const betTracker = require('./betTrackerMongo');
 
 const app = express();
 
@@ -1242,18 +1242,18 @@ app.post('/api/scan', async (req, res) => {
 
 
 
-app.get('/api/performance', (req, res) => {
-    const stats = betTracker.getPerformanceStats();
+app.get('/api/performance', async (req, res) => {
+    const stats = await betTracker.getPerformanceStats();
     res.json({ success: true, data: stats });
 });
 
 // ============================================
 // 📊 Bet History Endpoints
 // ============================================
-app.get('/api/bet-history', optionalAuth, (req, res) => {
+app.get('/api/bet-history', optionalAuth, async (req, res) => {
     try {
-        const bets = betTracker.getAllBets();
-        const stats = betTracker.getPerformanceStats();
+        const bets = await betTracker.getAllBets();
+        const stats = await betTracker.getPerformanceStats();
         res.json({
             success: true,
             data: bets,
@@ -1264,7 +1264,7 @@ app.get('/api/bet-history', optionalAuth, (req, res) => {
     }
 });
 
-app.post('/api/bet-history/:id/settle', requireAuth, (req, res) => {
+app.post('/api/bet-history/:id/settle', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { status, resultScore } = req.body;
@@ -1273,14 +1273,14 @@ app.post('/api/bet-history/:id/settle', requireAuth, (req, res) => {
             return res.status(400).json({ success: false, error: 'Status required (WON/LOST/VOID)' });
         }
 
-        const result = betTracker.manualSettle(id, status, resultScore);
+        const result = await betTracker.manualSettle(id, status, resultScore);
 
         if (!result.success) {
             return res.status(400).json(result);
         }
 
         // Return updated stats too
-        const stats = betTracker.getPerformanceStats();
+        const stats = await betTracker.getPerformanceStats();
         res.json({
             success: true,
             bet: result.bet,
