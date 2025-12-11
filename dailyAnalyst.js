@@ -110,6 +110,7 @@ async function fetchDay(day, log = console) {
         });
         const data = response.data;
         const parsed = [];
+        const skippedLeagues = [];
         const list = Array.isArray(data) ? data : Object.values(data);
         const now = Date.now();
 
@@ -119,6 +120,9 @@ async function fetchDay(day, log = console) {
 
                 // Filter: Skip leagues not in allowed list
                 if (!isLeagueAllowed(leagueName)) {
+                    if (skippedLeagues.length < 10) {
+                        skippedLeagues.push(leagueName);
+                    }
                     return; // Skip this tournament
                 }
 
@@ -140,6 +144,12 @@ async function fetchDay(day, log = console) {
                 });
             }
         });
+
+        // Debug: Show skipped leagues
+        if (skippedLeagues.length > 0) {
+            log.info(`[DailyAnalyst] ⚠️ Skipped leagues (first 10): ${skippedLeagues.join(', ')}`);
+        }
+
         log.info(`[DailyAnalyst] Parsed ${parsed.length} UPCOMING matches from Day ${day}.`);
         return parsed;
     } catch (e) {
