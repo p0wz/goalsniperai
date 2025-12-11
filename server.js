@@ -1302,6 +1302,21 @@ app.post('/api/bet-history/:id/settle', requireAuth, async (req, res) => {
     }
 });
 
+// Clear Bet History (Admin only)
+app.delete('/api/bet-history/clear', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    try {
+        const { source } = req.query; // Optional: 'live' or 'daily'
+        const result = await betTracker.clearAllBets(source || null);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ============================================
 // 📈 Daily Pre-Match Analyst Endpoint
 // ============================================

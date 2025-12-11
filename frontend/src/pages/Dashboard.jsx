@@ -100,6 +100,30 @@ export default function Dashboard() {
         } catch (e) { console.error(e); }
     };
 
+    const handleClearHistory = async (source = null) => {
+        const confirmMsg = source
+            ? `${source === 'live' ? 'Canlı bot' : 'Daily analyst'} geçmişini silmek istediğinize emin misiniz?`
+            : 'TÜM geçmişi silmek istediğinize emin misiniz?';
+
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            const url = source
+                ? `${API_URL}/api/bet-history/clear?source=${source}`
+                : `${API_URL}/api/bet-history/clear`;
+
+            const res = await fetch(url, { method: 'DELETE', credentials: 'include' });
+            const data = await res.json();
+            if (data.success) {
+                alert(`${data.clearedCount} kayıt silindi`);
+                fetchBetHistory(); // Refresh
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Silme işlemi başarısız');
+        }
+    };
+
     const handleScan = async () => {
         setLoading(true);
         try {
@@ -242,8 +266,11 @@ export default function Dashboard() {
                                     <StatCard label="Bekleyen" value={liveStats.pending} />
                                 </div>
                                 <div className="bg-card border border-border rounded-xl overflow-hidden">
-                                    <div className="p-4 border-b border-border">
+                                    <div className="p-4 border-b border-border flex items-center justify-between">
                                         <h3 className="font-semibold">⚡ Canlı Bot Geçmişi ({liveBets.length})</h3>
+                                        {liveBets.length > 0 && (
+                                            <button onClick={() => handleClearHistory('live')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">🗑️ Temizle</button>
+                                        )}
                                     </div>
                                     <div className="divide-y divide-border">
                                         {liveBets.length === 0 ? (
@@ -299,45 +326,49 @@ export default function Dashboard() {
                                     <StatCard label="Bekleyen" value={dailyStats.pending} />
                                 </div>
                                 <div className="bg-card border border-border rounded-xl overflow-hidden">
-                                    <div className="p-4 border-b border-border">
+                                    <div className="p-4 border-b border-border flex items-center justify-between">
                                         <h3 className="font-semibold">📅 Daily Analyst Geçmişi ({dailyBets.length})</h3>
-                                    </div>
-                                    <div className="divide-y divide-border">
-                                        {dailyBets.length === 0 ? (
-                                            <div className="p-8 text-center text-muted-foreground">Henüz daily analyst kaydı yok.</div>
-                                        ) : (
-                                            dailyBets.slice(0, 50).map((bet) => (
-                                                <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
-                                                    <div className="flex-1">
-                                                        <div className="font-medium">{bet.match}</div>
-                                                        <div className="text-sm text-muted-foreground">
-                                                            {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        {bet.status === 'PENDING' ? (
-                                                            <>
-                                                                <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅</button>
-                                                                <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌</button>
-                                                            </>
-                                                        ) : (
-                                                            <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
-                                                                {bet.status === 'WON' ? '✅' : '❌'}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))
+                                        {dailyBets.length > 0 && (
+                                            <button onClick={() => handleClearHistory('daily')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">🗑️ Temizle</button>
                                         )}
                                     </div>
                                 </div>
+                                <div className="divide-y divide-border">
+                                    {dailyBets.length === 0 ? (
+                                        <div className="p-8 text-center text-muted-foreground">Henüz daily analyst kaydı yok.</div>
+                                    ) : (
+                                        dailyBets.slice(0, 50).map((bet) => (
+                                            <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-accent/5 transition-colors">
+                                                <div className="flex-1">
+                                                    <div className="font-medium">{bet.match}</div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        {bet.market} • {bet.date} {bet.result_score && `• ${bet.result_score}`}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {bet.status === 'PENDING' ? (
+                                                        <>
+                                                            <button onClick={() => handleSettle(bet.id, 'WON')} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors">✅</button>
+                                                            <button onClick={() => handleSettle(bet.id, 'LOST')} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">❌</button>
+                                                        </>
+                                                    ) : (
+                                                        <Badge variant={bet.status === 'WON' ? 'default' : 'destructive'}>
+                                                            {bet.status === 'WON' ? '✅' : '❌'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
-                        );
+                            </div>
+                );
                     })()}
 
-                </motion.div>
-            </main>
-        </div>
+            </motion.div>
+        </main>
+        </div >
     );
 }
 

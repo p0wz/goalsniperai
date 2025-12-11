@@ -198,11 +198,37 @@ async function settleBets() {
     console.log('[BetTracker] Auto-settlement skipped. Use dashboard for manual settlement.');
 }
 
+// ============================================
+// 🗑️ Clear All Bets (Admin only)
+// ============================================
+async function clearAllBets(source = null) {
+    const db = await loadDb();
+
+    let clearedCount = 0;
+    let newDb = [];
+
+    if (source) {
+        // Clear only specific source (live or daily)
+        newDb = db.filter(b => b.source !== source);
+        clearedCount = db.length - newDb.length;
+    } else {
+        // Clear all
+        clearedCount = db.length;
+        newDb = [];
+    }
+
+    await saveDb(newDb);
+    console.log(`[BetTracker] 🗑️ Cleared ${clearedCount} bets${source ? ` (source: ${source})` : ''}`);
+
+    return { success: true, clearedCount };
+}
+
 module.exports = {
     recordBet,
     settleBets,
     getPerformanceStats,
     startTracking,
     getAllBets,
-    manualSettle
+    manualSettle,
+    clearAllBets
 };
