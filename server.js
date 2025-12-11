@@ -762,14 +762,22 @@ function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
     const totalxG = (stats?.xG?.home || 0) + (stats?.xG?.away || 0);
 
     // Build confidence from momentum and stats
-    let confidencePercent = 55;
+    let confidencePercent = 60; // Increased from 55
     const reasons = [momentum.reason];
 
     // Bonus confidence for strong stats
     if (totalSoT >= 3) { confidencePercent += 8; reasons.push(`${totalSoT} SoT`); }
     if (totalShots >= 5) { confidencePercent += 5; reasons.push(`${totalShots} shots`); }
     if (totalCorners >= 3) { confidencePercent += 5; reasons.push(`${totalCorners} corners`); }
-    if (totalxG > 0.5) { confidencePercent += 7; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
+
+    // xG bonus - higher threshold for stronger signal
+    if (totalxG > 0.8) {
+        confidencePercent += 10;
+        reasons.push(`🔥 xG: ${totalxG.toFixed(2)}`);
+    } else if (totalxG > 0.5) {
+        confidencePercent += 5;
+        reasons.push(`xG: ${totalxG.toFixed(2)}`);
+    }
 
     // Bonus for short timeframe momentum (more urgent)
     if (momentum.timeframe <= 3) { confidencePercent += 10; }
