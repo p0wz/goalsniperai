@@ -540,7 +540,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     const candidates = await processAndFilter(matches, log, customLimit);
 
     const results = {
-        over15: [], btts: [], doubleChance: [], homeOver15: [], under35: []
+        over15: [], over25: [], doubleChance: [], homeOver15: [], under35: []
     };
 
     // 3. AI Validation
@@ -611,7 +611,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`║  PLAY Signals: ${playCount}                                    ║`);
     log.info(`║  SKIP Count: ${skipCount}                                      ║`);
     log.info(`╠═══════════════════════════════════════════════════════╣`);
-    log.info(`║  Over 1.5: ${results.over15.length} | BTTS: ${results.btts.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length}  ║`);
+    log.info(`║  Over 1.5: ${results.over15.length} | Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length}  ║`);
     log.info(`╚═══════════════════════════════════════════════════════╝`);
     log.info(`\n`);
 
