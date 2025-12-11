@@ -443,14 +443,17 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
     // 1. Fetch
     log.info(`\n📅 STEP 1: Fetching Match List`);
-    log.info('[DailyAnalyst] Fetching Day 1 (Target: Today)...');
-    let matches = await fetchDay(1, log);
 
-    // Fallback to Day 2 (Tomorrow) if Today is empty
-    if (matches.length === 0) {
-        log.warn('[DailyAnalyst] Day 1 returned 0 matches. Trying Day 2 (Tomorrow)...');
-        matches = await fetchDay(2, log);
-    }
+    // Fetch both Day 1 (Today) and Day 2 (Tomorrow)
+    log.info('[DailyAnalyst] Fetching Day 1 (Today)...');
+    const day1Matches = await fetchDay(1, log);
+
+    log.info('[DailyAnalyst] Fetching Day 2 (Tomorrow)...');
+    const day2Matches = await fetchDay(2, log);
+
+    // Merge both days
+    let matches = [...day1Matches, ...day2Matches];
+    log.info(`[DailyAnalyst] Combined: ${day1Matches.length} (today) + ${day2Matches.length} (tomorrow) = ${matches.length} total matches`);
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
