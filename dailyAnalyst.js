@@ -222,6 +222,7 @@ function calculateAdvancedStats(history, teamName) {
     let goalsScored = 0;
     let goalsConceded = 0;
     let over15Count = 0;
+    let over25Count = 0;
     let under35Count = 0;
     let bttsCount = 0;
     let cleanSheetCount = 0;
@@ -251,6 +252,7 @@ function calculateAdvancedStats(history, teamName) {
         goalsConceded += oppScore;
 
         if (total > 1.5) over15Count++;
+        if (total > 2.5) over25Count++;
         if (total <= 3.5) under35Count++;
         if (s1 > 0 && s2 > 0) bttsCount++;
         if (oppScore === 0) cleanSheetCount++;
@@ -269,6 +271,7 @@ function calculateAdvancedStats(history, teamName) {
         avgScored: goalsScored / totalMatches,
         avgConceded: goalsConceded / totalMatches,
         over15Rate: (over15Count / totalMatches) * 100,
+        over25Rate: (over25Count / totalMatches) * 100,
         under35Rate: (under35Count / totalMatches) * 100,
         bttsRate: (bttsCount / totalMatches) * 100,
         scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
@@ -281,6 +284,7 @@ function calculateAdvancedStats(history, teamName) {
 async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     const candidates = {
         over15: [],
+        over25: [],
         // btts: [], // REMOVED
         doubleChance: [],
         homeOver15: [],
@@ -372,7 +376,12 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             candidates.over15.push({ ...m, filterStats: stats, market: 'Over 1.5 Goals' });
             passedFilters.push('Over 1.5');
         }
-        // Logic B: BTTS - REMOVED
+        // Logic B: Over 2.5
+        if (proxyLeagueAvg >= 2.8 && homeForm.over25Rate >= 60 && awayForm.over25Rate >= 60) {
+            candidates.over25.push({ ...m, filterStats: stats, market: 'Over 2.5 Goals' });
+            passedFilters.push('Over 2.5');
+        }
+        // Logic C: BTTS - REMOVED
         // if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
         //     candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
         //     passedFilters.push('BTTS');
