@@ -748,20 +748,30 @@ RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
 // ============================================
 // 📡 Fetch Match Statistics
 // ============================================
-async function fetchMatchStats(matchId) {
+async function fetchMatchStats(matchId, retries = 3) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
 
-    try {
-        const response = await axios.get(
-            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/stats/${matchId}`,
-            { headers: FLASHSCORE_API.headers, timeout: 15000 }
-        );
-        dailyRequestCount++;
-        return response.data;
-    } catch (error) {
-        log.warn(`Stats fetch failed for ${matchId}: ${error.message}`);
-        return null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await axios.get(
+                `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/stats/${matchId}`,
+                { headers: FLASHSCORE_API.headers, timeout: 15000 }
+            );
+            dailyRequestCount++;
+            return response.data;
+        } catch (error) {
+            const is429 = error.response?.status === 429 || error.message?.includes('429');
+            if (is429 && attempt < retries) {
+                const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+                log.warn(`[Stats] 429 Rate Limit - Retrying in ${delay / 1000}s (${attempt}/${retries})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            log.warn(`Stats fetch failed for ${matchId}: ${error.message}`);
+            return null;
+        }
     }
+    return null;
 }
 
 // ============================================
