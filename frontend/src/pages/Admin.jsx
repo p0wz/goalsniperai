@@ -4,6 +4,7 @@ import { API_URL } from '../config';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import AnalysisTerminal from '../components/AnalysisTerminal';
+import CouponBuilder from '../components/CouponBuilder';
 
 export default function Admin() {
     const [signals, setSignals] = useState([]);
@@ -149,8 +150,11 @@ export default function Admin() {
                         <Button variant={activeTab === 'users' ? 'primary' : 'secondary'} onClick={() => setActiveTab('users')}>Kullanıcılar</Button>
                         <Button variant={activeTab === 'signals' ? 'primary' : 'secondary'} onClick={() => setActiveTab('signals')}>Sinyal Onayı</Button>
                         <Button variant={activeTab === 'analysis' ? 'primary' : 'secondary'} onClick={() => setActiveTab('analysis')}>🤖 Analiz</Button>
+                        <Button variant={activeTab === 'coupons' ? 'primary' : 'secondary'} onClick={() => setActiveTab('coupons')}>🎟️ Kupon Yarat</Button>
                     </div>
                 </div>
+
+                {activeTab === 'coupons' && <CouponBuilder />}
 
                 {activeTab === 'users' && (
                     <div className="space-y-8">
