@@ -276,7 +276,8 @@ function parseMatchStats(statsData) {
         shotsOnTarget: { home: 0, away: 0 },
         corners: { home: 0, away: 0 },
         dangerousAttacks: { home: 0, away: 0 },
-        xG: { home: 0, away: 0 }
+        xG: { home: 0, away: 0 },
+        redCards: { home: 0, away: 0 }
     };
 
     // Try keys in order of preference, checking for non-empty arrays
@@ -347,6 +348,11 @@ function parseMatchStats(statsData) {
             name.includes('big chances') || name === 'attacks') {
             stats.dangerousAttacks.home = parseInt(home) || 0;
             stats.dangerousAttacks.away = parseInt(away) || 0;
+        }
+        // Check for Red Cards
+        if (name.includes('red cards') || name.includes('red card')) {
+            stats.redCards.home = parseInt(home) || 0;
+            stats.redCards.away = parseInt(away) || 0;
         }
     }
 
@@ -1155,6 +1161,12 @@ async function processMatches() {
             const totalSoT = stats.shotsOnTarget.home + stats.shotsOnTarget.away;
             const totalCorners = stats.corners.home + stats.corners.away;
             log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
+
+            // 🔴 RED CARD FILTER (Safety First)
+            if (stats.redCards && (stats.redCards.home > 0 || stats.redCards.away > 0)) {
+                log.info(`      🛑 RED CARD detected (Home: ${stats.redCards.home}, Away: ${stats.redCards.away}) - Skipping safety`);
+                continue;
+            }
         } else {
             log.warn(`      ⚠️ Could not fetch stats for this match`);
             continue; // Skip if no stats
