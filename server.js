@@ -804,7 +804,7 @@ function generateAIPrompt(matchInfo, liveAnalysis, historicalAnalysis, elapsed) 
 }
 
 // 🧬 MAIN HYBRID ANALYSIS FUNCTION
-async function performDeepAnalysis(liveMatch, liveStats, rawStatsData = null) {
+async function performDeepAnalysis(liveMatch, liveStats) {
     const matchId = liveMatch.match_id;
     const elapsed = parseElapsedTime(liveMatch.stage);
     const home = liveMatch.home_team?.name || 'Home';
@@ -835,19 +835,9 @@ async function performDeepAnalysis(liveMatch, liveStats, rawStatsData = null) {
     // ========================================
     // LAYER B: HISTORICAL VALIDATION (40% Weight)
     // ========================================
-    // Extract H2H from raw stats response (it's in the same API call)
-    let h2hData = null;
-    if (rawStatsData) {
-        // Try to find H2H data in the stats response
-        // Common field names: h2h, head2head, meetings, history
-        h2hData = rawStatsData.h2h || rawStatsData.head2head ||
-            rawStatsData.meetings || rawStatsData.history || null;
-
-        if (!h2hData && rawStatsData.data) {
-            // Sometimes nested under 'data'
-            h2hData = rawStatsData.data.h2h || rawStatsData.data.head2head || null;
-        }
-    }
+    // Fetch H2H data from dedicated endpoint: /match/h2h/{matchId}
+    log.info(`[DeepAnalysis] Fetching H2H data...`);
+    const h2hData = await fetchH2HData(matchId);
 
     const historical = calculateHistoricalScore(h2hData, dominantTeam, elapsed, home, away);
     log.info(`[DeepAnalysis] Historical Score: ${historical.score} (Tags: ${historical.tags.join(', ')})`);
@@ -1780,8 +1770,8 @@ async function processMatches() {
             // =================================================
             log.info(`      🧬 TRIGGERING DEEP ANALYSIS...`);
 
-            // Pass both parsed stats AND raw API response (contains H2H)
-            const deepAnalysis = await performDeepAnalysis(match, stats, statsData);
+            // H2H data is fetched internally via /match/h2h/{matchId}
+            const deepAnalysis = await performDeepAnalysis(match, stats);
 
             if (!deepAnalysis) {
                 log.info(`      ⏸️ Deep Analysis returned null - skipping`);
