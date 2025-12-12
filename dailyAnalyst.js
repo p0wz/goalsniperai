@@ -577,6 +577,9 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     for (const cat of Object.keys(candidates)) {
         if (!candidates[cat] || candidates[cat].length === 0) continue;
 
+        // Safety: Ensure result category exists
+        if (!results[cat]) results[cat] = [];
+
         log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates)`);
 
         for (const match of candidates[cat]) {
