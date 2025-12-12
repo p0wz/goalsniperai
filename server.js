@@ -400,524 +400,6 @@ function checkBaseActivity(elapsed, stats) {
 }
 
 // ============================================
-// 🧠 LIVE GOAL PROBABILITY ENGINE (v2.0)
-// ============================================
-// Replaces simple "Momentum" triggers with a sophisticated
-// Pressure Index system that calculates goal probability.
-
-const PRESSURE_WEIGHTS = {
-    SHOT_ON_TARGET: 15,
-    SHOT_OFF_TARGET: 5,
-    CORNER: 8,
-    DANGEROUS_ATTACK: 1,
-    POSSESSION_BONUS: 10, // If possession > 65%
-    XG_MULTIPLIER: 20     // xG * this value
-};
-
-const PROBABILITY_MAP = [
-    { maxScore: 30, minProb: 10, maxProb: 20, stars: 1 },
-    { maxScore: 60, minProb: 40, maxProb: 55, stars: 2 },
-    { maxScore: 100, minProb: 60, maxProb: 75, stars: 3 },
-    { maxScore: 150, minProb: 75, maxProb: 85, stars: 4 },
-    { maxScore: Infinity, minProb: 85, maxProb: 95, stars: 5 }
-];
-
-function calculateGoalProbability(match, liveStats, elapsed, matchId = null) {
-    const homeScore = match.home_team?.score || 0;
-    const awayScore = match.away_team?.score || 0;
-    const odds = match.odds || { '1': 2.0, '2': 2.0, 'X': 3.0 };
-    const homeOdds = parseFloat(odds['1']) || 2.0;
-    const awayOdds = parseFloat(odds['2']) || 2.0;
-
-    // === 1. CALCULATE PRESSURE SCORES (Per Team) ===
-    const homeSoT = liveStats?.shotsOnTarget?.home || 0;
-    const awaySoT = liveStats?.shotsOnTarget?.away || 0;
-    const homeShots = liveStats?.shots?.home || 0;
-    const awayShots = liveStats?.shots?.away || 0;
-    const homeCorners = liveStats?.corners?.home || 0;
-    const awayCorners = liveStats?.corners?.away || 0;
-    const homeDA = liveStats?.dangerousAttacks?.home || 0;
-    const awayDA = liveStats?.dangerousAttacks?.away || 0;
-    const homePoss = liveStats?.possession?.home || 50;
-    const awayPoss = liveStats?.possession?.away || 50;
-    const homexG = liveStats?.xG?.home || 0;
-    const awayxG = liveStats?.xG?.away || 0;
-    const homeRed = liveStats?.redCards?.home || 0;
-    const awayRed = liveStats?.redCards?.away || 0;
-
-    // Helper to calculate pressure from stats object
-    const calcPressure = (stats) => {
-        const sot = (stats?.shotsOnTarget?.home || 0) + (stats?.shotsOnTarget?.away || 0);
-        const shots = (stats?.shots?.home || 0) + (stats?.shots?.away || 0);
-        const corners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
-        const da = (stats?.dangerousAttacks?.home || 0) + (stats?.dangerousAttacks?.away || 0);
-        const xg = (stats?.xG?.home || 0) + (stats?.xG?.away || 0);
-        return (sot * 15) + ((shots - sot) * 5) + (corners * 8) + (da * 1) + (xg * 20);
-    };
-
-    // Base Pressure = Weighted sum of stats
-    let homePressure = (homeSoT * PRESSURE_WEIGHTS.SHOT_ON_TARGET) +
-        ((homeShots - homeSoT) * PRESSURE_WEIGHTS.SHOT_OFF_TARGET) +
-        (homeCorners * PRESSURE_WEIGHTS.CORNER) +
-        (homeDA * PRESSURE_WEIGHTS.DANGEROUS_ATTACK) +
-        (homexG * PRESSURE_WEIGHTS.XG_MULTIPLIER);
-
-    let awayPressure = (awaySoT * PRESSURE_WEIGHTS.SHOT_ON_TARGET) +
-        ((awayShots - awaySoT) * PRESSURE_WEIGHTS.SHOT_OFF_TARGET) +
-        (awayCorners * PRESSURE_WEIGHTS.CORNER) +
-        (awayDA * PRESSURE_WEIGHTS.DANGEROUS_ATTACK) +
-        (awayxG * PRESSURE_WEIGHTS.XG_MULTIPLIER);
-
-    // Possession Bonus (if dominant)
-    if (homePoss >= 65) homePressure += PRESSURE_WEIGHTS.POSSESSION_BONUS;
-    if (awayPoss >= 65) awayPressure += PRESSURE_WEIGHTS.POSSESSION_BONUS;
-
-    // === 2. CONTEXT MULTIPLIERS ===
-    const contextFactors = [];
-
-    // 2a. Favorite Losing (Desperation Mode)
-    const isHomeFavorite = homeOdds < 1.50;
-    const isAwayFavorite = awayOdds < 1.50;
-    const isHomeLosing = homeScore < awayScore;
-    const isAwayLosing = awayScore < homeScore;
-
-    if (isHomeFavorite && isHomeLosing) {
-        homePressure *= 1.5;
-        contextFactors.push('🔥 Home FAV chasing');
-    }
-    if (isAwayFavorite && isAwayLosing) {
-        awayPressure *= 1.5;
-        contextFactors.push('🔥 Away FAV chasing');
-    }
-
-    // 2b. Red Card Advantage
-    if (awayRed > 0 && homeRed === 0) {
-        homePressure *= 1.3;
-        contextFactors.push('🟥 Away Red Card');
-    }
-    if (homeRed > 0 && awayRed === 0) {
-        awayPressure *= 1.3;
-        contextFactors.push('🟥 Home Red Card');
-    }
-
-    // 2c. "Kill Zone" Time Bonus (70-85 mins)
-    let timeBonus = 0;
-    if (elapsed >= 70 && elapsed <= 85) {
-        timeBonus = 10;
-        contextFactors.push('⏱️ Kill Zone (70-85)');
-    }
-
-    // === 2d. MOMENTUM DELTA (Rising Pressure Detection) ===
-    let momentumBonus = 0;
-    let pressureDelta = 0;
-    const currentScore = `${homeScore}-${awayScore}`;
-
-    if (matchId) {
-        const history = getMatchHistory(matchId);
-        if (history.length >= 2) {
-            // Get oldest snapshot in history (typically ~6-12 mins ago)
-            const oldSnapshot = history[0];
-
-            // ⚽ GOAL RESET CHECK: If score changed, pressure was "consumed" by a goal
-            if (oldSnapshot.score !== currentScore) {
-                // Score changed - don't give momentum bonus, the pressure already converted
-                contextFactors.push('⚽ Goal Reset (Score Changed)');
-                // Reset momentum bonus to 0
-            } else {
-                // Score same - calculate pressure delta normally
-                const oldPressure = calcPressure(oldSnapshot.stats);
-                const currentPressure = calcPressure(liveStats);
-                pressureDelta = currentPressure - oldPressure;
-
-                // If pressure increased by 30+ points in last ~10 mins = "Rising Pressure"
-                if (pressureDelta >= 30) {
-                    momentumBonus = 15;
-                    contextFactors.push(`📈 Rising Pressure (+${Math.round(pressureDelta)})`);
-                } else if (pressureDelta >= 15) {
-                    momentumBonus = 8;
-                    contextFactors.push(`📈 Momentum (+${Math.round(pressureDelta)})`);
-                }
-            }
-        }
-    }
-
-    // === 3. DETERMINE DOMINANT TEAM ===
-    const totalPressure = homePressure + awayPressure;
-    let dominantTeam = 'Balanced';
-    let dominantPressure = Math.max(homePressure, awayPressure);
-
-    if (homePressure > awayPressure * 1.5) {
-        dominantTeam = 'Home';
-    } else if (awayPressure > homePressure * 1.5) {
-        dominantTeam = 'Away';
-    }
-
-    // === 4. MAP PRESSURE TO PROBABILITY ===
-    let probabilityPercent = 10;
-    let confidenceStars = 1;
-
-    for (const bracket of PROBABILITY_MAP) {
-        if (dominantPressure <= bracket.maxScore) {
-            // Linear interpolation within bracket
-            const rangeSize = bracket.maxScore === Infinity ? 50 : bracket.maxScore - (PROBABILITY_MAP[PROBABILITY_MAP.indexOf(bracket) - 1]?.maxScore || 0);
-            const positionInRange = dominantPressure - (PROBABILITY_MAP[PROBABILITY_MAP.indexOf(bracket) - 1]?.maxScore || 0);
-            const ratio = Math.min(positionInRange / rangeSize, 1);
-            probabilityPercent = Math.round(bracket.minProb + (bracket.maxProb - bracket.minProb) * ratio);
-            confidenceStars = bracket.stars;
-            break;
-        }
-    }
-
-    // Add time bonus and momentum bonus
-    probabilityPercent = Math.min(probabilityPercent + timeBonus + momentumBonus, 95);
-
-    // === 5. BUILD REASON STRING ===
-    const statsBreakdown = [];
-    if (dominantTeam === 'Home') {
-        if (homeSoT > 0) statsBreakdown.push(`${homeSoT} SoT`);
-        if (homeCorners > 0) statsBreakdown.push(`${homeCorners} Corners`);
-        if (homexG > 0) statsBreakdown.push(`${homexG.toFixed(2)} xG`);
-    } else if (dominantTeam === 'Away') {
-        if (awaySoT > 0) statsBreakdown.push(`${awaySoT} SoT`);
-        if (awayCorners > 0) statsBreakdown.push(`${awayCorners} Corners`);
-        if (awayxG > 0) statsBreakdown.push(`${awayxG.toFixed(2)} xG`);
-    } else {
-        statsBreakdown.push(`Balanced (H:${Math.round(homePressure)} / A:${Math.round(awayPressure)})`);
-    }
-
-    const reason = [
-        `Pressure Index: ${Math.round(dominantPressure)}`,
-        statsBreakdown.join(', '),
-        ...contextFactors
-    ].filter(Boolean).join(' | ');
-
-    // === 6. RECOMMENDED MARKET ===
-    let recommendedMarket = 'Next Goal Any';
-    if (dominantTeam === 'Home' && homePressure > 60) {
-        recommendedMarket = 'Next Goal Home';
-    } else if (dominantTeam === 'Away' && awayPressure > 60) {
-        recommendedMarket = 'Next Goal Away';
-    } else if (totalPressure > 80) {
-        recommendedMarket = 'Over 0.5 in Next 15 Mins';
-    }
-
-    return {
-        probabilityPercent,
-        confidenceStars,
-        dominantTeam,
-        homePressure: Math.round(homePressure),
-        awayPressure: Math.round(awayPressure),
-        reason,
-        recommendedMarket,
-        contextFactors,
-        stats: {
-            homeSoT, awaySoT, homeCorners, awayCorners, homexG, awayxG
-        }
-    };
-}
-
-// ============================================
-// 🧬 HYBRID ANALYSIS ENGINE v1.0
-// ============================================
-// Combines Live Pressure (60%) + Historical Context (40%)
-// for higher accuracy signal generation.
-
-// Historical Trend Bonus Points
-const HISTORICAL_BONUSES = {
-    SECOND_HALF_TEAM: 15,      // Team scores >60% of goals in 2nd half
-    HOME_STRONG: 10,           // Home team >70% W/D at home
-    HIGH_SCORING_H2H: 10,      // H2H avg > 2.5 goals
-    H2H_DOMINANCE: 10,         // Won 3/5 last meetings
-    LATE_CONCEDING: 15,        // Defender concedes late often
-    FORM_MOMENTUM: 10          // Won last 3 games
-};
-
-// Weights for final calculation
-const LAYER_WEIGHTS = {
-    LIVE: 0.60,    // 60% weight for live pressure
-    HISTORY: 0.40  // 40% weight for historical data
-};
-
-// Fetch H2H / Team Stats for a match (with Rate Limit Protection)
-async function fetchH2HData(matchId, retries = 2) {
-    if (dailyRequestCount >= DAILY_LIMIT) return null;
-
-    // Rate limit: wait 300ms between H2H calls
-    await new Promise(r => setTimeout(r, 300));
-
-    try {
-        const response = await axios.get(
-            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
-            { headers: FLASHSCORE_API.headers, timeout: 5000 }
-        );
-        dailyRequestCount++;
-        return response.data;
-    } catch (error) {
-        // Handle 429 Rate Limit with retry
-        if (error.response?.status === 429 && retries > 0) {
-            const waitTime = 2000 * (3 - retries);
-            log.warn(`[RateLimit] 429 for h2h/${matchId} - waiting ${waitTime}ms (${retries} retries left)`);
-            await new Promise(r => setTimeout(r, waitTime));
-            return fetchH2HData(matchId, retries - 1);
-        }
-        log.warn(`[H2H] Failed to fetch H2H for ${matchId}: ${error.message}`);
-        return null;
-    }
-}
-
-// Calculate historical score based on trends
-function calculateHistoricalScore(h2hData, dominantTeam, elapsed, homeTeam, awayTeam) {
-    let score = 0;
-    const tags = [];
-
-    if (!h2hData) {
-        return { score: 0, tags: ['NO_H2H_DATA'] };
-    }
-
-    try {
-        const meetings = h2hData.matches || [];
-        const homeStats = h2hData.homeTeamStats || {};
-        const awayStats = h2hData.awayTeamStats || {};
-
-        // 1. SECOND HALF TEAM CHECK (if >45 mins)
-        if (elapsed > 45) {
-            const secondHalfGoalRate = dominantTeam === 'Home'
-                ? (homeStats.secondHalfGoalRate || 0)
-                : (awayStats.secondHalfGoalRate || 0);
-
-            if (secondHalfGoalRate > 60) {
-                score += HISTORICAL_BONUSES.SECOND_HALF_TEAM;
-                tags.push('2ND_HALF_TEAM');
-            }
-        }
-
-        // 2. HOME STRONG CHECK
-        if (dominantTeam === 'Home') {
-            const homeWinDrawRate = homeStats.homeWinDrawRate || 0;
-            if (homeWinDrawRate > 70) {
-                score += HISTORICAL_BONUSES.HOME_STRONG;
-                tags.push('HOME_FORTRESS');
-            }
-        }
-
-        // 3. HIGH SCORING H2H CHECK
-        if (meetings.length > 0) {
-            const totalGoals = meetings.reduce((sum, m) => sum + (m.homeScore || 0) + (m.awayScore || 0), 0);
-            const avgGoals = totalGoals / meetings.length;
-            if (avgGoals > 2.5) {
-                score += HISTORICAL_BONUSES.HIGH_SCORING_H2H;
-                tags.push('HIGH_SCORING_H2H');
-            }
-        }
-
-        // 4. H2H DOMINANCE CHECK (won 3/5 last meetings)
-        if (meetings.length >= 5) {
-            const last5 = meetings.slice(0, 5);
-            const wins = last5.filter(m => {
-                if (dominantTeam === 'Home') {
-                    return (m.homeScore || 0) > (m.awayScore || 0);
-                } else {
-                    return (m.awayScore || 0) > (m.homeScore || 0);
-                }
-            }).length;
-            if (wins >= 3) {
-                score += HISTORICAL_BONUSES.H2H_DOMINANCE;
-                tags.push('H2H_DOMINANCE');
-            }
-        }
-
-        // 5. LATE CONCEDING TREND (Defender concedes after 75')
-        if (elapsed >= 65) {
-            const defender = dominantTeam === 'Home' ? awayStats : homeStats;
-            const lateConcedingRate = defender.lateConcedingRate || 0;
-            if (lateConcedingRate > 50) {
-                score += HISTORICAL_BONUSES.LATE_CONCEDING;
-                tags.push('LATE_CONCEDING_DEF');
-            }
-        }
-
-        // 6. FORM MOMENTUM (Attacker won last 3)
-        const attacker = dominantTeam === 'Home' ? homeStats : awayStats;
-        if (attacker.lastResults && attacker.lastResults.slice(0, 3).every(r => r === 'W')) {
-            score += HISTORICAL_BONUSES.FORM_MOMENTUM;
-            tags.push('HOT_STREAK');
-        }
-
-    } catch (error) {
-        log.warn(`[Historical] Calculation error: ${error.message}`);
-        tags.push('CALC_ERROR');
-    }
-
-    return { score, tags };
-}
-
-// Generate AI Prompt with Narrative
-function generateAIPrompt(matchInfo, liveAnalysis, historicalAnalysis, elapsed) {
-    const { home, away, score, dominantTeam, homePressure, awayPressure } = matchInfo;
-    const { contextFactors, reason } = liveAnalysis;
-    const { tags } = historicalAnalysis;
-
-    // Build narrative
-    let narrative = '';
-    const pressureTeam = dominantTeam === 'Home' ? home : away;
-    const defenseTeam = dominantTeam === 'Home' ? away : home;
-    const pressureIndex = dominantTeam === 'Home' ? homePressure : awayPressure;
-
-    // Situation description
-    if (contextFactors.includes('🔥 Home FAV chasing') || contextFactors.includes('🔥 Away FAV chasing')) {
-        narrative = `${pressureTeam} (Pre-Match Favorite) is losing but generating EXTREME pressure (Index: ${pressureIndex}).`;
-    } else if (contextFactors.includes('⏱️ Kill Zone (70-85)')) {
-        narrative = `Match is in the "Kill Zone" (${elapsed}'). ${pressureTeam} is pushing hard with pressure index of ${pressureIndex}.`;
-    } else {
-        narrative = `${pressureTeam} is dominating with a pressure index of ${pressureIndex} against ${defenseTeam}.`;
-    }
-
-    // Historical context
-    let historyContext = '';
-    if (tags.includes('2ND_HALF_TEAM')) {
-        historyContext += `Historically, ${pressureTeam} scores 60%+ of their goals in the 2nd half. `;
-    }
-    if (tags.includes('H2H_DOMINANCE')) {
-        historyContext += `${pressureTeam} has won 3 of last 5 H2H meetings. `;
-    }
-    if (tags.includes('LATE_CONCEDING_DEF')) {
-        historyContext += `${defenseTeam} tends to concede late in matches. `;
-    }
-    if (tags.includes('HOME_FORTRESS')) {
-        historyContext += `${home} has >70% Win/Draw rate at home. `;
-    }
-
-    if (!historyContext) {
-        historyContext = 'Limited historical data available for this fixture.';
-    }
-
-    // Final prompt
-    return `You are an elite sports betting analyst. Analyze this live match situation:
-
-**MATCH:** ${home} vs ${away}
-**SCORE:** ${score}  |  **TIME:** ${elapsed}'
-**LIVE PRESSURE:** ${reason}
-
-**NARRATIVE:** ${narrative}
-
-**HISTORICAL CONTEXT:** ${historyContext}
-
-**QUESTION:** Based on the current live pressure AND historical trends, is a goal by ${pressureTeam} highly likely in the next 15 minutes?
-
-**RESPOND WITH JSON ONLY:**
-{
-  "verdict": "PLAY" or "SKIP",
-  "confidence": 60-95,
-  "reason": "One sentence explanation"
-}`;
-}
-
-// 🧬 MAIN HYBRID ANALYSIS FUNCTION
-async function performDeepAnalysis(liveMatch, liveStats) {
-    const matchId = liveMatch.match_id;
-    const elapsed = parseElapsedTime(liveMatch.stage);
-    const home = liveMatch.home_team?.name || 'Home';
-    const away = liveMatch.away_team?.name || 'Away';
-    const homeScore = liveMatch.home_team?.score || 0;
-    const awayScore = liveMatch.away_team?.score || 0;
-    const score = `${homeScore}-${awayScore}`;
-
-    log.info(`[DeepAnalysis] Starting for ${home} vs ${away} (${score}, ${elapsed}')`);
-
-    // ========================================
-    // LAYER A: LIVE PRESSURE (60% Weight)
-    // ========================================
-    const livePressure = calculateGoalProbability(liveMatch, liveStats, elapsed, matchId);
-    const livePressureScore = livePressure.probabilityPercent;
-    const dominantTeam = livePressure.dominantTeam;
-    const homePressure = livePressure.homePressure;
-    const awayPressure = livePressure.awayPressure;
-
-    log.info(`[DeepAnalysis] Live Pressure: ${livePressureScore}% (${dominantTeam})`);
-
-    // If live pressure is too low, skip deep analysis
-    if (livePressureScore < 50 || dominantTeam === 'Balanced') {
-        log.info(`[DeepAnalysis] Skipped - Low pressure or balanced match`);
-        return null;
-    }
-
-    // ========================================
-    // LAYER B: HISTORICAL VALIDATION (40% Weight)
-    // ========================================
-    // Fetch H2H data from dedicated endpoint: /match/h2h/{matchId}
-    log.info(`[DeepAnalysis] Fetching H2H data...`);
-    const h2hData = await fetchH2HData(matchId);
-
-    const historical = calculateHistoricalScore(h2hData, dominantTeam, elapsed, home, away);
-    log.info(`[DeepAnalysis] Historical Score: ${historical.score} (Tags: ${historical.tags.join(', ')})`);
-
-    // Normalize historical score (max ~65 points possible)
-    const historicalScoreNormalized = Math.min((historical.score / 65) * 100, 100);
-
-    // ========================================
-    // SYNTHESIS: FINAL CONFIDENCE SCORE
-    // ========================================
-    let totalConfidence = Math.round(
-        (livePressureScore * LAYER_WEIGHTS.LIVE) +
-        (historicalScoreNormalized * LAYER_WEIGHTS.HISTORY)
-    );
-
-    // Cap at 95%
-    totalConfidence = Math.min(totalConfidence, 95);
-
-    log.success(`[DeepAnalysis] Total Confidence: ${totalConfidence}% (Live: ${livePressureScore}%, History: ${Math.round(historicalScoreNormalized)}%)`);
-
-    // ========================================
-    // AI PROMPT GENERATION
-    // ========================================
-    const matchInfo = {
-        home, away, score,
-        dominantTeam,
-        homePressure,
-        awayPressure
-    };
-    const aiPrompt = generateAIPrompt(matchInfo, livePressure, historical, elapsed);
-
-    // ========================================
-    // BUILD OUTPUT OBJECT
-    // ========================================
-    const strategyCode = dominantTeam === 'Home' ? 'NEXT_GOAL_HOME' : 'NEXT_GOAL_AWAY';
-    const marketRecommendation = dominantTeam === 'Home' ? 'Next Goal Home' : 'Next Goal Away';
-
-    // Collect all tags
-    const allTags = [...livePressure.contextFactors, ...historical.tags].filter(t =>
-        typeof t === 'string' && !t.includes('Pressure Index')
-    ).map(t => t.replace(/[^\w\s]/g, '').trim().toUpperCase().replace(/\s+/g, '_'));
-
-    return {
-        signal_id: `${matchId}_${strategyCode}`,
-        match_info: {
-            home,
-            away,
-            score,
-            time: `${elapsed}'`,
-            league: liveMatch.league_name || 'Unknown',
-            country: liveMatch.country_name || ''
-        },
-        analysis: {
-            live_pressure_score: livePressureScore,
-            historical_score: Math.round(historicalScoreNormalized),
-            total_confidence: totalConfidence,
-            dominant_team: dominantTeam,
-            home_pressure: homePressure,
-            away_pressure: awayPressure,
-            tags: allTags.slice(0, 6) // Max 6 tags
-        },
-        ai_prompt: aiPrompt,
-        verdict: 'PENDING_AI',
-        market_recommendation: marketRecommendation,
-        strategy_code: strategyCode,
-        live_stats: livePressure.stats,
-        h2h_available: !!h2hData
-    };
-}
-
-// ============================================
 // 🎯 Dynamic Momentum Detection (Lookback)
 // ============================================
 // Thresholds for momentum triggers
@@ -1264,24 +746,10 @@ RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
 }
 
 // ============================================
-// 📡 Fetch Match Statistics (with Rate Limit Protection)
+// 📡 Fetch Match Statistics
 // ============================================
-let lastApiCallTime = 0;
-const MIN_API_DELAY = 500; // 500ms between API calls
-
-async function rateLimitedDelay() {
-    const now = Date.now();
-    const elapsed = now - lastApiCallTime;
-    if (elapsed < MIN_API_DELAY) {
-        await new Promise(r => setTimeout(r, MIN_API_DELAY - elapsed));
-    }
-    lastApiCallTime = Date.now();
-}
-
-async function fetchMatchStats(matchId, retries = 2) {
+async function fetchMatchStats(matchId) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
-
-    await rateLimitedDelay();
 
     try {
         const response = await axios.get(
@@ -1291,25 +759,16 @@ async function fetchMatchStats(matchId, retries = 2) {
         dailyRequestCount++;
         return response.data;
     } catch (error) {
-        // Handle 429 Rate Limit with retry
-        if (error.response?.status === 429 && retries > 0) {
-            const waitTime = 2000 * (3 - retries); // 2s, 4s
-            log.warn(`[RateLimit] 429 for stats/${matchId} - waiting ${waitTime}ms (${retries} retries left)`);
-            await new Promise(r => setTimeout(r, waitTime));
-            return fetchMatchStats(matchId, retries - 1);
-        }
         log.warn(`Stats fetch failed for ${matchId}: ${error.message}`);
         return null;
     }
 }
 
 // ============================================
-// 💰 Fetch Match Odds (with Rate Limit Protection)
+// 💰 Fetch Match Odds (Pre-match or Live)
 // ============================================
-async function fetchMatchOdds(matchId, retries = 2) {
+async function fetchMatchOdds(matchId) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
-
-    await rateLimitedDelay();
 
     try {
         const response = await axios.get(
@@ -1351,16 +810,75 @@ async function fetchMatchOdds(matchId, retries = 2) {
         return odds['1'] > 0 ? odds : null;
 
     } catch (error) {
-        // Handle 429 Rate Limit with retry
-        if (error.response?.status === 429 && retries > 0) {
-            const waitTime = 2000 * (3 - retries);
-            log.warn(`[RateLimit] 429 for odds/${matchId} - waiting ${waitTime}ms (${retries} retries left)`);
-            await new Promise(r => setTimeout(r, waitTime));
-            return fetchMatchOdds(matchId, retries - 1);
-        }
         log.warn(`Odds fetch failed for ${matchId}: ${error.message}`);
         return null; // Return null to fallback to 2.0 safely
     }
+}
+
+// ============================================
+// 🤝 Fetch Match H2H (Head-to-Head History)
+// ============================================
+async function fetchMatchH2H(matchId) {
+    if (dailyRequestCount >= DAILY_LIMIT) return null;
+
+    try {
+        const response = await axios.get(
+            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
+            { headers: FLASHSCORE_API.headers, timeout: 10000 }
+        );
+        dailyRequestCount++;
+        return response.data;
+    } catch (error) {
+        log.warn(`H2H fetch failed for ${matchId}: ${error.message}`);
+        return null;
+    }
+}
+
+// Helper: Analyze H2H for goal patterns
+function analyzeH2HForGoals(h2hData, homeTeam, awayTeam) {
+    if (!h2hData) return { valid: true, reason: 'No H2H data (defaulting to valid)' };
+
+    const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+    if (sections.length === 0) return { valid: true, reason: 'Empty H2H data' };
+
+    // Filter mutual matches (both teams played each other)
+    const mutualMatches = sections.filter(m =>
+        (m.home_team?.name === homeTeam && m.away_team?.name === awayTeam) ||
+        (m.home_team?.name === awayTeam && m.away_team?.name === homeTeam)
+    ).slice(0, 5);
+
+    if (mutualMatches.length === 0) return { valid: true, reason: 'No direct H2H found' };
+
+    // Calculate goal stats
+    let totalGoals = 0;
+    let goalGames = 0;
+    for (const match of mutualMatches) {
+        const s1 = parseInt(match.home_team?.score) || 0;
+        const s2 = parseInt(match.away_team?.score) || 0;
+        if (!isNaN(s1) && !isNaN(s2)) {
+            const total = s1 + s2;
+            totalGoals += total;
+            if (total >= 1) goalGames++;
+        }
+    }
+
+    const avgGoals = mutualMatches.length > 0 ? totalGoals / mutualMatches.length : 0;
+    const goalRate = mutualMatches.length > 0 ? (goalGames / mutualMatches.length) * 100 : 0;
+
+    // Validation Criteria:
+    // 1. At least 60% of H2H games had 1+ goal
+    // 2. Average goals in H2H >= 1.5
+    const isValid = goalRate >= 60 && avgGoals >= 1.5;
+
+    return {
+        valid: isValid,
+        avgGoals: avgGoals.toFixed(2),
+        goalRate: goalRate.toFixed(0),
+        matchCount: mutualMatches.length,
+        reason: isValid
+            ? `H2H OK: ${avgGoals.toFixed(1)} avg goals, ${goalRate.toFixed(0)}% goal rate`
+            : `H2H FAIL: Only ${avgGoals.toFixed(1)} avg goals or ${goalRate.toFixed(0)}% goal rate (need 1.5+ avg, 60%+ rate)`
+    };
 }
 
 // ============================================
@@ -1769,161 +1287,136 @@ async function processMatches() {
             const totalCorners = stats.corners.home + stats.corners.away;
             log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
 
-            // 🔴 RED CARD NOW HANDLED BY PROBABILITY ENGINE (advantage context)
-            // No longer skip - the engine gives +30% to the team with advantage
-
-            // 💰 FETCH ODDS (Required for Context Multipliers)
-            const odds = await fetchMatchOdds(matchId);
-            if (odds) {
-                match.odds = odds;
-                log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
-            } else {
-                match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
-                log.info(`      ⚠️ No Odds found - using defaults`);
-            }
-
-            // STEP 1: Base Activity Check ("Is it Dead?" Filter)
-            const baseCheck = checkBaseActivity(elapsed, stats);
-
-            if (!baseCheck.isAlive) {
-                log.info(`      💀 ${baseCheck.reason}`);
-                continue; // Dead match, skip immediately
-            }
-            log.info(`      ✅ ${baseCheck.reason}`);
-
-            // Record stats to history for delta tracking
-            recordMatchStats(matchId, stats, score);
-
-            // STEP 2: INITIAL PRESSURE SCREENING (Quick Check)
-            const probability = calculateGoalProbability(match, stats, elapsed, matchId);
-            log.info(`      🧠 Initial Pressure: ${probability.probabilityPercent}% (${probability.confidenceStars}⭐) - ${probability.dominantTeam}`);
-
-            // Skip if initial pressure is too low (The Radar threshold: 50%)
-            if (probability.probabilityPercent < 50 || probability.dominantTeam === 'Balanced') {
-                log.info(`      ⏸️ Below radar threshold (Need 50%+ for Deep Analysis)`);
+            // 🔴 RED CARD FILTER (Safety First)
+            if (stats.redCards && (stats.redCards.home > 0 || stats.redCards.away > 0)) {
+                log.info(`      🛑 RED CARD detected (Home: ${stats.redCards.home}, Away: ${stats.redCards.away}) - Skipping safety`);
                 continue;
             }
-
-            // =================================================
-            // 🧬 HYBRID ANALYSIS ENGINE - DEEP DIVE
-            // =================================================
-            log.info(`      🧬 TRIGGERING DEEP ANALYSIS...`);
-
-            // H2H data is fetched internally via /match/h2h/{matchId}
-            const deepAnalysis = await performDeepAnalysis(match, stats);
-
-            if (!deepAnalysis) {
-                log.info(`      ⏸️ Deep Analysis returned null - skipping`);
-                continue;
-            }
-
-            log.info(`      📊 Hybrid Result: ${deepAnalysis.analysis.total_confidence}% (Live: ${deepAnalysis.analysis.live_pressure_score}% | History: ${deepAnalysis.analysis.historical_score}%)`);
-            log.info(`      🏷️ Tags: ${deepAnalysis.analysis.tags.join(', ')}`);
-
-            // STEP 3: FINAL FILTER - Only high confidence signals (65%+ hybrid confidence)
-            if (deepAnalysis.analysis.total_confidence < 65) {
-                log.info(`      ⏸️ Hybrid confidence too low (Need 65%+ after H2H validation)`);
-                continue;
-            }
-
-            // =================================================
-            // STEP 4: AI VALIDATION (Final Gate)
-            // =================================================
-            log.info(`      🤖 Sending to AI for final validation...`);
-
-            let aiVerdict = { verdict: 'PLAY', confidence: deepAnalysis.analysis.total_confidence, reason: 'AI bypassed - using hybrid score' };
-
-            try {
-                const aiResponse = await askAIAnalyst(deepAnalysis.ai_prompt, 'live');
-
-                if (aiResponse && aiResponse.verdict) {
-                    aiVerdict = aiResponse;
-                    log.info(`      🤖 AI Response: ${aiResponse.verdict} (${aiResponse.confidence}%) - ${aiResponse.reason}`);
-
-                    // AI must say PLAY with 70%+ confidence
-                    if (aiResponse.verdict !== 'PLAY' || aiResponse.confidence < 70) {
-                        log.info(`      ⏸️ AI rejected signal (Need PLAY with 70%+)`);
-                        continue;
-                    }
-                } else {
-                    log.warn(`      ⚠️ AI returned invalid response - using hybrid verdict`);
-                }
-            } catch (aiError) {
-                log.warn(`      ⚠️ AI validation failed: ${aiError.message} - using hybrid verdict`);
-            }
-
-            // Check daily signal limit
-            const strategyCode = deepAnalysis.strategy_code;
-
-            if (!checkSignalLimit(matchId, strategyCode)) {
-                log.warn(`      🔒 Signal limit reached for ${matchId}_${strategyCode}`);
-                continue;
-            }
-
-            // Build candidate signal (enhanced with hybrid data + AI verdict)
-            const candidate = {
-                id: deepAnalysis.signal_id,
-                home: deepAnalysis.match_info.home,
-                away: deepAnalysis.match_info.away,
-                homeLogo: match.home_team?.image_path || '',
-                awayLogo: match.away_team?.image_path || '',
-                score: deepAnalysis.match_info.score,
-                elapsed,
-                strategy: deepAnalysis.market_recommendation,
-                strategyCode,
-                phase: elapsed <= 45 ? 'First Half' : 'Second Half',
-                confidence: aiVerdict.confidence >= 85 ? 'HIGH' :
-                    aiVerdict.confidence >= 70 ? 'MEDIUM' : 'LOW',
-                confidencePercent: aiVerdict.confidence,
-                verdict: 'PLAY', // Passed all 3 gates: Momentum + H2H + AI
-                reason: `Live: ${deepAnalysis.analysis.live_pressure_score}% → H2H: ${deepAnalysis.analysis.historical_score}% → AI: ${aiVerdict.confidence}% | ${aiVerdict.reason || ''}`,
-                dominantTeam: deepAnalysis.analysis.dominant_team,
-                homePressure: deepAnalysis.analysis.home_pressure,
-                awayPressure: deepAnalysis.analysis.away_pressure,
-                // Deep Analysis extras
-                analysis: deepAnalysis.analysis,
-                aiAnalysis: aiVerdict, // AI response
-                ai_prompt: deepAnalysis.ai_prompt, // For admin review
-                h2h_available: deepAnalysis.h2h_available,
-                stats: {
-                    shots: stats.shots.home + stats.shots.away,
-                    shots_on_target: stats.shotsOnTarget.home + stats.shotsOnTarget.away,
-                    corners: stats.corners.home + stats.corners.away,
-                    xG: ((stats.xG?.home || 0) + (stats.xG?.away || 0)).toFixed(2),
-                    possession: `${stats.possession?.home || 50}%-${stats.possession?.away || 50}%`,
-                    homeOdds: (match.odds['1'] || 2.0).toFixed(2),
-                    awayOdds: (match.odds['2'] || 2.0).toFixed(2)
-                },
-                league: deepAnalysis.match_info.league,
-                leagueLogo: match.league_logo || '',
-                country: deepAnalysis.match_info.country
-            };
-
-            log.success(`      ✅ FINAL SIGNAL: Live ${deepAnalysis.analysis.live_pressure_score}% → H2H ${deepAnalysis.analysis.historical_score}% → AI ${aiVerdict.confidence}%`);
-            signals.push(candidate);
-
-            // Record signal for daily limit tracking
-            recordSignal(matchId, strategyCode);
-
-            // Auto-approve live signals
-            APPROVED_IDS.add(candidate.id);
-
-            // 📝 Record bet to history
-            await betTracker.recordBet({
-                match_id: matchId,
-                home_team: deepAnalysis.match_info.home,
-                away_team: deepAnalysis.match_info.away
-            }, deepAnalysis.market_recommendation, strategyCode, deepAnalysis.analysis.total_confidence, 'live_hybrid', candidate.score);
-
-            // Send Telegram notification
-            await sendTelegramNotification(candidate);
-
-            // Small delay between API calls
-            await new Promise(r => setTimeout(r, 200));
         } else {
             log.warn(`      ⚠️ Could not fetch stats for this match`);
             continue; // Skip if no stats
         }
+
+        // 💰 FETCH ODDS (New Context)
+        const odds = await fetchMatchOdds(matchId);
+        if (odds) {
+            match.odds = odds;
+            log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
+        } else {
+            match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
+            log.info(`      ⚠️ No Odds found - using defaults`);
+        }
+
+        // STEP 1: Base Activity Check ("Is it Dead?" Filter)
+        const baseCheck = checkBaseActivity(elapsed, stats);
+
+        if (!baseCheck.isAlive) {
+            log.info(`      💀 ${baseCheck.reason}`);
+            continue; // Dead match, skip immediately
+        }
+        log.info(`      ✅ ${baseCheck.reason}`);
+
+        // Record to history AFTER base activity check passes
+        recordMatchStats(matchId, stats, score);
+
+        // STEP 2: Detect Momentum (Dynamic Lookback)
+        const momentum = detectMomentum(matchId, stats, score);
+
+        if (momentum.detected) {
+            log.info(`      🔥 MOMENTUM: ${momentum.reason}`);
+        } else {
+            log.info(`      ⏸️ No momentum trigger yet (waiting for delta)`);
+            continue; // Skip if no momentum - this is the key filter!
+        }
+
+        // Run scout filters with momentum
+        let candidate = analyzeFirstHalfSniper(match, elapsed, stats, momentum);
+        if (!candidate) {
+            candidate = analyzeLateGameMomentum(match, elapsed, stats, momentum);
+        }
+
+        if (!candidate) {
+            log.info(`      ❌ Failed phase criteria (time/score mismatch)`);
+            continue;
+        }
+
+        // Check daily signal limit (max 2 per match per strategy)
+        if (!checkSignalLimit(matchId, candidate.strategyCode)) {
+            log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode} (max ${MAX_SIGNALS_PER_MATCH_STRATEGY}/day)`);
+            continue;
+        }
+
+        // Include base activity in reason
+        candidate.reason = `${baseCheck.reason} + ${candidate.reason}`;
+
+        log.info(`      ✓ ${candidate.phase}: ${candidate.strategyCode} (${candidate.confidencePercent}% base)`);
+
+        // 🎯 CONVERSION CHECK (Reject low accuracy shooters)
+        const totalShots = candidate.stats.shots || 0;
+        const totalSoT = candidate.stats.shots_on_target || 0;
+        if (totalShots >= 8) {
+            const accuracy = totalSoT / totalShots;
+            if (accuracy < 0.25) {
+                log.warn(`      ⛔ CONVERSION FAIL: ${Math.round(accuracy * 100)}% accuracy (need 25%+)`);
+                continue;
+            }
+        }
+
+        // 🤝 H2H VALIDATION (Check historical goal patterns)
+        log.info(`      🤝 Fetching H2H data...`);
+        const h2hData = await fetchMatchH2H(matchId);
+        const h2hAnalysis = analyzeH2HForGoals(h2hData, candidate.home, candidate.away);
+
+        if (!h2hAnalysis.valid) {
+            log.warn(`      ⛔ ${h2hAnalysis.reason}`);
+            continue;
+        }
+        log.info(`      ✅ ${h2hAnalysis.reason}`);
+
+        // Add H2H context to candidate
+        candidate.h2h = h2hAnalysis;
+
+        // Send to Gemini for AI validation
+        log.gemini(`      🤖 Asking Gemini AI...`);
+        const geminiResult = await askAIAnalyst(candidate);
+
+        // Update candidate with Gemini results
+        candidate.verdict = geminiResult.verdict || 'SKIP';
+        candidate.confidencePercent = geminiResult.confidence || candidate.confidencePercent;
+        candidate.confidence = geminiResult.confidence >= 75 ? 'HIGH' : geminiResult.confidence >= 50 ? 'MEDIUM' : 'LOW';
+        candidate.geminiReason = geminiResult.reason || '';
+
+        // Only add PLAY signals
+        if (candidate.verdict === 'PLAY') {
+            candidate.id = `${matchId}_${candidate.strategyCode}`;
+            log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
+            signals.push(candidate);
+
+            // Record signal for daily limit tracking
+            recordSignal(matchId, candidate.strategyCode);
+
+            // Auto-approve live signals (no admin approval needed)
+            APPROVED_IDS.add(candidate.id);
+
+            // 📝 Record bet to history (for Dashboard tracking)
+            const homeScore = match.home_team?.score || 0;
+            const awayScore = match.away_team?.score || 0;
+            const entryScore = `${homeScore}-${awayScore}`;
+
+            await betTracker.recordBet({
+                match_id: matchId,
+                home_team: match.home_team?.name || 'Unknown',
+                away_team: match.away_team?.name || 'Unknown'
+            }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live', entryScore);
+
+            // Send Telegram notification
+            await sendTelegramNotification(candidate);
+        } else {
+            log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
+        }
+
+        // Small delay between API calls
+        await new Promise(r => setTimeout(r, 200));
     }
 
     // Update cache
