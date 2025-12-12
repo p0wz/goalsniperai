@@ -833,29 +833,26 @@ async function performDeepAnalysis(liveMatch, liveStats) {
     }
 
     // ========================================
-    // LAYER B: HISTORICAL VALIDATION (40% Weight)
+    // LAYER B: HISTORICAL VALIDATION (DISABLED - No H2H endpoint)
     // ========================================
-    log.info(`[DeepAnalysis] Fetching H2H data (Lazy Load)...`);
-    const h2hData = await fetchH2HData(matchId);
-    const historical = calculateHistoricalScore(h2hData, dominantTeam, elapsed, home, away);
+    // NOTE: Flashscore4 API doesn't have /match/h2h/ endpoint
+    // H2H fetch is disabled until we find a valid API source
+    // Currently using 100% Live Pressure + AI Validation
+    log.info(`[DeepAnalysis] H2H disabled - using Live Pressure only`);
 
-    log.info(`[DeepAnalysis] Historical Score: ${historical.score} (Tags: ${historical.tags.join(', ')})`);
-
-    // Normalize historical score (max ~65 points possible)
-    const historicalScoreNormalized = Math.min((historical.score / 65) * 100, 100);
+    const historical = { score: 0, tags: ['H2H_DISABLED'] };
+    const historicalScoreNormalized = 0;
 
     // ========================================
     // SYNTHESIS: FINAL CONFIDENCE SCORE
     // ========================================
-    let totalConfidence = Math.round(
-        (livePressureScore * LAYER_WEIGHTS.LIVE) +
-        (historicalScoreNormalized * LAYER_WEIGHTS.HISTORY)
-    );
+    // Since H2H is disabled, use 100% Live Pressure
+    let totalConfidence = Math.round(livePressureScore);
 
     // Cap at 95%
     totalConfidence = Math.min(totalConfidence, 95);
 
-    log.success(`[DeepAnalysis] Total Confidence: ${totalConfidence}% (Live: ${livePressureScore}%, History: ${Math.round(historicalScoreNormalized)}%)`);
+    log.success(`[DeepAnalysis] Total Confidence: ${totalConfidence}% (Live Pressure Only)`);
 
     // ========================================
     // AI PROMPT GENERATION
