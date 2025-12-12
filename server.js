@@ -816,7 +816,17 @@ function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
         reasons.push(`xG: ${totalxG.toFixed(2)}`);
     }
 
-    // 🍀 UNLUCKY TEAM BONUS (xG Underperformance)
+    // � SHOT EFFICIENCY CHECK (Beceriksizlik Filtresi)
+    // If lots of shots (>=8) but accuracy is low (<30%), penalize
+    if (totalShots >= 8) {
+        const accuracy = totalSoT / totalShots;
+        if (accuracy < 0.30) {
+            confidencePercent -= 5;
+            reasons.push(`🔫 Low Accuracy (${Math.round(accuracy * 100)}%)`);
+        }
+    }
+
+    // �🍀 UNLUCKY TEAM BONUS (xG Underperformance)
     // If a team has generated 1.2+ more xG than actual goals, they are "due" for a goal.
     // This is optional (only if xG exists).
     const homexG = stats?.xG?.home || 0;
@@ -921,6 +931,16 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     if (totalShots >= 10) { confidencePercent += 8; reasons.push(`${totalShots} shots`); }
     if (totalCorners >= 5) { confidencePercent += 5; reasons.push(`${totalCorners} corners`); }
     if (totalxG > 1.0) { confidencePercent += 7; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
+
+    // 🎯 SHOT EFFICIENCY CHECK (Beceriksizlik Filtresi)
+    // If lots of shots (>=10) but accuracy is low (<30%), penalize
+    if (totalShots >= 10) {
+        const accuracy = totalSoT / totalShots;
+        if (accuracy < 0.30) {
+            confidencePercent -= 5;
+            reasons.push(`🔫 Low Accuracy (${Math.round(accuracy * 100)}%)`);
+        }
+    }
 
     // 🍀 UNLUCKY TEAM BONUS (xG Underperformance)
     const homexG = stats?.xG?.home || 0;
