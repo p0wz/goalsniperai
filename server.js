@@ -844,8 +844,8 @@ async function fetchMatchH2H(matchId) {
     }
 }
 
-// Helper: Analyze H2H for goal patterns
-function analyzeH2HForGoals(h2hData, homeTeam, awayTeam) {
+// Helper: Analyze H2H for goal patterns (Enhanced)
+function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0-0') {
     if (!h2hData) return { valid: true, reason: 'No H2H data (defaulting to valid)' };
 
     const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
@@ -859,36 +859,76 @@ function analyzeH2HForGoals(h2hData, homeTeam, awayTeam) {
 
     if (mutualMatches.length === 0) return { valid: true, reason: 'No direct H2H found' };
 
-    // Calculate goal stats
-    let totalGoals = 0;
+    // Parse current score
+    const [curHome, curAway] = currentScore.split('-').map(s => parseInt(s) || 0);
+    const currentTotal = curHome + curAway;
+
+    // Calculate SEPARATE stats for each team + combined
+    let combinedGoals = 0;
+    let homeTeamGoalsAtHome = 0;  // When homeTeam plays at home
+    let awayTeamGoalsAtAway = 0;  // When awayTeam plays away
+    let homeTeamMatches = 0;
+    let awayTeamMatches = 0;
     let goalGames = 0;
+    let bttsGames = 0;
+
     for (const match of mutualMatches) {
         const s1 = parseInt(match.home_team?.score) || 0;
         const s2 = parseInt(match.away_team?.score) || 0;
-        if (!isNaN(s1) && !isNaN(s2)) {
-            const total = s1 + s2;
-            totalGoals += total;
-            if (total >= 1) goalGames++;
+        if (isNaN(s1) || isNaN(s2)) continue;
+
+        const total = s1 + s2;
+        combinedGoals += total;
+        if (total >= 1) goalGames++;
+        if (s1 > 0 && s2 > 0) bttsGames++;
+
+        // Track home team's goals when they were home
+        if (match.home_team?.name === homeTeam) {
+            homeTeamGoalsAtHome += s1;
+            homeTeamMatches++;
+        }
+        // Track away team's goals when they were away
+        if (match.away_team?.name === awayTeam) {
+            awayTeamGoalsAtAway += s2;
+            awayTeamMatches++;
         }
     }
 
-    const avgGoals = mutualMatches.length > 0 ? totalGoals / mutualMatches.length : 0;
+    // Calculate averages
+    const avgCombined = mutualMatches.length > 0 ? combinedGoals / mutualMatches.length : 0;
+    const avgHomeAtHome = homeTeamMatches > 0 ? homeTeamGoalsAtHome / homeTeamMatches : 0;
+    const avgAwayAtAway = awayTeamMatches > 0 ? awayTeamGoalsAtAway / awayTeamMatches : 0;
     const goalRate = mutualMatches.length > 0 ? (goalGames / mutualMatches.length) * 100 : 0;
+    const bttsRate = mutualMatches.length > 0 ? (bttsGames / mutualMatches.length) * 100 : 0;
 
-    // Validation Criteria:
-    // 1. At least 60% of H2H games had 1+ goal
-    // 2. Average goals in H2H >= 1.5
-    const isValid = goalRate >= 60 && avgGoals >= 1.5;
+    // Validation Criteria (Context-Aware):
+    // If current score is 0-0, we need STRONGER evidence (higher thresholds)
+    const isZeroZero = currentTotal === 0;
+    const requiredAvg = isZeroZero ? 2.0 : 1.5;  // Stricter if 0-0
+    const requiredRate = isZeroZero ? 70 : 60;   // Stricter if 0-0
 
-    return {
-        valid: isValid,
-        avgGoals: avgGoals.toFixed(2),
+    // Must satisfy:
+    // 1. Combined goal rate >= 60% (or 70% if 0-0)
+    // 2. Combined avg goals >= 1.5 (or 2.0 if 0-0)
+    // 3. At least one team should have avg 0.5+ goals in their position
+    const isValid = goalRate >= requiredRate &&
+        avgCombined >= requiredAvg &&
+        (avgHomeAtHome >= 0.5 || avgAwayAtAway >= 0.5);
+
+    const stats = {
+        avgCombined: avgCombined.toFixed(2),
+        avgHomeAtHome: avgHomeAtHome.toFixed(2),
+        avgAwayAtAway: avgAwayAtAway.toFixed(2),
         goalRate: goalRate.toFixed(0),
-        matchCount: mutualMatches.length,
-        reason: isValid
-            ? `H2H OK: ${avgGoals.toFixed(1)} avg goals, ${goalRate.toFixed(0)}% goal rate`
-            : `H2H FAIL: Only ${avgGoals.toFixed(1)} avg goals or ${goalRate.toFixed(0)}% goal rate (need 1.5+ avg, 60%+ rate)`
+        bttsRate: bttsRate.toFixed(0),
+        matchCount: mutualMatches.length
     };
+
+    const reason = isValid
+        ? `H2H✓ Avg:${avgCombined.toFixed(1)} | ${homeTeam}@H:${avgHomeAtHome.toFixed(1)} | ${awayTeam}@A:${avgAwayAtAway.toFixed(1)} | ${goalRate.toFixed(0)}%`
+        : `H2H✗ Avg:${avgCombined.toFixed(1)}(need ${requiredAvg}+) | Rate:${goalRate.toFixed(0)}%(need ${requiredRate}%+)`;
+
+    return { valid: isValid, ...stats, reason };
 }
 
 // ============================================
@@ -1375,7 +1415,7 @@ async function processMatches() {
         // 🤝 H2H VALIDATION (Check historical goal patterns)
         log.info(`      🤝 Fetching H2H data...`);
         const h2hData = await fetchMatchH2H(matchId);
-        const h2hAnalysis = analyzeH2HForGoals(h2hData, candidate.home, candidate.away);
+        const h2hAnalysis = analyzeH2HForGoals(h2hData, candidate.home, candidate.away, candidate.score);
 
         if (!h2hAnalysis.valid) {
             log.warn(`      ⛔ ${h2hAnalysis.reason}`);
