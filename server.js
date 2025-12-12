@@ -779,6 +779,57 @@ async function fetchMatchStats(matchId) {
 }
 
 // ============================================
+// 💰 Fetch Match Odds (Pre-match or Live)
+// ============================================
+async function fetchMatchOdds(matchId) {
+    if (dailyRequestCount >= DAILY_LIMIT) return null;
+
+    try {
+        const response = await axios.get(
+            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/odds/${matchId}`,
+            { headers: FLASHSCORE_API.headers, timeout: 10000 }
+        );
+        dailyRequestCount++;
+
+        const data = response.data;
+        const odds = { '1': 0, 'X': 0, '2': 0 };
+
+        // Parse odds (Look for standard 1X2 market)
+        // Structure varies, usually a list of markets. We look for "Match Winner" or "1X2"
+        const markets = Array.isArray(data) ? data : (data.data || []);
+
+        // Find 1X2 market
+        const market = markets.find(m => m.name === 'Match Winner' || m.name === '1X2' || m.name === 'Full Time Result');
+
+        if (market && market.choices) {
+            market.choices.forEach(choice => {
+                if (choice.name === '1' || choice.name === 'Home') odds['1'] = parseFloat(choice.fractional_value || choice.decimal_value || 0);
+                if (choice.name === 'X' || choice.name === 'Draw') odds['X'] = parseFloat(choice.fractional_value || choice.decimal_value || 0);
+                if (choice.name === '2' || choice.name === 'Away') odds['2'] = parseFloat(choice.fractional_value || choice.decimal_value || 0);
+            });
+            // Fallback if numeric names are used in a different structure
+            if (market.choices.length === 3 && odds['1'] === 0) {
+                odds['1'] = parseFloat(market.choices[0].fractional_value || market.choices[0].decimal_value || 0);
+                odds['X'] = parseFloat(market.choices[1].fractional_value || market.choices[1].decimal_value || 0);
+                odds['2'] = parseFloat(market.choices[2].fractional_value || market.choices[2].decimal_value || 0);
+            }
+        } else {
+            // Fallback: Try to parse any available structure if logic above fails
+            // (Some endpoints return raw object)
+            if (data.home_odd) odds['1'] = parseFloat(data.home_odd);
+            if (data.draw_odd) odds['X'] = parseFloat(data.draw_odd);
+            if (data.away_odd) odds['2'] = parseFloat(data.away_odd);
+        }
+
+        return odds['1'] > 0 ? odds : null;
+
+    } catch (error) {
+        log.warn(`Odds fetch failed for ${matchId}: ${error.message}`);
+        return null; // Return null to fallback to 2.0 safely
+    }
+}
+
+// ============================================
 // 🎯 Strategy A: "First Half" (Time 12'-38', Score Diff <= 1)
 // ============================================
 function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
@@ -857,6 +908,17 @@ function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
         if (shotDiff >= 4 || sotDiff >= 2) domTeam = 'Home';
 
         reasons.push(`💪 ${domTeam} Dominating`);
+
+        // 🦁 FAVORITE CONTEXT (Smart Money)
+        // If the dominating team is also the favorite (Odds < 1.60), boost confidence
+        const isHomeFav = homeOdds < 1.60;
+        const isAwayFav = awayOdds < 1.60;
+
+        if ((domTeam === 'Home' && isHomeFav) || (domTeam === 'Away' && isAwayFav)) {
+            confidencePercent += 7;
+            const favOdds = domTeam === 'Home' ? homeOdds : awayOdds;
+            reasons.push(`🦁 Favorite Pushing (@${favOdds.toFixed(2)})`);
+        }
     } else {
         // Balanced match penalty (if no dominance and few chances)
         if (totalSoT < 3) confidencePercent -= 5;
@@ -971,6 +1033,17 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
         if (shotDiff >= 4 || sotDiff >= 2) domTeam = 'Home';
 
         reasons.push(`💪 ${domTeam} Dominating`);
+
+        // 🦁 FAVORITE CONTEXT (Smart Money)
+        // If the dominating team is also the favorite (Odds < 1.60), boost confidence
+        const isHomeFav = homeOdds < 1.60;
+        const isAwayFav = awayOdds < 1.60;
+
+        if ((domTeam === 'Home' && isHomeFav) || (domTeam === 'Away' && isAwayFav)) {
+            confidencePercent += 7;
+            const favOdds = domTeam === 'Home' ? homeOdds : awayOdds;
+            reasons.push(`🦁 Favorite Pushing (@${favOdds.toFixed(2)})`);
+        }
     } else {
         // Balanced match penalty (if no dominance and few chances)
         if (totalSoT < 4) confidencePercent -= 5;
@@ -1170,6 +1243,16 @@ async function processMatches() {
         } else {
             log.warn(`      ⚠️ Could not fetch stats for this match`);
             continue; // Skip if no stats
+        }
+
+        // 💰 FETCH ODDS (New Context)
+        const odds = await fetchMatchOdds(matchId);
+        if (odds) {
+            match.odds = odds;
+            log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
+        } else {
+            match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
+            log.info(`      ⚠️ No Odds found - using defaults`);
         }
 
         // STEP 1: Base Activity Check ("Is it Dead?" Filter)
