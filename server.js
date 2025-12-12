@@ -1785,6 +1785,32 @@ async function processMatches() {
                 continue;
             }
 
+            // =================================================
+            // STEP 4: AI VALIDATION (Final Gate)
+            // =================================================
+            log.info(`      🤖 Sending to AI for final validation...`);
+
+            let aiVerdict = { verdict: 'PLAY', confidence: deepAnalysis.analysis.total_confidence, reason: 'AI bypassed - using hybrid score' };
+
+            try {
+                const aiResponse = await askAIAnalyst(deepAnalysis.ai_prompt, 'live');
+
+                if (aiResponse && aiResponse.verdict) {
+                    aiVerdict = aiResponse;
+                    log.info(`      🤖 AI Response: ${aiResponse.verdict} (${aiResponse.confidence}%) - ${aiResponse.reason}`);
+
+                    // AI must say PLAY with 70%+ confidence
+                    if (aiResponse.verdict !== 'PLAY' || aiResponse.confidence < 70) {
+                        log.info(`      ⏸️ AI rejected signal (Need PLAY with 70%+)`);
+                        continue;
+                    }
+                } else {
+                    log.warn(`      ⚠️ AI returned invalid response - using hybrid verdict`);
+                }
+            } catch (aiError) {
+                log.warn(`      ⚠️ AI validation failed: ${aiError.message} - using hybrid verdict`);
+            }
+
             // Check daily signal limit
             const strategyCode = deepAnalysis.strategy_code;
 
@@ -1793,7 +1819,7 @@ async function processMatches() {
                 continue;
             }
 
-            // Build candidate signal (enhanced with hybrid data)
+            // Build candidate signal (enhanced with hybrid data + AI verdict)
             const candidate = {
                 id: deepAnalysis.signal_id,
                 home: deepAnalysis.match_info.home,
@@ -1805,16 +1831,17 @@ async function processMatches() {
                 strategy: deepAnalysis.market_recommendation,
                 strategyCode,
                 phase: elapsed <= 45 ? 'First Half' : 'Second Half',
-                confidence: deepAnalysis.analysis.total_confidence >= 80 ? 'HIGH' :
-                    deepAnalysis.analysis.total_confidence >= 65 ? 'MEDIUM' : 'LOW',
-                confidencePercent: deepAnalysis.analysis.total_confidence,
-                verdict: 'PLAY', // Hybrid engine already filtered
-                reason: `Live: ${deepAnalysis.analysis.live_pressure_score}% | H2H: ${deepAnalysis.analysis.historical_score}% | Tags: ${deepAnalysis.analysis.tags.slice(0, 3).join(', ')}`,
+                confidence: aiVerdict.confidence >= 85 ? 'HIGH' :
+                    aiVerdict.confidence >= 70 ? 'MEDIUM' : 'LOW',
+                confidencePercent: aiVerdict.confidence,
+                verdict: 'PLAY', // Passed all 3 gates: Momentum + H2H + AI
+                reason: `Live: ${deepAnalysis.analysis.live_pressure_score}% → H2H: ${deepAnalysis.analysis.historical_score}% → AI: ${aiVerdict.confidence}% | ${aiVerdict.reason || ''}`,
                 dominantTeam: deepAnalysis.analysis.dominant_team,
                 homePressure: deepAnalysis.analysis.home_pressure,
                 awayPressure: deepAnalysis.analysis.away_pressure,
                 // Deep Analysis extras
                 analysis: deepAnalysis.analysis,
+                aiAnalysis: aiVerdict, // AI response
                 ai_prompt: deepAnalysis.ai_prompt, // For admin review
                 h2h_available: deepAnalysis.h2h_available,
                 stats: {
@@ -1831,7 +1858,7 @@ async function processMatches() {
                 country: deepAnalysis.match_info.country
             };
 
-            log.success(`      ✅ HYBRID SIGNAL: ${deepAnalysis.analysis.total_confidence}% - ${deepAnalysis.market_recommendation}`);
+            log.success(`      ✅ FINAL SIGNAL: Live ${deepAnalysis.analysis.live_pressure_score}% → H2H ${deepAnalysis.analysis.historical_score}% → AI ${aiVerdict.confidence}%`);
             signals.push(candidate);
 
             // Record signal for daily limit tracking

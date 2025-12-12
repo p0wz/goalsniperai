@@ -136,7 +136,10 @@ export default function Admin() {
             <main className="flex-1 ml-60 p-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="font-display text-3xl">Admin Panel</h1>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-2 flex-wrap items-center">
+                        <Link to="/daily-analyst" className="px-3 py-1.5 bg-accent/20 text-accent text-sm rounded-lg hover:bg-accent/30 transition-colors">
+                            📅 Daily Analyst →
+                        </Link>
                         <Button variant={activeTab === 'users' ? 'primary' : 'secondary'} onClick={() => setActiveTab('users')}>👥 Kullanıcılar</Button>
                         <Button variant={activeTab === 'signals' ? 'primary' : 'secondary'} onClick={() => setActiveTab('signals')}>⚡ Canlı Bot</Button>
                         <Button variant={activeTab === 'daily' ? 'primary' : 'secondary'} onClick={() => setActiveTab('daily')}>📅 Günlük Analiz</Button>
