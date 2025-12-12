@@ -162,10 +162,21 @@ router.delete('/users/:id', async (req, res) => {
 // ============================================
 // 📈 Get Signal Stats
 // ============================================
+router.get('/signals/stats', (req, res) => {
+    try {
+        res.json({
+            success: true,
+            stats: {
+                total_signals_today: 0,
+                iy_signals: 0,
+                ms_signals: 0,
+                avg_confidence: 0
+            }
+        });
     } catch (error) {
-    console.error('[ADMIN] Signal stats error:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
-}
+        console.error('[ADMIN] Signal stats error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
 });
 
 // ============================================
