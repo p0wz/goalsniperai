@@ -638,9 +638,12 @@ const LAYER_WEIGHTS = {
     HISTORY: 0.40  // 40% weight for historical data
 };
 
-// Fetch H2H / Team Stats for a match (Lazy Loading)
-async function fetchH2HData(matchId) {
+// Fetch H2H / Team Stats for a match (with Rate Limit Protection)
+async function fetchH2HData(matchId, retries = 2) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
+
+    // Rate limit: wait 300ms between H2H calls
+    await new Promise(r => setTimeout(r, 300));
 
     try {
         const response = await axios.get(
@@ -650,6 +653,13 @@ async function fetchH2HData(matchId) {
         dailyRequestCount++;
         return response.data;
     } catch (error) {
+        // Handle 429 Rate Limit with retry
+        if (error.response?.status === 429 && retries > 0) {
+            const waitTime = 2000 * (3 - retries);
+            log.warn(`[RateLimit] 429 for h2h/${matchId} - waiting ${waitTime}ms (${retries} retries left)`);
+            await new Promise(r => setTimeout(r, waitTime));
+            return fetchH2HData(matchId, retries - 1);
+        }
         log.warn(`[H2H] Failed to fetch H2H for ${matchId}: ${error.message}`);
         return null;
     }
@@ -1254,10 +1264,24 @@ RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
 }
 
 // ============================================
-// 📡 Fetch Match Statistics
+// 📡 Fetch Match Statistics (with Rate Limit Protection)
 // ============================================
-async function fetchMatchStats(matchId) {
+let lastApiCallTime = 0;
+const MIN_API_DELAY = 500; // 500ms between API calls
+
+async function rateLimitedDelay() {
+    const now = Date.now();
+    const elapsed = now - lastApiCallTime;
+    if (elapsed < MIN_API_DELAY) {
+        await new Promise(r => setTimeout(r, MIN_API_DELAY - elapsed));
+    }
+    lastApiCallTime = Date.now();
+}
+
+async function fetchMatchStats(matchId, retries = 2) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
+
+    await rateLimitedDelay();
 
     try {
         const response = await axios.get(
@@ -1267,16 +1291,25 @@ async function fetchMatchStats(matchId) {
         dailyRequestCount++;
         return response.data;
     } catch (error) {
+        // Handle 429 Rate Limit with retry
+        if (error.response?.status === 429 && retries > 0) {
+            const waitTime = 2000 * (3 - retries); // 2s, 4s
+            log.warn(`[RateLimit] 429 for stats/${matchId} - waiting ${waitTime}ms (${retries} retries left)`);
+            await new Promise(r => setTimeout(r, waitTime));
+            return fetchMatchStats(matchId, retries - 1);
+        }
         log.warn(`Stats fetch failed for ${matchId}: ${error.message}`);
         return null;
     }
 }
 
 // ============================================
-// 💰 Fetch Match Odds (Pre-match or Live)
+// 💰 Fetch Match Odds (with Rate Limit Protection)
 // ============================================
-async function fetchMatchOdds(matchId) {
+async function fetchMatchOdds(matchId, retries = 2) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
+
+    await rateLimitedDelay();
 
     try {
         const response = await axios.get(
@@ -1318,6 +1351,13 @@ async function fetchMatchOdds(matchId) {
         return odds['1'] > 0 ? odds : null;
 
     } catch (error) {
+        // Handle 429 Rate Limit with retry
+        if (error.response?.status === 429 && retries > 0) {
+            const waitTime = 2000 * (3 - retries);
+            log.warn(`[RateLimit] 429 for odds/${matchId} - waiting ${waitTime}ms (${retries} retries left)`);
+            await new Promise(r => setTimeout(r, waitTime));
+            return fetchMatchOdds(matchId, retries - 1);
+        }
         log.warn(`Odds fetch failed for ${matchId}: ${error.message}`);
         return null; // Return null to fallback to 2.0 safely
     }
