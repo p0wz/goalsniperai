@@ -816,6 +816,20 @@ function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
         reasons.push(`xG: ${totalxG.toFixed(2)}`);
     }
 
+    // 🍀 UNLUCKY TEAM BONUS (xG Underperformance)
+    // If a team has generated 1.2+ more xG than actual goals, they are "due" for a goal.
+    // This is optional (only if xG exists).
+    const homexG = stats?.xG?.home || 0;
+    const awayxG = stats?.xG?.away || 0;
+    const homeUnderperf = homexG - homeScore;
+    const awayUnderperf = awayxG - awayScore;
+
+    if (homeUnderperf >= 1.2 || awayUnderperf >= 1.2) {
+        confidencePercent += 10;
+        const unluckyTeam = homeUnderperf > awayUnderperf ? 'Home' : 'Away';
+        reasons.push(`🍀 ${unluckyTeam} due for goal (xG diff)`);
+    }
+
     // 🔥 DOMINANCE CHECK (One-sided match?)
     const shotDiff = (stats?.shots?.home || 0) - (stats?.shots?.away || 0);
     const sotDiff = (stats?.shotsOnTarget?.home || 0) - (stats?.shotsOnTarget?.away || 0);
@@ -907,6 +921,18 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     if (totalShots >= 10) { confidencePercent += 8; reasons.push(`${totalShots} shots`); }
     if (totalCorners >= 5) { confidencePercent += 5; reasons.push(`${totalCorners} corners`); }
     if (totalxG > 1.0) { confidencePercent += 7; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
+
+    // 🍀 UNLUCKY TEAM BONUS (xG Underperformance)
+    const homexG = stats?.xG?.home || 0;
+    const awayxG = stats?.xG?.away || 0;
+    const homeUnderperf = homexG - homeScore;
+    const awayUnderperf = awayxG - awayScore;
+
+    if (homeUnderperf >= 1.2 || awayUnderperf >= 1.2) {
+        confidencePercent += 10;
+        const unluckyTeam = homeUnderperf > awayUnderperf ? 'Home' : 'Away';
+        reasons.push(`🍀 ${unluckyTeam} due for goal (xG diff)`);
+    }
 
     // 🔥 DOMINANCE CHECK (One-sided match?)
     const shotDiff = (stats?.shots?.home || 0) - (stats?.shots?.away || 0);
