@@ -400,6 +400,179 @@ function checkBaseActivity(elapsed, stats) {
 }
 
 // ============================================
+// 🧠 LIVE GOAL PROBABILITY ENGINE (v2.0)
+// ============================================
+// Replaces simple "Momentum" triggers with a sophisticated
+// Pressure Index system that calculates goal probability.
+
+const PRESSURE_WEIGHTS = {
+    SHOT_ON_TARGET: 15,
+    SHOT_OFF_TARGET: 5,
+    CORNER: 8,
+    DANGEROUS_ATTACK: 1,
+    POSSESSION_BONUS: 10, // If possession > 65%
+    XG_MULTIPLIER: 20     // xG * this value
+};
+
+const PROBABILITY_MAP = [
+    { maxScore: 30, minProb: 10, maxProb: 20, stars: 1 },
+    { maxScore: 60, minProb: 40, maxProb: 55, stars: 2 },
+    { maxScore: 100, minProb: 60, maxProb: 75, stars: 3 },
+    { maxScore: 150, minProb: 75, maxProb: 85, stars: 4 },
+    { maxScore: Infinity, minProb: 85, maxProb: 95, stars: 5 }
+];
+
+function calculateGoalProbability(match, liveStats, elapsed) {
+    const homeScore = match.home_team?.score || 0;
+    const awayScore = match.away_team?.score || 0;
+    const odds = match.odds || { '1': 2.0, '2': 2.0, 'X': 3.0 };
+    const homeOdds = parseFloat(odds['1']) || 2.0;
+    const awayOdds = parseFloat(odds['2']) || 2.0;
+
+    // === 1. CALCULATE PRESSURE SCORES (Per Team) ===
+    const homeSoT = liveStats?.shotsOnTarget?.home || 0;
+    const awaySoT = liveStats?.shotsOnTarget?.away || 0;
+    const homeShots = liveStats?.shots?.home || 0;
+    const awayShots = liveStats?.shots?.away || 0;
+    const homeCorners = liveStats?.corners?.home || 0;
+    const awayCorners = liveStats?.corners?.away || 0;
+    const homeDA = liveStats?.dangerousAttacks?.home || 0;
+    const awayDA = liveStats?.dangerousAttacks?.away || 0;
+    const homePoss = liveStats?.possession?.home || 50;
+    const awayPoss = liveStats?.possession?.away || 50;
+    const homexG = liveStats?.xG?.home || 0;
+    const awayxG = liveStats?.xG?.away || 0;
+    const homeRed = liveStats?.redCards?.home || 0;
+    const awayRed = liveStats?.redCards?.away || 0;
+
+    // Base Pressure = Weighted sum of stats
+    let homePressure = (homeSoT * PRESSURE_WEIGHTS.SHOT_ON_TARGET) +
+        ((homeShots - homeSoT) * PRESSURE_WEIGHTS.SHOT_OFF_TARGET) +
+        (homeCorners * PRESSURE_WEIGHTS.CORNER) +
+        (homeDA * PRESSURE_WEIGHTS.DANGEROUS_ATTACK) +
+        (homexG * PRESSURE_WEIGHTS.XG_MULTIPLIER);
+
+    let awayPressure = (awaySoT * PRESSURE_WEIGHTS.SHOT_ON_TARGET) +
+        ((awayShots - awaySoT) * PRESSURE_WEIGHTS.SHOT_OFF_TARGET) +
+        (awayCorners * PRESSURE_WEIGHTS.CORNER) +
+        (awayDA * PRESSURE_WEIGHTS.DANGEROUS_ATTACK) +
+        (awayxG * PRESSURE_WEIGHTS.XG_MULTIPLIER);
+
+    // Possession Bonus (if dominant)
+    if (homePoss >= 65) homePressure += PRESSURE_WEIGHTS.POSSESSION_BONUS;
+    if (awayPoss >= 65) awayPressure += PRESSURE_WEIGHTS.POSSESSION_BONUS;
+
+    // === 2. CONTEXT MULTIPLIERS ===
+    const contextFactors = [];
+
+    // 2a. Favorite Losing (Desperation Mode)
+    const isHomeFavorite = homeOdds < 1.50;
+    const isAwayFavorite = awayOdds < 1.50;
+    const isHomeLosing = homeScore < awayScore;
+    const isAwayLosing = awayScore < homeScore;
+
+    if (isHomeFavorite && isHomeLosing) {
+        homePressure *= 1.5;
+        contextFactors.push('🔥 Home FAV chasing');
+    }
+    if (isAwayFavorite && isAwayLosing) {
+        awayPressure *= 1.5;
+        contextFactors.push('🔥 Away FAV chasing');
+    }
+
+    // 2b. Red Card Advantage
+    if (awayRed > 0 && homeRed === 0) {
+        homePressure *= 1.3;
+        contextFactors.push('🟥 Away Red Card');
+    }
+    if (homeRed > 0 && awayRed === 0) {
+        awayPressure *= 1.3;
+        contextFactors.push('🟥 Home Red Card');
+    }
+
+    // 2c. "Kill Zone" Time Bonus (70-85 mins)
+    let timeBonus = 0;
+    if (elapsed >= 70 && elapsed <= 85) {
+        timeBonus = 10;
+        contextFactors.push('⏱️ Kill Zone (70-85)');
+    }
+
+    // === 3. DETERMINE DOMINANT TEAM ===
+    const totalPressure = homePressure + awayPressure;
+    let dominantTeam = 'Balanced';
+    let dominantPressure = Math.max(homePressure, awayPressure);
+
+    if (homePressure > awayPressure * 1.5) {
+        dominantTeam = 'Home';
+    } else if (awayPressure > homePressure * 1.5) {
+        dominantTeam = 'Away';
+    }
+
+    // === 4. MAP PRESSURE TO PROBABILITY ===
+    let probabilityPercent = 10;
+    let confidenceStars = 1;
+
+    for (const bracket of PROBABILITY_MAP) {
+        if (dominantPressure <= bracket.maxScore) {
+            // Linear interpolation within bracket
+            const rangeSize = bracket.maxScore === Infinity ? 50 : bracket.maxScore - (PROBABILITY_MAP[PROBABILITY_MAP.indexOf(bracket) - 1]?.maxScore || 0);
+            const positionInRange = dominantPressure - (PROBABILITY_MAP[PROBABILITY_MAP.indexOf(bracket) - 1]?.maxScore || 0);
+            const ratio = Math.min(positionInRange / rangeSize, 1);
+            probabilityPercent = Math.round(bracket.minProb + (bracket.maxProb - bracket.minProb) * ratio);
+            confidenceStars = bracket.stars;
+            break;
+        }
+    }
+
+    // Add time bonus
+    probabilityPercent = Math.min(probabilityPercent + timeBonus, 95);
+
+    // === 5. BUILD REASON STRING ===
+    const statsBreakdown = [];
+    if (dominantTeam === 'Home') {
+        if (homeSoT > 0) statsBreakdown.push(`${homeSoT} SoT`);
+        if (homeCorners > 0) statsBreakdown.push(`${homeCorners} Corners`);
+        if (homexG > 0) statsBreakdown.push(`${homexG.toFixed(2)} xG`);
+    } else if (dominantTeam === 'Away') {
+        if (awaySoT > 0) statsBreakdown.push(`${awaySoT} SoT`);
+        if (awayCorners > 0) statsBreakdown.push(`${awayCorners} Corners`);
+        if (awayxG > 0) statsBreakdown.push(`${awayxG.toFixed(2)} xG`);
+    } else {
+        statsBreakdown.push(`Balanced (H:${Math.round(homePressure)} / A:${Math.round(awayPressure)})`);
+    }
+
+    const reason = [
+        `Pressure Index: ${Math.round(dominantPressure)}`,
+        statsBreakdown.join(', '),
+        ...contextFactors
+    ].filter(Boolean).join(' | ');
+
+    // === 6. RECOMMENDED MARKET ===
+    let recommendedMarket = 'Next Goal Any';
+    if (dominantTeam === 'Home' && homePressure > 60) {
+        recommendedMarket = 'Next Goal Home';
+    } else if (dominantTeam === 'Away' && awayPressure > 60) {
+        recommendedMarket = 'Next Goal Away';
+    } else if (totalPressure > 80) {
+        recommendedMarket = 'Over 0.5 in Next 15 Mins';
+    }
+
+    return {
+        probabilityPercent,
+        confidenceStars,
+        dominantTeam,
+        homePressure: Math.round(homePressure),
+        awayPressure: Math.round(awayPressure),
+        reason,
+        recommendedMarket,
+        contextFactors,
+        stats: {
+            homeSoT, awaySoT, homeCorners, awayCorners, homexG, awayxG
+        }
+    };
+}
+
+// ============================================
 // 🎯 Dynamic Momentum Detection (Lookback)
 // ============================================
 // Thresholds for momentum triggers
@@ -1221,111 +1394,107 @@ async function processMatches() {
             const totalCorners = stats.corners.home + stats.corners.away;
             log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
 
-            // 🔴 RED CARD FILTER (Safety First)
-            if (stats.redCards && (stats.redCards.home > 0 || stats.redCards.away > 0)) {
-                log.info(`      🛑 RED CARD detected (Home: ${stats.redCards.home}, Away: ${stats.redCards.away}) - Skipping safety`);
+            // 🔴 RED CARD NOW HANDLED BY PROBABILITY ENGINE (advantage context)
+            // No longer skip - the engine gives +30% to the team with advantage
+
+            // 💰 FETCH ODDS (Required for Context Multipliers)
+            const odds = await fetchMatchOdds(matchId);
+            if (odds) {
+                match.odds = odds;
+                log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
+            } else {
+                match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
+                log.info(`      ⚠️ No Odds found - using defaults`);
+            }
+
+            // STEP 1: Base Activity Check ("Is it Dead?" Filter)
+            const baseCheck = checkBaseActivity(elapsed, stats);
+
+            if (!baseCheck.isAlive) {
+                log.info(`      💀 ${baseCheck.reason}`);
+                continue; // Dead match, skip immediately
+            }
+            log.info(`      ✅ ${baseCheck.reason}`);
+
+            // STEP 2: PROBABILITY ENGINE (Replaces old Momentum Detection)
+            const probability = calculateGoalProbability(match, stats, elapsed);
+
+            log.info(`      🧠 Probability: ${probability.probabilityPercent}% (${probability.confidenceStars}⭐) - ${probability.dominantTeam}`);
+            log.info(`      📊 ${probability.reason}`);
+
+            // STEP 3: FILTER - Only high probability signals (60%+ and 3+ stars)
+            if (probability.probabilityPercent < 60 || probability.confidenceStars < 3) {
+                log.info(`      ⏸️ Probability too low (Need 60%+ and 3⭐+)`);
                 continue;
             }
-        } else {
-            log.warn(`      ⚠️ Could not fetch stats for this match`);
-            continue; // Skip if no stats
-        }
 
-        // 💰 FETCH ODDS (New Context)
-        const odds = await fetchMatchOdds(matchId);
-        if (odds) {
-            match.odds = odds;
-            log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
-        } else {
-            match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
-            log.info(`      ⚠️ No Odds found - using defaults`);
-        }
+            // Check daily signal limit
+            const strategyCode = probability.dominantTeam === 'Home' ? 'NEXT_GOAL_HOME' :
+                probability.dominantTeam === 'Away' ? 'NEXT_GOAL_AWAY' : 'NEXT_GOAL_ANY';
 
-        // STEP 1: Base Activity Check ("Is it Dead?" Filter)
-        const baseCheck = checkBaseActivity(elapsed, stats);
+            if (!checkSignalLimit(matchId, strategyCode)) {
+                log.warn(`      🔒 Signal limit reached for ${matchId}_${strategyCode}`);
+                continue;
+            }
 
-        if (!baseCheck.isAlive) {
-            log.info(`      💀 ${baseCheck.reason}`);
-            continue; // Dead match, skip immediately
-        }
-        log.info(`      ✅ ${baseCheck.reason}`);
+            // Build candidate signal
+            const candidate = {
+                id: `${matchId}_${strategyCode}`,
+                home: match.home_team?.name || 'Home',
+                away: match.away_team?.name || 'Away',
+                homeLogo: match.home_team?.image_path || '',
+                awayLogo: match.away_team?.image_path || '',
+                score: `${match.home_team?.score || 0}-${match.away_team?.score || 0}`,
+                elapsed,
+                strategy: probability.recommendedMarket,
+                strategyCode,
+                phase: elapsed <= 45 ? 'First Half' : 'Second Half',
+                confidence: probability.confidenceStars >= 4 ? 'HIGH' : probability.confidenceStars >= 3 ? 'MEDIUM' : 'LOW',
+                confidencePercent: probability.probabilityPercent,
+                verdict: 'PLAY', // Engine already filtered low probability
+                reason: probability.reason,
+                dominantTeam: probability.dominantTeam,
+                homePressure: probability.homePressure,
+                awayPressure: probability.awayPressure,
+                stats: {
+                    shots: stats.shots.home + stats.shots.away,
+                    shots_on_target: stats.shotsOnTarget.home + stats.shotsOnTarget.away,
+                    corners: stats.corners.home + stats.corners.away,
+                    xG: ((stats.xG?.home || 0) + (stats.xG?.away || 0)).toFixed(2),
+                    possession: `${stats.possession?.home || 50}%-${stats.possession?.away || 50}%`,
+                    homeOdds: (match.odds['1'] || 2.0).toFixed(2),
+                    awayOdds: (match.odds['2'] || 2.0).toFixed(2)
+                },
+                league: match.league_name || 'Unknown',
+                leagueLogo: match.league_logo || '',
+                country: match.country_name || ''
+            };
 
-        // Record to history AFTER base activity check passes
-        recordMatchStats(matchId, stats, score);
-
-        // STEP 2: Detect Momentum (Dynamic Lookback)
-        const momentum = detectMomentum(matchId, stats, score);
-
-        if (momentum.detected) {
-            log.info(`      🔥 MOMENTUM: ${momentum.reason}`);
-        } else {
-            log.info(`      ⏸️ No momentum trigger yet (waiting for delta)`);
-            continue; // Skip if no momentum - this is the key filter!
-        }
-
-        // Run scout filters with momentum
-        let candidate = analyzeFirstHalfSniper(match, elapsed, stats, momentum);
-        if (!candidate) {
-            candidate = analyzeLateGameMomentum(match, elapsed, stats, momentum);
-        }
-
-        if (!candidate) {
-            log.info(`      ❌ Failed phase criteria (time/score mismatch)`);
-            continue;
-        }
-
-        // Check daily signal limit (max 2 per match per strategy)
-        if (!checkSignalLimit(matchId, candidate.strategyCode)) {
-            log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode} (max ${MAX_SIGNALS_PER_MATCH_STRATEGY}/day)`);
-            continue;
-        }
-
-        // Include base activity in reason
-        candidate.reason = `${baseCheck.reason} + ${candidate.reason}`;
-
-        log.info(`      ✓ ${candidate.phase}: ${candidate.strategyCode} (${candidate.confidencePercent}% base)`);
-
-        // Send to Gemini for AI validation
-        log.gemini(`      🤖 Asking Gemini AI...`);
-        const geminiResult = await askAIAnalyst(candidate);
-
-        // Update candidate with Gemini results
-        candidate.verdict = geminiResult.verdict || 'SKIP';
-        candidate.confidencePercent = geminiResult.confidence || candidate.confidencePercent;
-        candidate.confidence = geminiResult.confidence >= 75 ? 'HIGH' : geminiResult.confidence >= 50 ? 'MEDIUM' : 'LOW';
-        candidate.geminiReason = geminiResult.reason || '';
-
-        // Only add PLAY signals
-        if (candidate.verdict === 'PLAY') {
-            candidate.id = `${matchId}_${candidate.strategyCode}`;
-            log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
+            log.success(`      ✅ SIGNAL: ${probability.probabilityPercent}% - ${probability.recommendedMarket}`);
             signals.push(candidate);
 
             // Record signal for daily limit tracking
-            recordSignal(matchId, candidate.strategyCode);
+            recordSignal(matchId, strategyCode);
 
-            // Auto-approve live signals (no admin approval needed)
+            // Auto-approve live signals
             APPROVED_IDS.add(candidate.id);
 
-            // 📝 Record bet to history (for Dashboard tracking)
-            const homeScore = match.home_team?.score || 0;
-            const awayScore = match.away_team?.score || 0;
-            const entryScore = `${homeScore}-${awayScore}`;
-
+            // 📝 Record bet to history
             await betTracker.recordBet({
                 match_id: matchId,
                 home_team: match.home_team?.name || 'Unknown',
                 away_team: match.away_team?.name || 'Unknown'
-            }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live', entryScore);
+            }, probability.recommendedMarket, strategyCode, probability.probabilityPercent, 'live', candidate.score);
 
             // Send Telegram notification
             await sendTelegramNotification(candidate);
-        } else {
-            log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
-        }
 
-        // Small delay between API calls
-        await new Promise(r => setTimeout(r, 200));
+            // Small delay between API calls
+            await new Promise(r => setTimeout(r, 200));
+        } else {
+            log.warn(`      ⚠️ Could not fetch stats for this match`);
+            continue; // Skip if no stats
+        }
     }
 
     // Update cache
