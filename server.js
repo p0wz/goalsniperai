@@ -804,7 +804,7 @@ function generateAIPrompt(matchInfo, liveAnalysis, historicalAnalysis, elapsed) 
 }
 
 // 🧬 MAIN HYBRID ANALYSIS FUNCTION
-async function performDeepAnalysis(liveMatch, liveStats) {
+async function performDeepAnalysis(liveMatch, liveStats, rawStatsData = null) {
     const matchId = liveMatch.match_id;
     const elapsed = parseElapsedTime(liveMatch.stage);
     const home = liveMatch.home_team?.name || 'Home';
@@ -833,26 +833,40 @@ async function performDeepAnalysis(liveMatch, liveStats) {
     }
 
     // ========================================
-    // LAYER B: HISTORICAL VALIDATION (DISABLED - No H2H endpoint)
+    // LAYER B: HISTORICAL VALIDATION (40% Weight)
     // ========================================
-    // NOTE: Flashscore4 API doesn't have /match/h2h/ endpoint
-    // H2H fetch is disabled until we find a valid API source
-    // Currently using 100% Live Pressure + AI Validation
-    log.info(`[DeepAnalysis] H2H disabled - using Live Pressure only`);
+    // Extract H2H from raw stats response (it's in the same API call)
+    let h2hData = null;
+    if (rawStatsData) {
+        // Try to find H2H data in the stats response
+        // Common field names: h2h, head2head, meetings, history
+        h2hData = rawStatsData.h2h || rawStatsData.head2head ||
+            rawStatsData.meetings || rawStatsData.history || null;
 
-    const historical = { score: 0, tags: ['H2H_DISABLED'] };
-    const historicalScoreNormalized = 0;
+        if (!h2hData && rawStatsData.data) {
+            // Sometimes nested under 'data'
+            h2hData = rawStatsData.data.h2h || rawStatsData.data.head2head || null;
+        }
+    }
+
+    const historical = calculateHistoricalScore(h2hData, dominantTeam, elapsed, home, away);
+    log.info(`[DeepAnalysis] Historical Score: ${historical.score} (Tags: ${historical.tags.join(', ')})`);
+
+    // Normalize historical score (max ~65 points possible)
+    const historicalScoreNormalized = Math.min((historical.score / 65) * 100, 100);
 
     // ========================================
     // SYNTHESIS: FINAL CONFIDENCE SCORE
     // ========================================
-    // Since H2H is disabled, use 100% Live Pressure
-    let totalConfidence = Math.round(livePressureScore);
+    let totalConfidence = Math.round(
+        (livePressureScore * LAYER_WEIGHTS.LIVE) +
+        (historicalScoreNormalized * LAYER_WEIGHTS.HISTORY)
+    );
 
     // Cap at 95%
     totalConfidence = Math.min(totalConfidence, 95);
 
-    log.success(`[DeepAnalysis] Total Confidence: ${totalConfidence}% (Live Pressure Only)`);
+    log.success(`[DeepAnalysis] Total Confidence: ${totalConfidence}% (Live: ${livePressureScore}%, History: ${Math.round(historicalScoreNormalized)}%)`);
 
     // ========================================
     // AI PROMPT GENERATION
@@ -1766,7 +1780,8 @@ async function processMatches() {
             // =================================================
             log.info(`      🧬 TRIGGERING DEEP ANALYSIS...`);
 
-            const deepAnalysis = await performDeepAnalysis(match, stats);
+            // Pass both parsed stats AND raw API response (contains H2H)
+            const deepAnalysis = await performDeepAnalysis(match, stats, statsData);
 
             if (!deepAnalysis) {
                 log.info(`      ⏸️ Deep Analysis returned null - skipping`);
