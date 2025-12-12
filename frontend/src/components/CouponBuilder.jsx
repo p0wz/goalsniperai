@@ -3,7 +3,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Trash2, GripVertical, Save, Plus, Wallet, Zap, Trophy, TrendingUp } from 'lucide-react';
-import Button from './ui/Button';
+import { Button } from './ui/Button';
 
 // Draggable Item Component
 function DraggableMatch({ match, id }) {
