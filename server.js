@@ -640,14 +640,13 @@ const LAYER_WEIGHTS = {
 
 // Fetch H2H / Team Stats for a match (Lazy Loading)
 async function fetchH2HData(matchId) {
+    if (dailyRequestCount >= DAILY_LIMIT) return null;
+
     try {
-        const response = await axios.get(`https://flashscore4.p.rapidapi.com/api/flashscore/v1/match/h2h/${matchId}`, {
-            headers: {
-                'X-RapidAPI-Key': RAPIDAPI_KEY,
-                'X-RapidAPI-Host': 'flashscore4.p.rapidapi.com'
-            },
-            timeout: 5000
-        });
+        const response = await axios.get(
+            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
+            { headers: FLASHSCORE_API.headers, timeout: 5000 }
+        );
         dailyRequestCount++;
         return response.data;
     } catch (error) {
