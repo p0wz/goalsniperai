@@ -428,24 +428,58 @@ function SignalCard({ signal, onDelete }) {
 // DAILY SIGNAL CARD
 // ============================================
 function DailySignalCard({ signal, categoryColor, categoryLabel, onDelete }) {
+    const [showPrompt, setShowPrompt] = useState(false);
+
+    const handleDelete = () => {
+        if (window.confirm(`"${signal.event_home_team} vs ${signal.event_away_team}" maçını silmek istiyor musunuz?`)) {
+            onDelete();
+        }
+    };
+
+    // Generate AI prompt
+    const generatePrompt = () => {
+        const s = signal.stats || {};
+        return `You are a professional football betting analyst. Analyze this match for market: ${signal.market || 'Unknown'}.
+
+Match: ${signal.event_home_team} vs ${signal.event_away_team}
+League: ${signal.league || 'Unknown'}
+Kick-off: ${signal.startTime || 'Unknown'}
+
+Statistics:
+- Home Form (Last 5): Over 1.5 Rate ${s.homeForm?.over15Rate?.toFixed(0) || 0}%, Avg Scored ${s.homeForm?.avgScored?.toFixed(2) || 0}
+- Away Form (Last 5): Over 1.5 Rate ${s.awayForm?.over15Rate?.toFixed(0) || 0}%, Avg Scored ${s.awayForm?.avgScored?.toFixed(2) || 0}
+- Home @ Home: Scored in ${s.homeHomeStats?.scoringRate?.toFixed(0) || 0}% of games
+- Away @ Away: Avg Conceded ${s.awayAwayStats?.avgConceded?.toFixed(2) || 0}
+
+IMPORTANT: This match has ALREADY passed strict statistical filters. Give your recommendation.
+
+RESPOND WITH JSON: {"verdict": "PLAY" or "SKIP", "confidence": 0-100, "reason": "Brief reason"}`;
+    };
+
+    const copyPrompt = () => {
+        navigator.clipboard.writeText(generatePrompt());
+        alert('Prompt kopyalandı!');
+    };
+
     return (
-        <div className="p-4 rounded-xl border bg-card border-border hover:border-accent/30 transition-all group">
+        <div className="p-4 rounded-xl border bg-card border-border hover:border-accent/30 transition-all">
             {/* Category Badge */}
-            <div className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-3 border ${categoryColor}`}>
-                {categoryLabel}
+            <div className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-3 border ${categoryColor || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
+                {categoryLabel || signal.category || 'Unknown'}
             </div>
 
             {/* Teams */}
             <div className="mb-3">
-                <div className="font-bold">{signal.event_home_team || signal.home}</div>
+                <div className="font-bold text-sm">{signal.event_home_team || signal.home}</div>
                 <div className="text-xs text-muted-foreground my-0.5">vs</div>
-                <div className="font-bold">{signal.event_away_team || signal.away}</div>
+                <div className="font-bold text-sm">{signal.event_away_team || signal.away}</div>
             </div>
 
             {/* Match Info */}
             <div className="text-xs text-muted-foreground mb-3 space-y-1">
                 {signal.league && <div>🏆 {signal.league}</div>}
                 {signal.startTime && <div>⏰ {signal.startTime}</div>}
+                {signal.market && <div>📊 {signal.market}</div>}
             </div>
 
             {/* Stats Summary */}
@@ -453,21 +487,50 @@ function DailySignalCard({ signal, categoryColor, categoryLabel, onDelete }) {
                 <div className="bg-muted/30 rounded-lg p-2 text-xs mb-3">
                     <div className="grid grid-cols-2 gap-1">
                         {signal.stats.homeForm && (
-                            <div>Home O1.5: {signal.stats.homeForm.over15Rate?.toFixed(0)}%</div>
+                            <div>H O1.5: {signal.stats.homeForm.over15Rate?.toFixed(0) || 0}%</div>
                         )}
                         {signal.stats.awayForm && (
-                            <div>Away O1.5: {signal.stats.awayForm.over15Rate?.toFixed(0)}%</div>
+                            <div>A O1.5: {signal.stats.awayForm.over15Rate?.toFixed(0) || 0}%</div>
+                        )}
+                        {signal.stats.homeHomeStats && (
+                            <div>H Skor: {signal.stats.homeHomeStats.scoringRate?.toFixed(0) || 0}%</div>
+                        )}
+                        {signal.stats.leagueAvg && (
+                            <div>Lig Ort: {signal.stats.leagueAvg.toFixed(1)}</div>
                         )}
                     </div>
                 </div>
             )}
 
+            {/* AI Prompt Toggle */}
+            <button
+                onClick={() => setShowPrompt(!showPrompt)}
+                className="text-xs text-accent hover:underline mb-2 block"
+            >
+                {showPrompt ? '📋 Promptu Gizle' : '📋 AI Prompt Göster'}
+            </button>
+
+            {/* AI Prompt Display */}
+            {showPrompt && (
+                <div className="mb-3">
+                    <div className="bg-black/50 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap max-h-32 overflow-y-auto border border-border text-gray-300">
+                        {generatePrompt()}
+                    </div>
+                    <button
+                        onClick={copyPrompt}
+                        className="mt-2 text-xs bg-accent/20 text-accent px-3 py-1 rounded-lg hover:bg-accent/30 transition-colors"
+                    >
+                        📋 Kopyala
+                    </button>
+                </div>
+            )}
+
             {/* Delete Button */}
             <button
-                onClick={onDelete}
-                className="w-full bg-red-600/10 hover:bg-red-600/30 text-red-400 h-7 text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
+                onClick={handleDelete}
+                className="w-full bg-red-600/20 hover:bg-red-600/40 text-red-400 h-8 text-xs rounded-lg transition-colors flex items-center justify-center gap-1 border border-red-600/30"
             >
-                🗑️ Kaldır
+                🗑️ Bu Maçı Sil
             </button>
         </div>
     );
