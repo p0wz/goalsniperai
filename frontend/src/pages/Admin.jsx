@@ -136,11 +136,12 @@ export default function Admin() {
             <main className="flex-1 ml-60 p-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="font-display text-3xl">Admin Panel</h1>
-                    <div className="flex gap-2">
-                        <Button variant={activeTab === 'users' ? 'primary' : 'secondary'} onClick={() => setActiveTab('users')}>Kullanıcılar</Button>
-                        <Button variant={activeTab === 'signals' ? 'primary' : 'secondary'} onClick={() => setActiveTab('signals')}>Sinyal Onayı</Button>
-                        <Button variant={activeTab === 'analysis' ? 'primary' : 'secondary'} onClick={() => setActiveTab('analysis')}>🤖 Analiz</Button>
-                        <Button variant={activeTab === 'coupons' ? 'primary' : 'secondary'} onClick={() => setActiveTab('coupons')}>🎟️ Kupon Yarat</Button>
+                    <div className="flex gap-2 flex-wrap">
+                        <Button variant={activeTab === 'users' ? 'primary' : 'secondary'} onClick={() => setActiveTab('users')}>👥 Kullanıcılar</Button>
+                        <Button variant={activeTab === 'signals' ? 'primary' : 'secondary'} onClick={() => setActiveTab('signals')}>⚡ Canlı Bot</Button>
+                        <Button variant={activeTab === 'daily' ? 'primary' : 'secondary'} onClick={() => setActiveTab('daily')}>📅 Günlük Analiz</Button>
+                        <Button variant={activeTab === 'analysis' ? 'primary' : 'secondary'} onClick={() => setActiveTab('analysis')}>🤖 Terminal</Button>
+                        <Button variant={activeTab === 'coupons' ? 'primary' : 'secondary'} onClick={() => setActiveTab('coupons')}>🎟️ Kupon</Button>
                     </div>
                 </div>
 
@@ -194,14 +195,22 @@ export default function Admin() {
                 )}
 
                 {activeTab === 'signals' && (
-                    <SignalsView
+                    <LiveSignalsView
                         signals={signals}
-                        dailySignals={dailySignals}
                         onDelete={handleDeleteSignal}
                         handleScan={handleScan}
-                        handleDailyScan={handleDailyAnalysis}
                         scanning={scanning}
+                    />
+                )}
+
+                {activeTab === 'daily' && (
+                    <DailyAnalystView
+                        dailySignals={dailySignals}
+                        setDailySignals={setDailySignals}
+                        onDelete={handleDeleteSignal}
+                        handleDailyScan={handleDailyAnalysis}
                         analyzing={analyzing}
+                        loadData={loadData}
                     />
                 )}
 
@@ -219,98 +228,249 @@ export default function Admin() {
     );
 }
 
-function SignalsView({ signals, dailySignals, onDelete, handleScan, handleDailyScan, scanning, analyzing }) {
-    const [sort, setSort] = useState('newest'); // newest, confidence
-
-    const sortedSignals = [...signals].sort((a, b) => {
-        if (sort === 'confidence') return (b.aiAnalysis?.confidence || 0) - (a.aiAnalysis?.confidence || 0);
-        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-    });
-
+// ============================================
+// LIVE SIGNALS VIEW (Canlı Bot Sinyalleri)
+// ============================================
+function LiveSignalsView({ signals, onDelete, handleScan, scanning }) {
     return (
-        <div className="space-y-8">
-            {/* Live Signals */}
-            <section>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Canlı Sinyaller</h2>
-                    <div className="flex gap-2">
-                        <select className="bg-muted text-xs p-1 rounded border border-border" value={sort} onChange={e => setSort(e.target.value)}>
-                            <option value="newest">En Yeni</option>
-                            <option value="confidence">Güven Skoru</option>
-                        </select>
-                        <Button onClick={handleScan} disabled={scanning}>{scanning ? 'Taranıyor...' : 'Yeni Tara'}</Button>
-                    </div>
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold">⚡ Canlı Bot Sinyalleri</h2>
+                <Button onClick={handleScan} disabled={scanning}>
+                    {scanning ? '🔄 Taranıyor...' : '🔍 Yeni Tara'}
+                </Button>
+            </div>
+
+            {signals.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                    <div className="text-4xl mb-3">📭</div>
+                    <p>Henüz canlı sinyal yok</p>
+                    <p className="text-xs mt-1">Bot 3 dakikada bir otomatik tarama yapar</p>
                 </div>
+            ) : (
                 <div className="grid grid-cols-3 gap-4">
-                    {sortedSignals.map((s, i) => (
-                        <AdminSignalCard key={i} signal={s} onDelete={onDelete} />
+                    {signals.map((s, i) => (
+                        <SignalCard key={i} signal={s} onDelete={() => onDelete(s.id)} />
                     ))}
                 </div>
-            </section>
-
-            {/* Daily Signals */}
-            <section>
-                <div className="flex justify-between items-center mb-4 border-t pt-8">
-                    <h2 className="text-xl font-bold">Maç Önü Analiz</h2>
-                    <div className="flex gap-2">
-                        <Button onClick={() => handleDailyScan(1)} disabled={analyzing} size="sm">Test (1 Maç)</Button>
-                        <Button onClick={() => handleDailyScan(100)} disabled={analyzing}>Tam Analiz</Button>
-                    </div>
-                </div>
-                {Object.entries(dailySignals).map(([cat, list]) => (
-                    <div key={cat} className="mb-6">
-                        <h3 className="font-semibold capitalize mb-2 flex items-center gap-2">
-                            {cat} <span className="text-xs text-muted-foreground">({list?.length || 0})</span>
-                        </h3>
-                        <div className="grid grid-cols-3 gap-4">
-                            {list && list.map((s) => (
-                                <AdminSignalCard key={s.id} signal={s} onDelete={onDelete} isDaily category={cat} />
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </section>
+            )}
         </div>
-    )
+    );
 }
 
-function AdminSignalCard({ signal, onDelete, isDaily, category }) {
-    const handleDelete = () => {
-        if (confirm('Bu sinyali silmek istediğinize emin misiniz?')) {
-            onDelete(signal.id, isDaily ? category : null);
+// ============================================
+// DAILY ANALYST VIEW (Günlük Analiz)
+// ============================================
+function DailyAnalystView({ dailySignals, setDailySignals, onDelete, handleDailyScan, analyzing, loadData }) {
+    const [selectedCategory, setSelectedCategory] = useState('all');
+
+    const CATEGORY_COLORS = {
+        over15: 'bg-green-500/20 text-green-400 border-green-500/30',
+        over25: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        doubleChance: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        homeOver15: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+        under35: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+        under25: 'bg-red-500/20 text-red-400 border-red-500/30'
+    };
+
+    const CATEGORY_LABELS = {
+        over15: '⚽ Over 1.5',
+        over25: '⚽⚽ Over 2.5',
+        doubleChance: '🎯 1X DC',
+        homeOver15: '🏠 Home O1.5',
+        under35: '🛡️ Under 3.5',
+        under25: '🔒 Under 2.5'
+    };
+
+    const allSignals = Object.entries(dailySignals).flatMap(([cat, list]) =>
+        (list || []).map(s => ({ ...s, category: cat }))
+    );
+
+    const filteredSignals = selectedCategory === 'all'
+        ? allSignals
+        : allSignals.filter(s => s.category === selectedCategory);
+
+    const totalCount = allSignals.length;
+
+    const clearCategory = (cat) => {
+        if (confirm(`${CATEGORY_LABELS[cat] || cat} kategorisindeki tüm sinyalleri silmek istiyor musunuz?`)) {
+            setDailySignals(prev => ({ ...prev, [cat]: [] }));
         }
     };
 
     return (
-        <div className="relative p-4 rounded-xl border bg-card border-border hover:border-accent/50 transition-colors">
-            <div className="flex justify-between mb-2">
-                <span className="font-bold text-sm">{isDaily ? signal.event_home_team : signal.home} vs {isDaily ? signal.event_away_team : signal.away}</span>
-                <span className="text-xs text-muted-foreground">{signal.startTime || ''}</span>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-xl font-bold">📅 Günlük Maç Analizi</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {totalCount} sinyal bulundu
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <Button onClick={() => handleDailyScan(5)} disabled={analyzing} size="sm" variant="secondary">
+                        Test (5)
+                    </Button>
+                    <Button onClick={() => handleDailyScan(100)} disabled={analyzing}>
+                        {analyzing ? '🔄 Analiz Ediliyor...' : '🚀 Tam Analiz'}
+                    </Button>
+                </div>
             </div>
 
-            {/* Market & League */}
-            <div className="text-xs text-accent font-semibold mb-2">{signal.market || signal.strategy}</div>
-            {signal.league && <div className="text-xs text-muted-foreground mb-2">{signal.league}</div>}
+            {/* Category Filter Tabs */}
+            <div className="flex gap-2 flex-wrap">
+                <button
+                    onClick={() => setSelectedCategory('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${selectedCategory === 'all'
+                        ? 'bg-accent text-white'
+                        : 'bg-muted text-muted-foreground hover:text-white'
+                        }`}
+                >
+                    Tümü ({totalCount})
+                </button>
+                {Object.entries(dailySignals).map(([cat, list]) => (
+                    <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${selectedCategory === cat
+                            ? CATEGORY_COLORS[cat] || 'bg-accent text-white'
+                            : 'bg-muted/50 text-muted-foreground hover:text-white border-transparent'
+                            }`}
+                    >
+                        {CATEGORY_LABELS[cat] || cat} ({list?.length || 0})
+                    </button>
+                ))}
+            </div>
 
-            {/* Confidence */}
+            {/* Clear Category Button */}
+            {selectedCategory !== 'all' && filteredSignals.length > 0 && (
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => clearCategory(selectedCategory)}
+                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    >
+                        🗑️ Bu Kategoriyi Temizle
+                    </button>
+                </div>
+            )}
+
+            {/* Signals Grid */}
+            {filteredSignals.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                    <div className="text-4xl mb-3">📭</div>
+                    <p>Bu kategoride sinyal yok</p>
+                    <p className="text-xs mt-1">Analizi çalıştırarak yeni sinyaller bulabilirsiniz</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredSignals.map((s) => (
+                        <DailySignalCard
+                            key={s.id}
+                            signal={s}
+                            categoryColor={CATEGORY_COLORS[s.category]}
+                            categoryLabel={CATEGORY_LABELS[s.category]}
+                            onDelete={() => onDelete(s.id, s.category)}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================
+// SIGNAL CARD (Live Bot)
+// ============================================
+function SignalCard({ signal, onDelete }) {
+    return (
+        <div className="p-4 rounded-xl border bg-card border-border hover:border-accent/50 transition-all group">
+            <div className="flex justify-between items-start mb-3">
+                <div>
+                    <div className="font-bold text-sm">{signal.home}</div>
+                    <div className="text-xs text-muted-foreground">vs</div>
+                    <div className="font-bold text-sm">{signal.away}</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-lg font-bold text-accent">{signal.score}</div>
+                    <div className="text-xs text-muted-foreground">{signal.elapsed}'</div>
+                </div>
+            </div>
+
+            <div className="text-xs text-accent font-semibold mb-2">{signal.strategy}</div>
+
             {signal.confidencePercent && (
-                <div className="text-xs mb-2">
-                    <span className="text-muted-foreground">Güven: </span>
-                    <span className={`font-bold ${signal.confidencePercent >= 70 ? 'text-green-400' : 'text-yellow-400'}`}>
-                        {signal.confidencePercent}%
-                    </span>
+                <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">Olasılık</span>
+                        <span className="font-bold">{signal.confidencePercent}%</span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                            className={`h-full rounded-full ${signal.confidencePercent >= 70 ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            style={{ width: `${signal.confidencePercent}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            <button
+                onClick={onDelete}
+                className="w-full mt-2 bg-red-600/10 hover:bg-red-600/30 text-red-400 h-7 text-xs rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+            >
+                🗑️ Kaldır
+            </button>
+        </div>
+    );
+}
+
+// ============================================
+// DAILY SIGNAL CARD
+// ============================================
+function DailySignalCard({ signal, categoryColor, categoryLabel, onDelete }) {
+    return (
+        <div className="p-4 rounded-xl border bg-card border-border hover:border-accent/30 transition-all group">
+            {/* Category Badge */}
+            <div className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-3 border ${categoryColor}`}>
+                {categoryLabel}
+            </div>
+
+            {/* Teams */}
+            <div className="mb-3">
+                <div className="font-bold">{signal.event_home_team || signal.home}</div>
+                <div className="text-xs text-muted-foreground my-0.5">vs</div>
+                <div className="font-bold">{signal.event_away_team || signal.away}</div>
+            </div>
+
+            {/* Match Info */}
+            <div className="text-xs text-muted-foreground mb-3 space-y-1">
+                {signal.league && <div>🏆 {signal.league}</div>}
+                {signal.startTime && <div>⏰ {signal.startTime}</div>}
+            </div>
+
+            {/* Stats Summary */}
+            {signal.stats && (
+                <div className="bg-muted/30 rounded-lg p-2 text-xs mb-3">
+                    <div className="grid grid-cols-2 gap-1">
+                        {signal.stats.homeForm && (
+                            <div>Home O1.5: {signal.stats.homeForm.over15Rate?.toFixed(0)}%</div>
+                        )}
+                        {signal.stats.awayForm && (
+                            <div>Away O1.5: {signal.stats.awayForm.over15Rate?.toFixed(0)}%</div>
+                        )}
+                    </div>
                 </div>
             )}
 
             {/* Delete Button */}
             <button
-                onClick={handleDelete}
-                className="w-full mt-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 h-8 text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
+                onClick={onDelete}
+                className="w-full bg-red-600/10 hover:bg-red-600/30 text-red-400 h-7 text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
             >
                 🗑️ Kaldır
             </button>
         </div>
-    )
+    );
 }
 
 function AdminSidebar({ logout }) {
