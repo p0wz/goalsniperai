@@ -617,6 +617,297 @@ function calculateGoalProbability(match, liveStats, elapsed, matchId = null) {
 }
 
 // ============================================
+// 🧬 HYBRID ANALYSIS ENGINE v1.0
+// ============================================
+// Combines Live Pressure (60%) + Historical Context (40%)
+// for higher accuracy signal generation.
+
+// Historical Trend Bonus Points
+const HISTORICAL_BONUSES = {
+    SECOND_HALF_TEAM: 15,      // Team scores >60% of goals in 2nd half
+    HOME_STRONG: 10,           // Home team >70% W/D at home
+    HIGH_SCORING_H2H: 10,      // H2H avg > 2.5 goals
+    H2H_DOMINANCE: 10,         // Won 3/5 last meetings
+    LATE_CONCEDING: 15,        // Defender concedes late often
+    FORM_MOMENTUM: 10          // Won last 3 games
+};
+
+// Weights for final calculation
+const LAYER_WEIGHTS = {
+    LIVE: 0.60,    // 60% weight for live pressure
+    HISTORY: 0.40  // 40% weight for historical data
+};
+
+// Fetch H2H / Team Stats for a match (Lazy Loading)
+async function fetchH2HData(matchId) {
+    try {
+        const response = await axios.get(`https://flashscore4.p.rapidapi.com/api/flashscore/v1/match/h2h/${matchId}`, {
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEY,
+                'X-RapidAPI-Host': 'flashscore4.p.rapidapi.com'
+            },
+            timeout: 5000
+        });
+        dailyRequestCount++;
+        return response.data;
+    } catch (error) {
+        log.warn(`[H2H] Failed to fetch H2H for ${matchId}: ${error.message}`);
+        return null;
+    }
+}
+
+// Calculate historical score based on trends
+function calculateHistoricalScore(h2hData, dominantTeam, elapsed, homeTeam, awayTeam) {
+    let score = 0;
+    const tags = [];
+
+    if (!h2hData) {
+        return { score: 0, tags: ['NO_H2H_DATA'] };
+    }
+
+    try {
+        const meetings = h2hData.matches || [];
+        const homeStats = h2hData.homeTeamStats || {};
+        const awayStats = h2hData.awayTeamStats || {};
+
+        // 1. SECOND HALF TEAM CHECK (if >45 mins)
+        if (elapsed > 45) {
+            const secondHalfGoalRate = dominantTeam === 'Home'
+                ? (homeStats.secondHalfGoalRate || 0)
+                : (awayStats.secondHalfGoalRate || 0);
+
+            if (secondHalfGoalRate > 60) {
+                score += HISTORICAL_BONUSES.SECOND_HALF_TEAM;
+                tags.push('2ND_HALF_TEAM');
+            }
+        }
+
+        // 2. HOME STRONG CHECK
+        if (dominantTeam === 'Home') {
+            const homeWinDrawRate = homeStats.homeWinDrawRate || 0;
+            if (homeWinDrawRate > 70) {
+                score += HISTORICAL_BONUSES.HOME_STRONG;
+                tags.push('HOME_FORTRESS');
+            }
+        }
+
+        // 3. HIGH SCORING H2H CHECK
+        if (meetings.length > 0) {
+            const totalGoals = meetings.reduce((sum, m) => sum + (m.homeScore || 0) + (m.awayScore || 0), 0);
+            const avgGoals = totalGoals / meetings.length;
+            if (avgGoals > 2.5) {
+                score += HISTORICAL_BONUSES.HIGH_SCORING_H2H;
+                tags.push('HIGH_SCORING_H2H');
+            }
+        }
+
+        // 4. H2H DOMINANCE CHECK (won 3/5 last meetings)
+        if (meetings.length >= 5) {
+            const last5 = meetings.slice(0, 5);
+            const wins = last5.filter(m => {
+                if (dominantTeam === 'Home') {
+                    return (m.homeScore || 0) > (m.awayScore || 0);
+                } else {
+                    return (m.awayScore || 0) > (m.homeScore || 0);
+                }
+            }).length;
+            if (wins >= 3) {
+                score += HISTORICAL_BONUSES.H2H_DOMINANCE;
+                tags.push('H2H_DOMINANCE');
+            }
+        }
+
+        // 5. LATE CONCEDING TREND (Defender concedes after 75')
+        if (elapsed >= 65) {
+            const defender = dominantTeam === 'Home' ? awayStats : homeStats;
+            const lateConcedingRate = defender.lateConcedingRate || 0;
+            if (lateConcedingRate > 50) {
+                score += HISTORICAL_BONUSES.LATE_CONCEDING;
+                tags.push('LATE_CONCEDING_DEF');
+            }
+        }
+
+        // 6. FORM MOMENTUM (Attacker won last 3)
+        const attacker = dominantTeam === 'Home' ? homeStats : awayStats;
+        if (attacker.lastResults && attacker.lastResults.slice(0, 3).every(r => r === 'W')) {
+            score += HISTORICAL_BONUSES.FORM_MOMENTUM;
+            tags.push('HOT_STREAK');
+        }
+
+    } catch (error) {
+        log.warn(`[Historical] Calculation error: ${error.message}`);
+        tags.push('CALC_ERROR');
+    }
+
+    return { score, tags };
+}
+
+// Generate AI Prompt with Narrative
+function generateAIPrompt(matchInfo, liveAnalysis, historicalAnalysis, elapsed) {
+    const { home, away, score, dominantTeam, homePressure, awayPressure } = matchInfo;
+    const { contextFactors, reason } = liveAnalysis;
+    const { tags } = historicalAnalysis;
+
+    // Build narrative
+    let narrative = '';
+    const pressureTeam = dominantTeam === 'Home' ? home : away;
+    const defenseTeam = dominantTeam === 'Home' ? away : home;
+    const pressureIndex = dominantTeam === 'Home' ? homePressure : awayPressure;
+
+    // Situation description
+    if (contextFactors.includes('🔥 Home FAV chasing') || contextFactors.includes('🔥 Away FAV chasing')) {
+        narrative = `${pressureTeam} (Pre-Match Favorite) is losing but generating EXTREME pressure (Index: ${pressureIndex}).`;
+    } else if (contextFactors.includes('⏱️ Kill Zone (70-85)')) {
+        narrative = `Match is in the "Kill Zone" (${elapsed}'). ${pressureTeam} is pushing hard with pressure index of ${pressureIndex}.`;
+    } else {
+        narrative = `${pressureTeam} is dominating with a pressure index of ${pressureIndex} against ${defenseTeam}.`;
+    }
+
+    // Historical context
+    let historyContext = '';
+    if (tags.includes('2ND_HALF_TEAM')) {
+        historyContext += `Historically, ${pressureTeam} scores 60%+ of their goals in the 2nd half. `;
+    }
+    if (tags.includes('H2H_DOMINANCE')) {
+        historyContext += `${pressureTeam} has won 3 of last 5 H2H meetings. `;
+    }
+    if (tags.includes('LATE_CONCEDING_DEF')) {
+        historyContext += `${defenseTeam} tends to concede late in matches. `;
+    }
+    if (tags.includes('HOME_FORTRESS')) {
+        historyContext += `${home} has >70% Win/Draw rate at home. `;
+    }
+
+    if (!historyContext) {
+        historyContext = 'Limited historical data available for this fixture.';
+    }
+
+    // Final prompt
+    return `You are an elite sports betting analyst. Analyze this live match situation:
+
+**MATCH:** ${home} vs ${away}
+**SCORE:** ${score}  |  **TIME:** ${elapsed}'
+**LIVE PRESSURE:** ${reason}
+
+**NARRATIVE:** ${narrative}
+
+**HISTORICAL CONTEXT:** ${historyContext}
+
+**QUESTION:** Based on the current live pressure AND historical trends, is a goal by ${pressureTeam} highly likely in the next 15 minutes?
+
+**RESPOND WITH JSON ONLY:**
+{
+  "verdict": "PLAY" or "SKIP",
+  "confidence": 60-95,
+  "reason": "One sentence explanation"
+}`;
+}
+
+// 🧬 MAIN HYBRID ANALYSIS FUNCTION
+async function performDeepAnalysis(liveMatch, liveStats) {
+    const matchId = liveMatch.match_id;
+    const elapsed = parseElapsedTime(liveMatch.stage);
+    const home = liveMatch.home_team?.name || 'Home';
+    const away = liveMatch.away_team?.name || 'Away';
+    const homeScore = liveMatch.home_team?.score || 0;
+    const awayScore = liveMatch.away_team?.score || 0;
+    const score = `${homeScore}-${awayScore}`;
+
+    log.info(`[DeepAnalysis] Starting for ${home} vs ${away} (${score}, ${elapsed}')`);
+
+    // ========================================
+    // LAYER A: LIVE PRESSURE (60% Weight)
+    // ========================================
+    const livePressure = calculateGoalProbability(liveMatch, liveStats, elapsed, matchId);
+    const livePressureScore = livePressure.probabilityPercent;
+    const dominantTeam = livePressure.dominantTeam;
+    const homePressure = livePressure.homePressure;
+    const awayPressure = livePressure.awayPressure;
+
+    log.info(`[DeepAnalysis] Live Pressure: ${livePressureScore}% (${dominantTeam})`);
+
+    // If live pressure is too low, skip deep analysis
+    if (livePressureScore < 50 || dominantTeam === 'Balanced') {
+        log.info(`[DeepAnalysis] Skipped - Low pressure or balanced match`);
+        return null;
+    }
+
+    // ========================================
+    // LAYER B: HISTORICAL VALIDATION (40% Weight)
+    // ========================================
+    log.info(`[DeepAnalysis] Fetching H2H data (Lazy Load)...`);
+    const h2hData = await fetchH2HData(matchId);
+    const historical = calculateHistoricalScore(h2hData, dominantTeam, elapsed, home, away);
+
+    log.info(`[DeepAnalysis] Historical Score: ${historical.score} (Tags: ${historical.tags.join(', ')})`);
+
+    // Normalize historical score (max ~65 points possible)
+    const historicalScoreNormalized = Math.min((historical.score / 65) * 100, 100);
+
+    // ========================================
+    // SYNTHESIS: FINAL CONFIDENCE SCORE
+    // ========================================
+    let totalConfidence = Math.round(
+        (livePressureScore * LAYER_WEIGHTS.LIVE) +
+        (historicalScoreNormalized * LAYER_WEIGHTS.HISTORY)
+    );
+
+    // Cap at 95%
+    totalConfidence = Math.min(totalConfidence, 95);
+
+    log.success(`[DeepAnalysis] Total Confidence: ${totalConfidence}% (Live: ${livePressureScore}%, History: ${Math.round(historicalScoreNormalized)}%)`);
+
+    // ========================================
+    // AI PROMPT GENERATION
+    // ========================================
+    const matchInfo = {
+        home, away, score,
+        dominantTeam,
+        homePressure,
+        awayPressure
+    };
+    const aiPrompt = generateAIPrompt(matchInfo, livePressure, historical, elapsed);
+
+    // ========================================
+    // BUILD OUTPUT OBJECT
+    // ========================================
+    const strategyCode = dominantTeam === 'Home' ? 'NEXT_GOAL_HOME' : 'NEXT_GOAL_AWAY';
+    const marketRecommendation = dominantTeam === 'Home' ? 'Next Goal Home' : 'Next Goal Away';
+
+    // Collect all tags
+    const allTags = [...livePressure.contextFactors, ...historical.tags].filter(t =>
+        typeof t === 'string' && !t.includes('Pressure Index')
+    ).map(t => t.replace(/[^\w\s]/g, '').trim().toUpperCase().replace(/\s+/g, '_'));
+
+    return {
+        signal_id: `${matchId}_${strategyCode}`,
+        match_info: {
+            home,
+            away,
+            score,
+            time: `${elapsed}'`,
+            league: liveMatch.league_name || 'Unknown',
+            country: liveMatch.country_name || ''
+        },
+        analysis: {
+            live_pressure_score: livePressureScore,
+            historical_score: Math.round(historicalScoreNormalized),
+            total_confidence: totalConfidence,
+            dominant_team: dominantTeam,
+            home_pressure: homePressure,
+            away_pressure: awayPressure,
+            tags: allTags.slice(0, 6) // Max 6 tags
+        },
+        ai_prompt: aiPrompt,
+        verdict: 'PENDING_AI',
+        market_recommendation: marketRecommendation,
+        strategy_code: strategyCode,
+        live_stats: livePressure.stats,
+        h2h_available: !!h2hData
+    };
+}
+
+// ============================================
 // 🎯 Dynamic Momentum Detection (Lookback)
 // ============================================
 // Thresholds for momentum triggers
@@ -1463,46 +1754,69 @@ async function processMatches() {
             // Record stats to history for delta tracking
             recordMatchStats(matchId, stats, score);
 
-            // STEP 2: PROBABILITY ENGINE (with Momentum Delta)
+            // STEP 2: INITIAL PRESSURE SCREENING (Quick Check)
             const probability = calculateGoalProbability(match, stats, elapsed, matchId);
+            log.info(`      🧠 Initial Pressure: ${probability.probabilityPercent}% (${probability.confidenceStars}⭐) - ${probability.dominantTeam}`);
 
-            log.info(`      🧠 Probability: ${probability.probabilityPercent}% (${probability.confidenceStars}⭐) - ${probability.dominantTeam}`);
-            log.info(`      📊 ${probability.reason}`);
+            // Skip if initial pressure is too low (The Radar threshold: 50%)
+            if (probability.probabilityPercent < 50 || probability.dominantTeam === 'Balanced') {
+                log.info(`      ⏸️ Below radar threshold (Need 50%+ for Deep Analysis)`);
+                continue;
+            }
 
-            // STEP 3: FILTER - Only high probability signals (60%+ and 3+ stars)
-            if (probability.probabilityPercent < 60 || probability.confidenceStars < 3) {
-                log.info(`      ⏸️ Probability too low (Need 60%+ and 3⭐+)`);
+            // =================================================
+            // 🧬 HYBRID ANALYSIS ENGINE - DEEP DIVE
+            // =================================================
+            log.info(`      🧬 TRIGGERING DEEP ANALYSIS...`);
+
+            const deepAnalysis = await performDeepAnalysis(match, stats);
+
+            if (!deepAnalysis) {
+                log.info(`      ⏸️ Deep Analysis returned null - skipping`);
+                continue;
+            }
+
+            log.info(`      📊 Hybrid Result: ${deepAnalysis.analysis.total_confidence}% (Live: ${deepAnalysis.analysis.live_pressure_score}% | History: ${deepAnalysis.analysis.historical_score}%)`);
+            log.info(`      🏷️ Tags: ${deepAnalysis.analysis.tags.join(', ')}`);
+
+            // STEP 3: FINAL FILTER - Only high confidence signals (65%+ hybrid confidence)
+            if (deepAnalysis.analysis.total_confidence < 65) {
+                log.info(`      ⏸️ Hybrid confidence too low (Need 65%+ after H2H validation)`);
                 continue;
             }
 
             // Check daily signal limit
-            const strategyCode = probability.dominantTeam === 'Home' ? 'NEXT_GOAL_HOME' :
-                probability.dominantTeam === 'Away' ? 'NEXT_GOAL_AWAY' : 'NEXT_GOAL_ANY';
+            const strategyCode = deepAnalysis.strategy_code;
 
             if (!checkSignalLimit(matchId, strategyCode)) {
                 log.warn(`      🔒 Signal limit reached for ${matchId}_${strategyCode}`);
                 continue;
             }
 
-            // Build candidate signal
+            // Build candidate signal (enhanced with hybrid data)
             const candidate = {
-                id: `${matchId}_${strategyCode}`,
-                home: match.home_team?.name || 'Home',
-                away: match.away_team?.name || 'Away',
+                id: deepAnalysis.signal_id,
+                home: deepAnalysis.match_info.home,
+                away: deepAnalysis.match_info.away,
                 homeLogo: match.home_team?.image_path || '',
                 awayLogo: match.away_team?.image_path || '',
-                score: `${match.home_team?.score || 0}-${match.away_team?.score || 0}`,
+                score: deepAnalysis.match_info.score,
                 elapsed,
-                strategy: probability.recommendedMarket,
+                strategy: deepAnalysis.market_recommendation,
                 strategyCode,
                 phase: elapsed <= 45 ? 'First Half' : 'Second Half',
-                confidence: probability.confidenceStars >= 4 ? 'HIGH' : probability.confidenceStars >= 3 ? 'MEDIUM' : 'LOW',
-                confidencePercent: probability.probabilityPercent,
-                verdict: 'PLAY', // Engine already filtered low probability
-                reason: probability.reason,
-                dominantTeam: probability.dominantTeam,
-                homePressure: probability.homePressure,
-                awayPressure: probability.awayPressure,
+                confidence: deepAnalysis.analysis.total_confidence >= 80 ? 'HIGH' :
+                    deepAnalysis.analysis.total_confidence >= 65 ? 'MEDIUM' : 'LOW',
+                confidencePercent: deepAnalysis.analysis.total_confidence,
+                verdict: 'PLAY', // Hybrid engine already filtered
+                reason: `Live: ${deepAnalysis.analysis.live_pressure_score}% | H2H: ${deepAnalysis.analysis.historical_score}% | Tags: ${deepAnalysis.analysis.tags.slice(0, 3).join(', ')}`,
+                dominantTeam: deepAnalysis.analysis.dominant_team,
+                homePressure: deepAnalysis.analysis.home_pressure,
+                awayPressure: deepAnalysis.analysis.away_pressure,
+                // Deep Analysis extras
+                analysis: deepAnalysis.analysis,
+                ai_prompt: deepAnalysis.ai_prompt, // For admin review
+                h2h_available: deepAnalysis.h2h_available,
                 stats: {
                     shots: stats.shots.home + stats.shots.away,
                     shots_on_target: stats.shotsOnTarget.home + stats.shotsOnTarget.away,
@@ -1512,12 +1826,12 @@ async function processMatches() {
                     homeOdds: (match.odds['1'] || 2.0).toFixed(2),
                     awayOdds: (match.odds['2'] || 2.0).toFixed(2)
                 },
-                league: match.league_name || 'Unknown',
+                league: deepAnalysis.match_info.league,
                 leagueLogo: match.league_logo || '',
-                country: match.country_name || ''
+                country: deepAnalysis.match_info.country
             };
 
-            log.success(`      ✅ SIGNAL: ${probability.probabilityPercent}% - ${probability.recommendedMarket}`);
+            log.success(`      ✅ HYBRID SIGNAL: ${deepAnalysis.analysis.total_confidence}% - ${deepAnalysis.market_recommendation}`);
             signals.push(candidate);
 
             // Record signal for daily limit tracking
@@ -1529,9 +1843,9 @@ async function processMatches() {
             // 📝 Record bet to history
             await betTracker.recordBet({
                 match_id: matchId,
-                home_team: match.home_team?.name || 'Unknown',
-                away_team: match.away_team?.name || 'Unknown'
-            }, probability.recommendedMarket, strategyCode, probability.probabilityPercent, 'live', candidate.score);
+                home_team: deepAnalysis.match_info.home,
+                away_team: deepAnalysis.match_info.away
+            }, deepAnalysis.market_recommendation, strategyCode, deepAnalysis.analysis.total_confidence, 'live_hybrid', candidate.score);
 
             // Send Telegram notification
             await sendTelegramNotification(candidate);
