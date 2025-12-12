@@ -510,22 +510,33 @@ function calculateGoalProbability(match, liveStats, elapsed, matchId = null) {
     // === 2d. MOMENTUM DELTA (Rising Pressure Detection) ===
     let momentumBonus = 0;
     let pressureDelta = 0;
+    const currentScore = `${homeScore}-${awayScore}`;
+
     if (matchId) {
         const history = getMatchHistory(matchId);
         if (history.length >= 2) {
             // Get oldest snapshot in history (typically ~6-12 mins ago)
             const oldSnapshot = history[0];
-            const oldPressure = calcPressure(oldSnapshot.stats);
-            const currentPressure = calcPressure(liveStats);
-            pressureDelta = currentPressure - oldPressure;
 
-            // If pressure increased by 30+ points in last ~10 mins = "Rising Pressure"
-            if (pressureDelta >= 30) {
-                momentumBonus = 15;
-                contextFactors.push(`📈 Rising Pressure (+${Math.round(pressureDelta)})`);
-            } else if (pressureDelta >= 15) {
-                momentumBonus = 8;
-                contextFactors.push(`📈 Momentum (+${Math.round(pressureDelta)})`);
+            // ⚽ GOAL RESET CHECK: If score changed, pressure was "consumed" by a goal
+            if (oldSnapshot.score !== currentScore) {
+                // Score changed - don't give momentum bonus, the pressure already converted
+                contextFactors.push('⚽ Goal Reset (Score Changed)');
+                // Reset momentum bonus to 0
+            } else {
+                // Score same - calculate pressure delta normally
+                const oldPressure = calcPressure(oldSnapshot.stats);
+                const currentPressure = calcPressure(liveStats);
+                pressureDelta = currentPressure - oldPressure;
+
+                // If pressure increased by 30+ points in last ~10 mins = "Rising Pressure"
+                if (pressureDelta >= 30) {
+                    momentumBonus = 15;
+                    contextFactors.push(`📈 Rising Pressure (+${Math.round(pressureDelta)})`);
+                } else if (pressureDelta >= 15) {
+                    momentumBonus = 8;
+                    contextFactors.push(`📈 Momentum (+${Math.round(pressureDelta)})`);
+                }
             }
         }
     }

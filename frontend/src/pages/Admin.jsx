@@ -51,27 +51,17 @@ export default function Admin() {
         } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
-    const handleApprove = async (id, matchData = null, market = null, category = null) => {
-        try {
-            // For daily signals, use the new approval endpoint
-            if (matchData) {
-                const res = await fetch(`${API_URL}/api/daily-analysis/approve/${id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ matchData, market, category, confidence: 85 })
-                });
-                if (!res.ok) throw new Error('Approval failed');
-            } else {
-                // Legacy live signal approval
-                const res = await fetch(`${API_URL}/api/admin/approve/${id}`, { method: 'POST', credentials: 'include' });
-                if (!res.ok) throw new Error('Approval failed');
-            }
-
-            // Refresh data from server to get accurate state
-            await loadData();
-        } catch (e) {
-            alert("Error approving: " + e.message);
+    // DELETE signal from list (no approval needed - signals auto-recorded when analysis runs)
+    const handleDeleteSignal = (signalId, category = null) => {
+        if (category) {
+            // Daily signal: remove from category
+            setDailySignals(prev => ({
+                ...prev,
+                [category]: prev[category]?.filter(s => s.id !== signalId) || []
+            }));
+        } else {
+            // Live signal: remove from signals array
+            setSignals(prev => prev.filter(s => s.id !== signalId));
         }
     };
 
@@ -207,7 +197,7 @@ export default function Admin() {
                     <SignalsView
                         signals={signals}
                         dailySignals={dailySignals}
-                        onApprove={handleApprove}
+                        onDelete={handleDeleteSignal}
                         handleScan={handleScan}
                         handleDailyScan={handleDailyAnalysis}
                         scanning={scanning}
@@ -229,7 +219,7 @@ export default function Admin() {
     );
 }
 
-function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDailyScan, scanning, analyzing }) {
+function SignalsView({ signals, dailySignals, onDelete, handleScan, handleDailyScan, scanning, analyzing }) {
     const [sort, setSort] = useState('newest'); // newest, confidence
 
     const sortedSignals = [...signals].sort((a, b) => {
@@ -253,7 +243,7 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                     {sortedSignals.map((s, i) => (
-                        <AdminSignalCard key={i} signal={s} onApprove={onApprove} />
+                        <AdminSignalCard key={i} signal={s} onDelete={onDelete} />
                     ))}
                 </div>
             </section>
@@ -269,10 +259,12 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
                 </div>
                 {Object.entries(dailySignals).map(([cat, list]) => (
                     <div key={cat} className="mb-6">
-                        <h3 className="font-semibold capitalize mb-2">{cat}</h3>
+                        <h3 className="font-semibold capitalize mb-2 flex items-center gap-2">
+                            {cat} <span className="text-xs text-muted-foreground">({list?.length || 0})</span>
+                        </h3>
                         <div className="grid grid-cols-3 gap-4">
                             {list && list.map((s) => (
-                                <AdminSignalCard key={s.id} signal={s} onApprove={onApprove} isDaily category={cat} />
+                                <AdminSignalCard key={s.id} signal={s} onDelete={onDelete} isDaily category={cat} />
                             ))}
                         </div>
                     </div>
@@ -282,85 +274,41 @@ function SignalsView({ signals, dailySignals, onApprove, handleScan, handleDaily
     )
 }
 
-function AdminSignalCard({ signal, onApprove, isDaily, category }) {
-    const [showPrompt, setShowPrompt] = useState(false);
-
-    const handleClick = () => {
-        if (isDaily) {
-            // Daily signal: pass match data for bet tracking
-            const matchData = {
-                matchId: signal.matchId,
-                home_team: signal.event_home_team,
-                away_team: signal.event_away_team
-            };
-            onApprove(signal.id, matchData, signal.market, category);
-        } else {
-            // Live signal: legacy approval
-            onApprove(signal.id);
+function AdminSignalCard({ signal, onDelete, isDaily, category }) {
+    const handleDelete = () => {
+        if (confirm('Bu sinyali silmek istediğinize emin misiniz?')) {
+            onDelete(signal.id, isDaily ? category : null);
         }
     };
 
-    // Generate AI prompt from stats
-    const generatePrompt = () => {
-        if (!signal.stats) return 'İstatistik verisi yok.';
-        const s = signal.stats;
-        return `You are a professional football betting analyst. Analyze this match for market: ${signal.market}.
-
-Match: ${signal.event_home_team} vs ${signal.event_away_team}
-
-Statistics:
-- Home Form (Last 5): Over 1.5 Rate ${s.homeForm?.over15Rate?.toFixed(0) || 0}%, Avg Scored ${s.homeForm?.avgScored?.toFixed(2) || 0}
-- Away Form (Last 5): Over 1.5 Rate ${s.awayForm?.over15Rate?.toFixed(0) || 0}%, Avg Scored ${s.awayForm?.avgScored?.toFixed(2) || 0}
-- Home @ Home: Scored in ${s.homeHomeStats?.scoringRate?.toFixed(0) || 0}% of games, Avg Scored ${s.homeHomeStats?.avgScored?.toFixed(2) || 0}
-- Away @ Away: Scored in ${s.awayAwayStats?.scoringRate?.toFixed(0) || 0}% of games, Avg Conceded ${s.awayAwayStats?.avgConceded?.toFixed(2) || 0}
-
-IMPORTANT: These matches have ALREADY passed strict statistical filters. If you recommend PLAY, give confidence between 80-95%.
-
-RESPOND WITH ONLY JSON: {"verdict": "PLAY", "confidence": 85, "reason": "Brief reason"}`;
-    };
-
-    const copyPrompt = () => {
-        navigator.clipboard.writeText(generatePrompt());
-        alert('Prompt kopyalandı!');
-    };
-
     return (
-        <div className={`relative p-4 rounded-xl border ${signal.isApproved ? 'bg-green-500/10 border-green-500/30' : 'bg-card border-border'}`}>
+        <div className="relative p-4 rounded-xl border bg-card border-border hover:border-accent/50 transition-colors">
             <div className="flex justify-between mb-2">
                 <span className="font-bold text-sm">{isDaily ? signal.event_home_team : signal.home} vs {isDaily ? signal.event_away_team : signal.away}</span>
-                {signal.isApproved ? <span className="text-green-500 text-xs font-bold">ONAYLANDI</span> : <span className="text-yellow-500 text-xs font-bold">BEKLİYOR</span>}
+                <span className="text-xs text-muted-foreground">{signal.startTime || ''}</span>
             </div>
-            {isDaily && signal.market && (
-                <div className="text-xs text-muted-foreground mb-2">{signal.market} • {signal.league || ''}</div>
-            )}
 
-            {/* AI Prompt Toggle */}
-            {isDaily && !signal.isApproved && (
-                <button
-                    onClick={() => setShowPrompt(!showPrompt)}
-                    className="text-xs text-accent underline mb-2 block"
-                >
-                    {showPrompt ? 'Promptu Gizle' : '📋 AI Promptu Göster'}
-                </button>
-            )}
+            {/* Market & League */}
+            <div className="text-xs text-accent font-semibold mb-2">{signal.market || signal.strategy}</div>
+            {signal.league && <div className="text-xs text-muted-foreground mb-2">{signal.league}</div>}
 
-            {/* AI Prompt Display */}
-            {showPrompt && (
-                <div className="mb-3">
-                    <div className="bg-muted/50 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto border border-border">
-                        {generatePrompt()}
-                    </div>
-                    <button onClick={copyPrompt} className="mt-2 text-xs bg-accent/20 text-accent px-3 py-1 rounded-lg hover:bg-accent/30 transition-colors">
-                        📋 Kopyala
-                    </button>
+            {/* Confidence */}
+            {signal.confidencePercent && (
+                <div className="text-xs mb-2">
+                    <span className="text-muted-foreground">Güven: </span>
+                    <span className={`font-bold ${signal.confidencePercent >= 70 ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {signal.confidencePercent}%
+                    </span>
                 </div>
             )}
 
-            {!signal.isApproved && (
-                <Button className="w-full mt-2 bg-green-600 hover:bg-green-700 h-8 text-xs" onClick={handleClick}>
-                    ONAYLA ✅
-                </Button>
-            )}
+            {/* Delete Button */}
+            <button
+                onClick={handleDelete}
+                className="w-full mt-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 h-8 text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
+            >
+                🗑️ Kaldır
+            </button>
         </div>
     )
 }
