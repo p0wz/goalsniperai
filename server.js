@@ -816,6 +816,22 @@ function analyzeFirstHalfSniper(match, elapsed, stats, momentum = null) {
         reasons.push(`xG: ${totalxG.toFixed(2)}`);
     }
 
+    // 🔥 DOMINANCE CHECK (One-sided match?)
+    const shotDiff = (stats?.shots?.home || 0) - (stats?.shots?.away || 0);
+    const sotDiff = (stats?.shotsOnTarget?.home || 0) - (stats?.shotsOnTarget?.away || 0);
+
+    // If Home or Away is dominating by 4+ shots OR 2+ SoT
+    if (Math.abs(shotDiff) >= 4 || Math.abs(sotDiff) >= 2) {
+        confidencePercent += 10;
+        let domTeam = 'Away';
+        if (shotDiff >= 4 || sotDiff >= 2) domTeam = 'Home';
+
+        reasons.push(`💪 ${domTeam} Dominating`);
+    } else {
+        // Balanced match penalty (if no dominance and few chances)
+        if (totalSoT < 3) confidencePercent -= 5;
+    }
+
     // Bonus for short timeframe momentum (more urgent)
     if (momentum.timeframe <= 3) { confidencePercent += 10; }
     else if (momentum.timeframe <= 6) { confidencePercent += 5; }
@@ -899,7 +915,9 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     // If Home or Away is dominating by 4+ shots OR 2+ SoT
     if (Math.abs(shotDiff) >= 4 || Math.abs(sotDiff) >= 2) {
         confidencePercent += 10;
-        const domTeam = shotDiff > 0 ? 'Home' : 'Away';
+        let domTeam = 'Away';
+        if (shotDiff >= 4 || sotDiff >= 2) domTeam = 'Home';
+
         reasons.push(`💪 ${domTeam} Dominating`);
     } else {
         // Balanced match penalty (if no dominance and few chances)
