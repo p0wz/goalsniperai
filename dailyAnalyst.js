@@ -299,7 +299,8 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         // btts: [], // REMOVED
         doubleChance: [],
         homeOver15: [],
-        under35: []
+        under35: [],
+        under25: []
     };
 
     let processed = 0;

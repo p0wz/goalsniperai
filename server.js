@@ -360,57 +360,43 @@ function parseMatchStats(statsData) {
 }
 
 // ============================================
-// 🔍 Base Activity Check ("Is it Dead?" Filter)
+// 🔍 Base Activity Check (Dynamic Linear Thresholds)
 // ============================================
-// Phase-specific minimum thresholds to consider a match "alive"
-const BASE_ACTIVITY_THRESHOLDS = {
-    FIRST_HALF: {
-        // 15'-45': Just need early life
-        MIN_SHOTS: 4,
-        MIN_CORNERS: 2
-    },
-    LATE_GAME: {
-        // 60'-85': Must have established stats by now
-        MIN_SHOTS: 10,
-        MIN_CORNERS: 4
-    }
-};
-
 function checkBaseActivity(elapsed, stats) {
     const totalShots = (stats?.shots?.home || 0) + (stats?.shots?.away || 0);
     const totalCorners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
 
-    // Determine which phase we're checking
-    const isFirstHalf = elapsed >= 15 && elapsed <= 45;
-    const isLateGame = elapsed >= 46 && elapsed <= 85; // Extended to cover 46-60 gap
-
-    if (isFirstHalf) {
-        const thresholds = BASE_ACTIVITY_THRESHOLDS.FIRST_HALF;
-        const isAlive = totalShots >= thresholds.MIN_SHOTS || totalCorners >= thresholds.MIN_CORNERS;
+    // 1. Safety Buffer
+    if (elapsed < 16) {
         return {
-            phase: 'FIRST_HALF',
-            isAlive,
-            reason: isAlive
-                ? `Base Activity ✓ (${totalShots} shots, ${totalCorners} corners)`
-                : `Dead match (need ${thresholds.MIN_SHOTS}+ shots OR ${thresholds.MIN_CORNERS}+ corners)`,
+            phase: 'EARLY',
+            isAlive: true,
+            reason: 'Early game buffer',
             stats: { shots: totalShots, corners: totalCorners }
         };
     }
 
-    if (isLateGame) {
-        const thresholds = BASE_ACTIVITY_THRESHOLDS.LATE_GAME;
-        const isAlive = totalShots >= thresholds.MIN_SHOTS || totalCorners >= thresholds.MIN_CORNERS;
-        return {
-            phase: 'LATE_GAME',
-            isAlive,
-            reason: isAlive
-                ? `Base Activity ✓ (${totalShots} shots, ${totalCorners} corners)`
-                : `Dead match (need ${thresholds.MIN_SHOTS}+ shots OR ${thresholds.MIN_CORNERS}+ corners)`,
-            stats: { shots: totalShots, corners: totalCorners }
-        };
-    }
+    // 2. Dynamic Threshold Calculation
+    // Slope: 0.14 shots/min => 15'->2, 30'->4, 45'->6, 60'->8, 75'->10
+    // Slope: 0.06 corners/min => 15'->1, 30'->2, 45'->3, 60'->4
+    const minShots = Math.floor(elapsed * 0.14);
+    const minCorners = Math.floor(elapsed * 0.06);
 
-    return { phase: null, isAlive: false, reason: 'Outside valid time range' };
+    // 3. Evaluation (Must meet at least one criteria to be "Alive")
+    // We use OR logic: High shots OR high corners = Active game.
+    // If BOTH are low, it's a dead game.
+    const isAlive = totalShots >= minShots || totalCorners >= minCorners;
+
+    const reason = isAlive
+        ? `Active Match ✓ (Stats: ${totalShots}S/${totalCorners}C vs Req: ${minShots}S/${minCorners}C)`
+        : `💀 Dead Match (Need >${minShots} Shots or >${minCorners} Corners)`;
+
+    return {
+        phase: elapsed <= 45 ? '1H' : '2H',
+        isAlive,
+        reason,
+        stats: { shots: totalShots, corners: totalCorners }
+    };
 }
 
 // ============================================
