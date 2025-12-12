@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
 import Pricing from './pages/Pricing';
+import DailyAnalyst from './pages/DailyAnalyst';
 
 import { useState, useEffect } from 'react';
 
@@ -48,6 +49,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/daily-analyst" element={<DailyAnalyst />} />
       </Routes>
     </BrowserRouter>
   );
