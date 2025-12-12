@@ -9,6 +9,7 @@ const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 // Redis Key
 const BETS_KEY = 'goalsniper:bets';
+const COUPONS_KEY = 'goalsniper:coupons';
 
 // ============================================
 // 🔧 Redis Helper Functions
@@ -223,12 +224,72 @@ async function clearAllBets(source = null) {
     return { success: true, clearedCount };
 }
 
+// ============================================
+// 🎫 Coupon Management
+// ============================================
+async function getCoupons() {
+    const data = await redisGet(COUPONS_KEY);
+    if (!data) return [];
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        console.error('[BetTracker] Parse coupons error:', e.message);
+        return [];
+    }
+}
+
+async function saveCoupon(couponData) {
+    const coupons = await getCoupons();
+
+    const newCoupon = {
+        id: `coupon_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        title: couponData.title || 'Daily Coupon',
+        matches: couponData.matches || [], // Array of match objects
+        totalOdds: couponData.totalOdds || 0,
+        status: 'PENDING',
+        created_at: new Date().toISOString(),
+        settled_at: null
+    };
+
+    coupons.unshift(newCoupon); // Add to top
+
+    // Limit to 50 coupons history
+    if (coupons.length > 50) coupons.pop();
+
+    await redisSet(COUPONS_KEY, coupons);
+    return newCoupon;
+}
+
+async function settleCoupon(couponId, status) {
+    const coupons = await getCoupons();
+    const index = coupons.findIndex(c => c.id === couponId);
+
+    if (index === -1) return { success: false, error: 'Coupon not found' };
+
+    coupons[index].status = status;
+    coupons[index].settled_at = new Date().toISOString();
+
+    await redisSet(COUPONS_KEY, coupons);
+    return { success: true, coupon: coupons[index] };
+}
+
+async function deleteCoupon(couponId) {
+    const coupons = await getCoupons();
+    const filtered = coupons.filter(c => c.id !== couponId);
+    await redisSet(COUPONS_KEY, filtered);
+    return { success: true };
+}
+
 module.exports = {
     recordBet,
-    settleBets,
-    getPerformanceStats,
-    startTracking,
     getAllBets,
+    getPerformanceStats,
     manualSettle,
-    clearAllBets
+    startTracking,
+    clearAllBets,
+    // Coupon Exports
+    getCoupons,
+    saveCoupon,
+    settleCoupon,
+    deleteCoupon
 };

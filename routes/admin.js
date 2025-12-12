@@ -162,21 +162,58 @@ router.delete('/users/:id', async (req, res) => {
 // ============================================
 // 📈 Get Signal Stats
 // ============================================
-router.get('/signals/stats', (req, res) => {
-    try {
-        // This would connect to signal history in production
-        res.json({
-            success: true,
-            stats: {
-                total_signals_today: 0,
-                iy_signals: 0,
-                ms_signals: 0,
-                avg_confidence: 0
-            }
-        });
     } catch (error) {
-        console.error('[ADMIN] Signal stats error:', error);
-        res.status(500).json({ success: false, error: 'Server error' });
+    console.error('[ADMIN] Signal stats error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+}
+});
+
+// ============================================
+// 🎫 Coupon Management Endpoints
+// ============================================
+const { getCoupons, saveCoupon, settleCoupon, deleteCoupon } = require('../betTrackerRedis');
+
+// Get All Coupons (Admin/Public)
+router.get('/coupons', async (req, res) => {
+    try {
+        const coupons = await getCoupons();
+        res.json({ success: true, coupons });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create Coupon
+router.post('/coupons', async (req, res) => {
+    try {
+        const result = await saveCoupon(req.body);
+        res.json({ success: true, coupon: result });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Settle Coupon
+router.post('/coupons/:id/settle', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const result = await settleCoupon(id, status);
+        if (!result.success) return res.status(400).json(result);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete Coupon
+router.delete('/coupons/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await deleteCoupon(id);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

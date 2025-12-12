@@ -231,6 +231,7 @@ function calculateAdvancedStats(history, teamName) {
     let goalsConceded = 0;
     let over15Count = 0;
     let over25Count = 0;
+    let under25Count = 0;
     let under35Count = 0;
     let bttsCount = 0;
     let cleanSheetCount = 0;
@@ -261,6 +262,7 @@ function calculateAdvancedStats(history, teamName) {
 
         if (total > 1.5) over15Count++;
         if (total > 2.5) over25Count++;
+        if (total <= 2.5) under25Count++;
         if (total <= 3.5) under35Count++;
         if (s1 > 0 && s2 > 0) bttsCount++;
         if (oppScore === 0) cleanSheetCount++;
@@ -280,6 +282,7 @@ function calculateAdvancedStats(history, teamName) {
         avgConceded: goalsConceded / totalMatches,
         over15Rate: (over15Count / totalMatches) * 100,
         over25Rate: (over25Count / totalMatches) * 100,
+        under25Rate: (under25Count / totalMatches) * 100,
         under35Rate: (under35Count / totalMatches) * 100,
         bttsRate: (bttsCount / totalMatches) * 100,
         scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
@@ -425,6 +428,18 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             passedFilters.push('Under 3.5');
         }
 
+        // Logic F: Under 2.5 (NEW)
+        // Strict low-scoring check: League Avg < 2.5, Both Teams U2.5 Rate >= 75%
+        if (proxyLeagueAvg < 2.5 && homeForm.under25Rate >= 75 && awayForm.under25Rate >= 75) {
+            // Extra Safety: Check H2H history for high scoring games
+            const mutualOver35 = mutualH2H.some(g => (parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0)) > 3);
+
+            if (!mutualOver35) {
+                candidates.under25.push({ ...m, filterStats: stats, market: 'Under 2.5 Goals' });
+                passedFilters.push('Under 2.5');
+            }
+        }
+
         if (passedFilters.length > 0) {
             log.info(`   ✅ PASSED: ${passedFilters.join(', ')}`);
         } else {
@@ -538,7 +553,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { over15: [], btts: [], doubleChance: [], homeOver15: [], under35: [] };
+        return { over15: [], btts: [], doubleChance: [], homeOver15: [], under35: [], under25: [] };
     }
 
     log.info(`✅ Found ${matches.length} upcoming fixtures. Processing top ${customLimit}...`);
@@ -555,7 +570,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        over15: [], over25: [], doubleChance: [], homeOver15: [], under35: []
+        over15: [], over25: [], doubleChance: [], homeOver15: [], under35: [], under25: []
     };
 
     // Convert candidates to results format (no AI validation)
@@ -593,7 +608,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`║  Matches Scanned: ${customLimit}                               ║`);
     log.info(`║  Candidates Found: ${totalCandidates}                             ║`);
     log.info(`╠═══════════════════════════════════════════════════════╣`);
-    log.info(`║  Over 1.5: ${results.over15.length} | Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length}  ║`);
+    log.info(`║  Over 1.5: ${results.over15.length} | Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} ║`);
     log.info(`╚═══════════════════════════════════════════════════════╝`);
     log.info(`\n⏳ Waiting for Admin Approval in Admin Panel...`);
 
