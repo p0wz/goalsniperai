@@ -892,6 +892,20 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     if (totalCorners >= 5) { confidencePercent += 5; reasons.push(`${totalCorners} corners`); }
     if (totalxG > 1.0) { confidencePercent += 7; reasons.push(`xG: ${totalxG.toFixed(2)}`); }
 
+    // 🔥 DOMINANCE CHECK (One-sided match?)
+    const shotDiff = (stats?.shots?.home || 0) - (stats?.shots?.away || 0);
+    const sotDiff = (stats?.shotsOnTarget?.home || 0) - (stats?.shotsOnTarget?.away || 0);
+
+    // If Home or Away is dominating by 4+ shots OR 2+ SoT
+    if (Math.abs(shotDiff) >= 4 || Math.abs(sotDiff) >= 2) {
+        confidencePercent += 10;
+        const domTeam = shotDiff > 0 ? 'Home' : 'Away';
+        reasons.push(`💪 ${domTeam} Dominating`);
+    } else {
+        // Balanced match penalty (if no dominance and few chances)
+        if (totalSoT < 4) confidencePercent -= 5;
+    }
+
     // Bonus for close game (more likely to push for goal)
     if (goalDiff <= 1) { confidencePercent += 8; reasons.push(`Close: ${homeScore}-${awayScore}`); }
 
