@@ -402,13 +402,13 @@ function checkBaseActivity(elapsed, stats) {
 // ============================================
 // 🎯 Dynamic Momentum Detection (Lookback)
 // ============================================
-// Thresholds for momentum triggers
+// Thresholds for momentum triggers (HARDENED)
 const MOMENTUM_THRESHOLDS = {
-    CORNER_SIEGE: 2,        // +2 corners
-    SHOT_SURGE: 2,          // +2 shots
-    SOT_THREAT: 1,          // +1 shot on target
-    DA_PRESSURE: 5,         // +5 dangerous attacks (if available)
-    XG_SPIKE: 0.3           // +0.3 xG increase
+    CORNER_SIEGE: 3,        // +3 corners (was 2)
+    SHOT_SURGE: 4,          // +4 shots (was 2)
+    SOT_THREAT: 2,          // +2 shots on target (was 1)
+    DA_PRESSURE: 8,         // +8 dangerous attacks (was 5)
+    XG_SPIKE: 0.4           // +0.4 xG increase (was 0.3)
 };
 
 function detectMomentum(matchId, currentStats, currentScore = '0-0') {
