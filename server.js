@@ -422,7 +422,7 @@ const PROBABILITY_MAP = [
     { maxScore: Infinity, minProb: 85, maxProb: 95, stars: 5 }
 ];
 
-function calculateGoalProbability(match, liveStats, elapsed) {
+function calculateGoalProbability(match, liveStats, elapsed, matchId = null) {
     const homeScore = match.home_team?.score || 0;
     const awayScore = match.away_team?.score || 0;
     const odds = match.odds || { '1': 2.0, '2': 2.0, 'X': 3.0 };
@@ -444,6 +444,16 @@ function calculateGoalProbability(match, liveStats, elapsed) {
     const awayxG = liveStats?.xG?.away || 0;
     const homeRed = liveStats?.redCards?.home || 0;
     const awayRed = liveStats?.redCards?.away || 0;
+
+    // Helper to calculate pressure from stats object
+    const calcPressure = (stats) => {
+        const sot = (stats?.shotsOnTarget?.home || 0) + (stats?.shotsOnTarget?.away || 0);
+        const shots = (stats?.shots?.home || 0) + (stats?.shots?.away || 0);
+        const corners = (stats?.corners?.home || 0) + (stats?.corners?.away || 0);
+        const da = (stats?.dangerousAttacks?.home || 0) + (stats?.dangerousAttacks?.away || 0);
+        const xg = (stats?.xG?.home || 0) + (stats?.xG?.away || 0);
+        return (sot * 15) + ((shots - sot) * 5) + (corners * 8) + (da * 1) + (xg * 20);
+    };
 
     // Base Pressure = Weighted sum of stats
     let homePressure = (homeSoT * PRESSURE_WEIGHTS.SHOT_ON_TARGET) +
@@ -497,6 +507,29 @@ function calculateGoalProbability(match, liveStats, elapsed) {
         contextFactors.push('⏱️ Kill Zone (70-85)');
     }
 
+    // === 2d. MOMENTUM DELTA (Rising Pressure Detection) ===
+    let momentumBonus = 0;
+    let pressureDelta = 0;
+    if (matchId) {
+        const history = getMatchHistory(matchId);
+        if (history.length >= 2) {
+            // Get oldest snapshot in history (typically ~6-12 mins ago)
+            const oldSnapshot = history[0];
+            const oldPressure = calcPressure(oldSnapshot.stats);
+            const currentPressure = calcPressure(liveStats);
+            pressureDelta = currentPressure - oldPressure;
+
+            // If pressure increased by 30+ points in last ~10 mins = "Rising Pressure"
+            if (pressureDelta >= 30) {
+                momentumBonus = 15;
+                contextFactors.push(`📈 Rising Pressure (+${Math.round(pressureDelta)})`);
+            } else if (pressureDelta >= 15) {
+                momentumBonus = 8;
+                contextFactors.push(`📈 Momentum (+${Math.round(pressureDelta)})`);
+            }
+        }
+    }
+
     // === 3. DETERMINE DOMINANT TEAM ===
     const totalPressure = homePressure + awayPressure;
     let dominantTeam = 'Balanced';
@@ -524,8 +557,8 @@ function calculateGoalProbability(match, liveStats, elapsed) {
         }
     }
 
-    // Add time bonus
-    probabilityPercent = Math.min(probabilityPercent + timeBonus, 95);
+    // Add time bonus and momentum bonus
+    probabilityPercent = Math.min(probabilityPercent + timeBonus + momentumBonus, 95);
 
     // === 5. BUILD REASON STRING ===
     const statsBreakdown = [];
@@ -1416,8 +1449,11 @@ async function processMatches() {
             }
             log.info(`      ✅ ${baseCheck.reason}`);
 
-            // STEP 2: PROBABILITY ENGINE (Replaces old Momentum Detection)
-            const probability = calculateGoalProbability(match, stats, elapsed);
+            // Record stats to history for delta tracking
+            recordMatchStats(matchId, stats, score);
+
+            // STEP 2: PROBABILITY ENGINE (with Momentum Delta)
+            const probability = calculateGoalProbability(match, stats, elapsed, matchId);
 
             log.info(`      🧠 Probability: ${probability.probabilityPercent}% (${probability.confidenceStars}⭐) - ${probability.dominantTeam}`);
             log.info(`      📊 ${probability.reason}`);
