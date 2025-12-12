@@ -382,7 +382,7 @@ function checkBaseActivity(elapsed, stats) {
 
     // Determine which phase we're checking
     const isFirstHalf = elapsed >= 15 && elapsed <= 45;
-    const isLateGame = elapsed >= 60 && elapsed <= 85;
+    const isLateGame = elapsed >= 46 && elapsed <= 85; // Extended to cover 46-60 gap
 
     if (isFirstHalf) {
         const thresholds = BASE_ACTIVITY_THRESHOLDS.FIRST_HALF;
@@ -971,8 +971,8 @@ function analyzeLateGameMomentum(match, elapsed, stats, momentum = null) {
     const awayScore = match.away_team?.score || 0;
     const goalDiff = Math.abs(homeScore - awayScore);
 
-    // Time 55' - 82', score diff <= 2
-    if (elapsed < 55 || elapsed > 82 || goalDiff > 2) {
+    // Time 46' - 82', score diff <= 2 (Extended coverage)
+    if (elapsed < 46 || elapsed > 82 || goalDiff > 2) {
         return null;
     }
 
@@ -1193,7 +1193,7 @@ async function processMatches() {
         if (isFinished) return false;
 
         const isFirstHalfCandidate = elapsed >= 12 && elapsed <= 38 && scoreDiff <= 1;
-        const isLateGameCandidate = elapsed >= 55 && elapsed <= 82 && scoreDiff <= 2;
+        const isLateGameCandidate = elapsed >= 46 && elapsed <= 82 && scoreDiff <= 2;
 
         return isFirstHalfCandidate || isLateGameCandidate;
     });
