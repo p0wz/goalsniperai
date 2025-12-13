@@ -312,6 +312,7 @@ function App() {
                   <tr>
                     <th className="p-3">Time</th>
                     <th className="p-3">Match</th>
+                    <th className="p-3">Score</th>
                     <th className="p-3">Strategy</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Actions</th>
@@ -326,6 +327,9 @@ function App() {
                       <td className="p-3 font-medium">
                         <div>{bet.home_team} vs {bet.away_team}</div>
                         <div className="text-xs text-muted-foreground">{bet.league}</div>
+                      </td>
+                      <td className="p-3 font-mono text-xs">
+                        {bet.entry_score || '-'}
                       </td>
                       <td className="p-3">
                         <div className="font-medium">{bet.strategy}</div>
