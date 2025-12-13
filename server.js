@@ -624,6 +624,14 @@ Possession: ${candidate.stats.possession || 'N/A'}
 Home Win: ${candidate.stats.homeOdds} | Away Win: ${candidate.stats.awayOdds}${candidate.stats.drawOdds ? ` | Draw: ${candidate.stats.drawOdds}` : ''}
 Favorite: ${parseFloat(candidate.stats.homeOdds) < parseFloat(candidate.stats.awayOdds) ? candidate.home : candidate.away}
 
+=== H2H & FORM STATS ===
+${candidate.h2h ? `Home Form (@H): ${candidate.h2h.homeForm || 'N/A'} | Goal Rate: ${candidate.h2h.homeGoalRate || 'N/A'}%
+Away Form (@A): ${candidate.h2h.awayForm || 'N/A'} | Goal Rate: ${candidate.h2h.awayGoalRate || 'N/A'}%
+1st Half Goal Rate: ${candidate.h2h.htGoalRate || 'N/A'}%
+2nd Half Goal Rate: ${candidate.h2h.shGoalRate || 'N/A'}%
+Expected Total Goals: ${candidate.h2h.expectedTotal || 'N/A'}
+Recent Matches Analyzed: Home(${candidate.h2h.homeMatches || 0}) Away(${candidate.h2h.awayMatches || 0})` : 'H2H data not available'}
+
 === SCOUT ANALYSIS ===
 ${candidate.reason}
 
@@ -636,6 +644,8 @@ Consider:
 3. xG vs actual goals
 4. Time remaining in strategic window
 5. Odds movement indicating market sentiment
+6. H2H form - Are these teams historically high-scoring?
+7. Half-specific goal rates (1H vs 2H patterns)
 
 RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
 {"verdict": "PLAY", "confidence": 75, "reason": "Your analysis here"}`;
