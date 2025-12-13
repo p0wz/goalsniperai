@@ -75,10 +75,18 @@ async function recordBet(matchData, market, strategyCode, confidence, source = '
     const db = await loadDb();
 
     // Prevent Duplicates
-    const exists = db.find(b => b.api_fixture_id == matchData.match_id && b.market === market);
-    if (exists) {
-        console.log(`[BetTracker] Duplicate bet skipped: ${matchData.home_team} vs ${matchData.away_team} (${market})`);
-        return;
+    // General Rule: Same match + Same strategy = DUPLICATE
+    // EXCEPTION: For 'LATE_GAME', if the score is different, we allow it (max 2 managed by server.js)
+    const existingBet = db.find(b => b.api_fixture_id == matchData.match_id && b.strategy === strategyCode);
+
+    if (existingBet) {
+        // If it's Late Game AND score is different, allow it
+        if (strategyCode === 'LATE_GAME' && existingBet.entry_score !== entryScore) {
+            console.log(`[BetTracker] allowing 2nd Late Game bet due to score change (${existingBet.entry_score} -> ${entryScore})`);
+        } else {
+            console.log(`[BetTracker] Duplicate bet skipped: ${matchData.home_team} vs ${matchData.away_team} (${market}) - Strategy: ${strategyCode}`);
+            return;
+        }
     }
 
     const newBet = {

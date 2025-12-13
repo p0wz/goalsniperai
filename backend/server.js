@@ -192,12 +192,12 @@ const MAX_LOOKBACK_MS = 12 * 60 * 1000; // 12 minutes
 // ============================================
 // 🔒 Daily Signal Limiter (Max 1 per match per strategy)
 // ============================================
-// Structure: { "YYYY-MM-DD": { "matchId_STRATEGY": count } }
+// Structure: { "YYYY-MM-DD": { "matchId_STRATEGY": { count: number, lastScore: string } } }
 let DAILY_SIGNAL_COUNTS = {};
 let DAILY_SIGNAL_DATE = null;
 const MAX_SIGNALS_PER_MATCH_STRATEGY = 1;
 
-function checkSignalLimit(matchId, strategyCode) {
+function checkSignalLimit(matchId, strategyCode, currentScore) {
     const today = new Date().toISOString().split('T')[0];
 
     // Reset daily counters if new day
@@ -208,15 +208,33 @@ function checkSignalLimit(matchId, strategyCode) {
     }
 
     const key = `${matchId}_${strategyCode}`;
-    const count = DAILY_SIGNAL_COUNTS[key] || 0;
+    const data = DAILY_SIGNAL_COUNTS[key] || { count: 0, lastScore: null };
 
-    return count < MAX_SIGNALS_PER_MATCH_STRATEGY;
+    // Standard Limit Check
+    if (data.count < MAX_SIGNALS_PER_MATCH_STRATEGY) {
+        return true;
+    }
+
+    // EXCEPTION: Late Game Strategy allows 2nd signal IF score changed
+    if (strategyCode === 'LATE_GAME' && data.count < 2) {
+        if (data.lastScore && data.lastScore !== currentScore) {
+            log.info(`[SignalLimiter] Allowing 2nd signal for ${key} (Score changed: ${data.lastScore} -> ${currentScore})`);
+            return true;
+        }
+    }
+
+    return false;
 }
 
-function recordSignal(matchId, strategyCode) {
+function recordSignal(matchId, strategyCode, currentScore) {
     const key = `${matchId}_${strategyCode}`;
-    DAILY_SIGNAL_COUNTS[key] = (DAILY_SIGNAL_COUNTS[key] || 0) + 1;
-    log.info(`[SignalLimiter] Recorded signal: ${key} (count: ${DAILY_SIGNAL_COUNTS[key]}/${MAX_SIGNALS_PER_MATCH_STRATEGY})`);
+    const data = DAILY_SIGNAL_COUNTS[key] || { count: 0, lastScore: null };
+
+    data.count += 1;
+    data.lastScore = currentScore;
+    DAILY_SIGNAL_COUNTS[key] = data;
+
+    log.info(`[SignalLimiter] Recorded signal: ${key} (count: ${data.count}/${MAX_SIGNALS_PER_MATCH_STRATEGY}+)`);
 }
 
 function recordMatchStats(matchId, stats, score = '0-0') {
@@ -1515,9 +1533,9 @@ async function processMatches() {
                 continue;
             }
 
-            // Check daily signal limit (max 2 per match per strategy)
-            if (!checkSignalLimit(matchId, candidate.strategyCode)) {
-                log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode} (max ${MAX_SIGNALS_PER_MATCH_STRATEGY}/day)`);
+            // Check daily signal limit (max 2 per match per strategy if score changed)
+            if (!checkSignalLimit(matchId, candidate.strategyCode, candidate.score)) {
+                log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode}`);
                 continue;
             }
 
@@ -1612,7 +1630,7 @@ async function processMatches() {
                 signals.push(candidate);
 
                 // Record signal for daily limit tracking
-                recordSignal(matchId, candidate.strategyCode);
+                recordSignal(matchId, candidate.strategyCode, candidate.score);
 
                 // Auto-approve live signals (no admin approval needed)
                 APPROVED_IDS.add(candidate.id);

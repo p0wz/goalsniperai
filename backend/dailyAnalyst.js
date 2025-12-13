@@ -530,7 +530,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`║  Matches Scanned: ${customLimit}                               ║`);
     log.info(`║  Candidates Found: ${totalCandidates}                             ║`);
     log.info(`╠═══════════════════════════════════════════════════════╣`);
-    log.info(`║  Over 1.5: ${results.over15.length} | Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} ║`);
+    log.info(`║  Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} ║`);
     log.info(`╚═══════════════════════════════════════════════════════╝`);
     log.info(`\n⏳ Waiting for Admin Approval in Admin Panel...`);
 
