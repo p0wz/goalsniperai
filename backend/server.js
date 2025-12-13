@@ -124,7 +124,7 @@ const log = {
 // ⚙️ Configuration
 // ============================================
 const PORT = process.env.PORT || 3000;
-const POLL_INTERVAL = 3 * 60 * 1000; // 3 minutes
+const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // Validate required environment variables
 if (!process.env.RAPIDAPI_KEY) {
@@ -762,7 +762,7 @@ Output JSON only: { "verdict": "PLAY" | "SKIP", "confidence": number, "reason": 
 // ============================================
 // 📡 Fetch Match Statistics
 // ============================================
-const API_DELAY = 2000; // 2 seconds between API calls (30 RPM quota)
+const API_DELAY = 4000; // 4 seconds between API calls (Safe for 30 RPM quota)
 
 async function fetchMatchStats(matchId, retries = 3) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
@@ -1345,291 +1345,305 @@ async function fetchLiveMatches() {
 // ============================================
 // 🔄 Process All Tournaments & Matches
 // ============================================
+let isScanning = false;
+
 async function processMatches() {
-    log.info('═══════════════════════════════════════════════════════');
-    log.info('🔄 LIVE BOT SCAN STARTED');
-    log.info('═══════════════════════════════════════════════════════');
+    if (isScanning) {
+        log.warn('⚠️ Scan already in progress, skipping this cycle.');
+        return;
+    }
+    isScanning = true;
 
-    const { tournaments, quotaRemaining } = await fetchLiveMatches();
-    const signals = [];
+    try {
+        log.info('═══════════════════════════════════════════════════════');
+        log.info('🔄 LIVE BOT SCAN STARTED');
+        log.info('═══════════════════════════════════════════════════════');
 
-    log.info(`📊 API Quota: ${quotaRemaining}/${DAILY_LIMIT} remaining`);
+        const { tournaments, quotaRemaining } = await fetchLiveMatches();
+        const signals = [];
 
-    if (tournaments.length === 0) {
-        log.warn('⚠️ No live matches found at this time');
-        CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
+        log.info(`📊 API Quota: ${quotaRemaining}/${DAILY_LIMIT} remaining`);
+
+        if (tournaments.length === 0) {
+            log.warn('⚠️ No live matches found at this time');
+            CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
+            return signals;
+        }
+
+        log.info(`🏆 Found ${tournaments.length} tournaments with live matches`);
+
+        // Flatten all matches
+        const allMatches = [];
+        for (const tournament of tournaments) {
+            const matchCount = tournament.matches?.length || 0;
+            if (matchCount > 0) {
+                log.info(`   └─ ${tournament.name}: ${matchCount} match(es)`);
+            }
+            for (const match of tournament.matches || []) {
+                allMatches.push({
+                    ...match,
+                    league_name: tournament.name,
+                    league_logo: tournament.image_path,
+                    country_name: tournament.country_name
+                });
+            }
+        }
+
+        log.info(`───────────────────────────────────────────────────────`);
+        log.info(`📋 Total Live Matches: ${allMatches.length}`);
+
+        // Filter candidates by time ranges (12-38 for First Half, 55-82 for Late Game)
+        const candidates = allMatches.filter(m => {
+            const elapsed = parseElapsedTime(m.stage);
+            const homeScore = m.home_team?.score || 0;
+            const awayScore = m.away_team?.score || 0;
+            const scoreDiff = Math.abs(homeScore - awayScore);
+            const stageStr = (m.stage || '').toString().toUpperCase();
+
+            // Skip finished matches
+            const isFinished = stageStr.includes('FT') || stageStr.includes('AET') ||
+                stageStr.includes('PEN') || stageStr.includes('FINISHED') ||
+                elapsed >= 90;
+            if (isFinished) return false;
+
+            const isFirstHalfCandidate = elapsed >= 12 && elapsed <= 38 && scoreDiff <= 1;
+            const isLateGameCandidate = elapsed >= 46 && elapsed <= 82 && scoreDiff <= 2;
+
+            return isFirstHalfCandidate || isLateGameCandidate;
+        });
+
+        log.info(`🎯 Candidates Matching Time/Score: ${candidates.length}/${allMatches.length}`);
+
+        if (candidates.length === 0) {
+            log.info('ℹ️ No matches meet First Half (12-38\', diff≤1) or Late Game (55-82\', diff≤2) criteria');
+            CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
+            return signals;
+        }
+
+        // Periodically clean old history entries
+        cleanOldHistory();
+
+        // Track signals sent per match per strategy (prevent duplicates)
+        // Structure: { matchId_strategyCode: true }
+        const sentSignals = new Set();
+
+        log.info(`───────────────────────────────────────────────────────`);
+        log.info(`🔍 ANALYZING CANDIDATES (Momentum-Based):`);
+
+        for (const match of candidates) {
+            const elapsed = parseElapsedTime(match.stage);
+            const matchId = match.match_id;
+            const homeName = match.home_team?.name || 'Unknown';
+            const awayName = match.away_team?.name || 'Unknown';
+            const score = `${match.home_team?.score || 0}-${match.away_team?.score || 0}`;
+
+            log.info(`\n   🏟️ ${homeName} vs ${awayName} (${score}, ${elapsed}')`);
+
+            // Fetch stats
+            const statsData = await fetchMatchStats(matchId);
+            const stats = statsData ? parseMatchStats(statsData) : null;
+
+            if (stats) {
+                const totalShots = stats.shots.home + stats.shots.away;
+                const totalSoT = stats.shotsOnTarget.home + stats.shotsOnTarget.away;
+                const totalCorners = stats.corners.home + stats.corners.away;
+                log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
+
+                // 🔴 RED CARD FILTER (Safety First)
+                if (stats.redCards && (stats.redCards.home > 0 || stats.redCards.away > 0)) {
+                    log.info(`      🛑 RED CARD detected (Home: ${stats.redCards.home}, Away: ${stats.redCards.away}) - Skipping safety`);
+                    continue;
+                }
+            } else {
+                log.warn(`      ⚠️ Could not fetch stats for this match`);
+                continue; // Skip if no stats
+            }
+
+            // 💰 FETCH ODDS (New Context)
+            const odds = await fetchMatchOdds(matchId);
+            if (odds) {
+                match.odds = odds;
+                log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
+            } else {
+                match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
+                log.info(`      ⚠️ No Odds found - using defaults`);
+            }
+
+            // STEP 1: Base Activity Check ("Is it Dead?" Filter)
+            const baseCheck = checkBaseActivity(elapsed, stats);
+
+            if (!baseCheck.isAlive) {
+                log.info(`      💀 ${baseCheck.reason}`);
+                continue; // Dead match, skip immediately
+            }
+            log.info(`      ✅ ${baseCheck.reason}`);
+
+            // Record to history AFTER base activity check passes
+            recordMatchStats(matchId, stats, score);
+
+            // STEP 2: Detect Momentum (Dynamic Lookback)
+            const momentum = detectMomentum(matchId, stats, score);
+
+            if (momentum.detected) {
+                log.info(`      🔥 MOMENTUM: ${momentum.reason}`);
+            } else {
+                log.info(`      ⏸️ No momentum trigger yet (waiting for delta)`);
+                continue; // Skip if no momentum - this is the key filter!
+            }
+
+            // Run scout filters with momentum
+            let candidate = analyzeFirstHalfSniper(match, elapsed, stats, momentum);
+            if (!candidate) {
+                candidate = analyzeLateGameMomentum(match, elapsed, stats, momentum);
+            }
+
+            if (!candidate) {
+                log.info(`      ❌ Failed phase criteria (time/score mismatch)`);
+                continue;
+            }
+
+            // Check daily signal limit (max 2 per match per strategy)
+            if (!checkSignalLimit(matchId, candidate.strategyCode)) {
+                log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode} (max ${MAX_SIGNALS_PER_MATCH_STRATEGY}/day)`);
+                continue;
+            }
+
+            // Include base activity in reason
+            candidate.reason = `${baseCheck.reason} + ${candidate.reason}`;
+
+            log.info(`      ✓ ${candidate.phase}: ${candidate.strategyCode} (${candidate.confidencePercent}% base)`);
+
+            // 🎯 CONVERSION CHECK (Reject low accuracy shooters)
+            const totalShots = candidate.stats.shots || 0;
+            const totalSoT = candidate.stats.shots_on_target || 0;
+            if (totalShots >= 8) {
+                const accuracy = totalSoT / totalShots;
+                if (accuracy < 0.25) {
+                    log.warn(`      ⛔ CONVERSION FAIL: ${Math.round(accuracy * 100)}% accuracy (need 25%+)`);
+                    continue;
+                }
+            }
+
+            // 🤝 H2H VALIDATION (Check historical goal patterns)
+            log.info(`      🤝 Fetching H2H data...`);
+            const h2hData = await fetchMatchH2H(matchId);
+            const h2hAnalysis = await analyzeH2HForGoals(h2hData, candidate.home, candidate.away, candidate.score, elapsed);
+
+            if (!h2hAnalysis.valid) {
+                log.warn(`      ⛔ ${h2hAnalysis.reason}`);
+                continue;
+            }
+            log.info(`      ✅ ${h2hAnalysis.reason}`);
+            log.info(`      📊 Form Stats: Home[${h2hAnalysis.homeForm}] Away[${h2hAnalysis.awayForm}] | 1H:${h2hAnalysis.htGoalRate}% 2H:${h2hAnalysis.shGoalRate}% | Details:${h2hAnalysis.detailsChecked || 0}`);
+
+            // Add H2H context to candidate
+            candidate.h2h = h2hAnalysis;
+
+            // 📊 HALF-SPECIFIC CONFIDENCE ADJUSTMENT (Soft Bonus/Penalty)
+            const htRate = parseFloat(h2hAnalysis.htGoalRate) || 0;
+            const shRate = parseFloat(h2hAnalysis.shGoalRate) || 0;
+
+            if (candidate.strategyCode === 'FIRST_HALF' && h2hAnalysis.htGoalRate !== 'N/A') {
+                if (htRate < 30) {
+                    candidate.confidencePercent -= 10;
+                    candidate.reason += ` | ⚠️ Low 1H rate (${htRate}%)`;
+                } else if (htRate > 60) {
+                    candidate.confidencePercent += 5;
+                    candidate.reason += ` | 📈 High 1H rate (${htRate}%)`;
+                }
+            }
+
+            if (candidate.strategyCode === 'LATE_GAME' && h2hAnalysis.shGoalRate !== 'N/A') {
+                if (shRate < 30) {
+                    candidate.confidencePercent -= 10;
+                    candidate.reason += ` | ⚠️ Low 2H rate (${shRate}%)`;
+                } else if (shRate > 60) {
+                    candidate.confidencePercent += 5;
+                    candidate.reason += ` | 📈 High 2H rate (${shRate}%)`;
+                }
+            }
+
+            // Cap confidence
+            if (candidate.confidencePercent > 95) candidate.confidencePercent = 95;
+            if (candidate.confidencePercent < 30) candidate.confidencePercent = 30;
+
+            // 🔒 SCORE SAFETY CHECK (Double-check before AI)
+            // Prevent "Ghost Signals" if a goal happened during processing
+            const latestDetails = await fetchMatchDetails(matchId, 1);
+            if (latestDetails && latestDetails.home_team && latestDetails.away_team) {
+                const latestHome = parseInt(latestDetails.home_team.score) || 0;
+                const latestAway = parseInt(latestDetails.away_team.score) || 0;
+                const currentHome = parseInt(match.home_team?.score) || 0;
+                const currentAway = parseInt(match.away_team?.score) || 0;
+
+                if (latestHome !== currentHome || latestAway !== currentAway) {
+                    log.warn(`      🛑 ABORTING: Score changed during analysis! (Was ${currentHome}-${currentAway}, Now ${latestHome}-${latestAway})`);
+                    continue;
+                }
+            }
+
+            // Send to Gemini for AI validation
+            log.gemini(`      🤖 Asking Gemini AI...`);
+            const geminiResult = await askAIAnalyst(candidate);
+
+            // Update candidate with Gemini results
+            candidate.verdict = geminiResult.verdict || 'SKIP';
+            candidate.confidencePercent = geminiResult.confidence || candidate.confidencePercent;
+            candidate.confidence = geminiResult.confidence >= 75 ? 'HIGH' : geminiResult.confidence >= 50 ? 'MEDIUM' : 'LOW';
+            candidate.geminiReason = geminiResult.reason || '';
+
+            // Only add PLAY signals
+            if (candidate.verdict === 'PLAY') {
+                candidate.id = `${matchId}_${candidate.strategyCode}`;
+                log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
+                signals.push(candidate);
+
+                // Record signal for daily limit tracking
+                recordSignal(matchId, candidate.strategyCode);
+
+                // Auto-approve live signals (no admin approval needed)
+                APPROVED_IDS.add(candidate.id);
+
+                // 📝 Record bet to history (for Dashboard tracking)
+                const homeScore = match.home_team?.score || 0;
+                const awayScore = match.away_team?.score || 0;
+                const entryScore = `${homeScore}-${awayScore}`;
+
+                await betTracker.recordBet({
+                    match_id: matchId,
+                    home_team: match.home_team?.name || 'Unknown',
+                    away_team: match.away_team?.name || 'Unknown'
+                }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live', entryScore);
+
+                // Send Telegram notification
+                await sendTelegramNotification(candidate);
+            } else {
+                log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
+            }
+
+            // Small delay between API calls
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        // Update cache
+        CACHED_DATA = {
+            signals,
+            lastUpdated: new Date().toISOString(),
+            quotaRemaining: DAILY_LIMIT - dailyRequestCount,
+            quotaLimit: DAILY_LIMIT,
+            isLive: true
+        };
+
+        log.info(`───────────────────────────────────────────────────────`);
+        log.success(`📊 SCAN COMPLETE: ${signals.length} signals found`);
+        log.info(`═══════════════════════════════════════════════════════\n`);
+
         return signals;
+    } catch (error) {
+        log.error(`Scan failed: ${error.message}`);
+    } finally {
+        isScanning = false;
     }
-
-    log.info(`🏆 Found ${tournaments.length} tournaments with live matches`);
-
-    // Flatten all matches
-    const allMatches = [];
-    for (const tournament of tournaments) {
-        const matchCount = tournament.matches?.length || 0;
-        if (matchCount > 0) {
-            log.info(`   └─ ${tournament.name}: ${matchCount} match(es)`);
-        }
-        for (const match of tournament.matches || []) {
-            allMatches.push({
-                ...match,
-                league_name: tournament.name,
-                league_logo: tournament.image_path,
-                country_name: tournament.country_name
-            });
-        }
-    }
-
-    log.info(`───────────────────────────────────────────────────────`);
-    log.info(`📋 Total Live Matches: ${allMatches.length}`);
-
-    // Filter candidates by time ranges (12-38 for First Half, 55-82 for Late Game)
-    const candidates = allMatches.filter(m => {
-        const elapsed = parseElapsedTime(m.stage);
-        const homeScore = m.home_team?.score || 0;
-        const awayScore = m.away_team?.score || 0;
-        const scoreDiff = Math.abs(homeScore - awayScore);
-        const stageStr = (m.stage || '').toString().toUpperCase();
-
-        // Skip finished matches
-        const isFinished = stageStr.includes('FT') || stageStr.includes('AET') ||
-            stageStr.includes('PEN') || stageStr.includes('FINISHED') ||
-            elapsed >= 90;
-        if (isFinished) return false;
-
-        const isFirstHalfCandidate = elapsed >= 12 && elapsed <= 38 && scoreDiff <= 1;
-        const isLateGameCandidate = elapsed >= 46 && elapsed <= 82 && scoreDiff <= 2;
-
-        return isFirstHalfCandidate || isLateGameCandidate;
-    });
-
-    log.info(`🎯 Candidates Matching Time/Score: ${candidates.length}/${allMatches.length}`);
-
-    if (candidates.length === 0) {
-        log.info('ℹ️ No matches meet First Half (12-38\', diff≤1) or Late Game (55-82\', diff≤2) criteria');
-        CACHED_DATA = { ...CACHED_DATA, signals: [], lastUpdated: new Date().toISOString(), quotaRemaining };
-        return signals;
-    }
-
-    // Periodically clean old history entries
-    cleanOldHistory();
-
-    // Track signals sent per match per strategy (prevent duplicates)
-    // Structure: { matchId_strategyCode: true }
-    const sentSignals = new Set();
-
-    log.info(`───────────────────────────────────────────────────────`);
-    log.info(`🔍 ANALYZING CANDIDATES (Momentum-Based):`);
-
-    for (const match of candidates) {
-        const elapsed = parseElapsedTime(match.stage);
-        const matchId = match.match_id;
-        const homeName = match.home_team?.name || 'Unknown';
-        const awayName = match.away_team?.name || 'Unknown';
-        const score = `${match.home_team?.score || 0}-${match.away_team?.score || 0}`;
-
-        log.info(`\n   🏟️ ${homeName} vs ${awayName} (${score}, ${elapsed}')`);
-
-        // Fetch stats
-        const statsData = await fetchMatchStats(matchId);
-        const stats = statsData ? parseMatchStats(statsData) : null;
-
-        if (stats) {
-            const totalShots = stats.shots.home + stats.shots.away;
-            const totalSoT = stats.shotsOnTarget.home + stats.shotsOnTarget.away;
-            const totalCorners = stats.corners.home + stats.corners.away;
-            log.info(`      📈 Stats: Shots ${totalShots} | SoT ${totalSoT} | Corners ${totalCorners}`);
-
-            // 🔴 RED CARD FILTER (Safety First)
-            if (stats.redCards && (stats.redCards.home > 0 || stats.redCards.away > 0)) {
-                log.info(`      🛑 RED CARD detected (Home: ${stats.redCards.home}, Away: ${stats.redCards.away}) - Skipping safety`);
-                continue;
-            }
-        } else {
-            log.warn(`      ⚠️ Could not fetch stats for this match`);
-            continue; // Skip if no stats
-        }
-
-        // 💰 FETCH ODDS (New Context)
-        const odds = await fetchMatchOdds(matchId);
-        if (odds) {
-            match.odds = odds;
-            log.info(`      💰 Odds: 1:${odds['1']} X:${odds['X']} 2:${odds['2']}`);
-        } else {
-            match.odds = { '1': 2.0, 'X': 3.5, '2': 2.0 }; // Default dummy
-            log.info(`      ⚠️ No Odds found - using defaults`);
-        }
-
-        // STEP 1: Base Activity Check ("Is it Dead?" Filter)
-        const baseCheck = checkBaseActivity(elapsed, stats);
-
-        if (!baseCheck.isAlive) {
-            log.info(`      💀 ${baseCheck.reason}`);
-            continue; // Dead match, skip immediately
-        }
-        log.info(`      ✅ ${baseCheck.reason}`);
-
-        // Record to history AFTER base activity check passes
-        recordMatchStats(matchId, stats, score);
-
-        // STEP 2: Detect Momentum (Dynamic Lookback)
-        const momentum = detectMomentum(matchId, stats, score);
-
-        if (momentum.detected) {
-            log.info(`      🔥 MOMENTUM: ${momentum.reason}`);
-        } else {
-            log.info(`      ⏸️ No momentum trigger yet (waiting for delta)`);
-            continue; // Skip if no momentum - this is the key filter!
-        }
-
-        // Run scout filters with momentum
-        let candidate = analyzeFirstHalfSniper(match, elapsed, stats, momentum);
-        if (!candidate) {
-            candidate = analyzeLateGameMomentum(match, elapsed, stats, momentum);
-        }
-
-        if (!candidate) {
-            log.info(`      ❌ Failed phase criteria (time/score mismatch)`);
-            continue;
-        }
-
-        // Check daily signal limit (max 2 per match per strategy)
-        if (!checkSignalLimit(matchId, candidate.strategyCode)) {
-            log.warn(`      🔒 Signal limit reached for ${matchId}_${candidate.strategyCode} (max ${MAX_SIGNALS_PER_MATCH_STRATEGY}/day)`);
-            continue;
-        }
-
-        // Include base activity in reason
-        candidate.reason = `${baseCheck.reason} + ${candidate.reason}`;
-
-        log.info(`      ✓ ${candidate.phase}: ${candidate.strategyCode} (${candidate.confidencePercent}% base)`);
-
-        // 🎯 CONVERSION CHECK (Reject low accuracy shooters)
-        const totalShots = candidate.stats.shots || 0;
-        const totalSoT = candidate.stats.shots_on_target || 0;
-        if (totalShots >= 8) {
-            const accuracy = totalSoT / totalShots;
-            if (accuracy < 0.25) {
-                log.warn(`      ⛔ CONVERSION FAIL: ${Math.round(accuracy * 100)}% accuracy (need 25%+)`);
-                continue;
-            }
-        }
-
-        // 🤝 H2H VALIDATION (Check historical goal patterns)
-        log.info(`      🤝 Fetching H2H data...`);
-        const h2hData = await fetchMatchH2H(matchId);
-        const h2hAnalysis = await analyzeH2HForGoals(h2hData, candidate.home, candidate.away, candidate.score, elapsed);
-
-        if (!h2hAnalysis.valid) {
-            log.warn(`      ⛔ ${h2hAnalysis.reason}`);
-            continue;
-        }
-        log.info(`      ✅ ${h2hAnalysis.reason}`);
-        log.info(`      📊 Form Stats: Home[${h2hAnalysis.homeForm}] Away[${h2hAnalysis.awayForm}] | 1H:${h2hAnalysis.htGoalRate}% 2H:${h2hAnalysis.shGoalRate}% | Details:${h2hAnalysis.detailsChecked || 0}`);
-
-        // Add H2H context to candidate
-        candidate.h2h = h2hAnalysis;
-
-        // 📊 HALF-SPECIFIC CONFIDENCE ADJUSTMENT (Soft Bonus/Penalty)
-        const htRate = parseFloat(h2hAnalysis.htGoalRate) || 0;
-        const shRate = parseFloat(h2hAnalysis.shGoalRate) || 0;
-
-        if (candidate.strategyCode === 'FIRST_HALF' && h2hAnalysis.htGoalRate !== 'N/A') {
-            if (htRate < 30) {
-                candidate.confidencePercent -= 10;
-                candidate.reason += ` | ⚠️ Low 1H rate (${htRate}%)`;
-            } else if (htRate > 60) {
-                candidate.confidencePercent += 5;
-                candidate.reason += ` | 📈 High 1H rate (${htRate}%)`;
-            }
-        }
-
-        if (candidate.strategyCode === 'LATE_GAME' && h2hAnalysis.shGoalRate !== 'N/A') {
-            if (shRate < 30) {
-                candidate.confidencePercent -= 10;
-                candidate.reason += ` | ⚠️ Low 2H rate (${shRate}%)`;
-            } else if (shRate > 60) {
-                candidate.confidencePercent += 5;
-                candidate.reason += ` | 📈 High 2H rate (${shRate}%)`;
-            }
-        }
-
-        // Cap confidence
-        if (candidate.confidencePercent > 95) candidate.confidencePercent = 95;
-        if (candidate.confidencePercent < 30) candidate.confidencePercent = 30;
-
-        // 🔒 SCORE SAFETY CHECK (Double-check before AI)
-        // Prevent "Ghost Signals" if a goal happened during processing
-        const latestDetails = await fetchMatchDetails(matchId, 1);
-        if (latestDetails && latestDetails.home_team && latestDetails.away_team) {
-            const latestHome = parseInt(latestDetails.home_team.score) || 0;
-            const latestAway = parseInt(latestDetails.away_team.score) || 0;
-            const currentHome = parseInt(match.home_team?.score) || 0;
-            const currentAway = parseInt(match.away_team?.score) || 0;
-
-            if (latestHome !== currentHome || latestAway !== currentAway) {
-                log.warn(`      🛑 ABORTING: Score changed during analysis! (Was ${currentHome}-${currentAway}, Now ${latestHome}-${latestAway})`);
-                continue;
-            }
-        }
-
-        // Send to Gemini for AI validation
-        log.gemini(`      🤖 Asking Gemini AI...`);
-        const geminiResult = await askAIAnalyst(candidate);
-
-        // Update candidate with Gemini results
-        candidate.verdict = geminiResult.verdict || 'SKIP';
-        candidate.confidencePercent = geminiResult.confidence || candidate.confidencePercent;
-        candidate.confidence = geminiResult.confidence >= 75 ? 'HIGH' : geminiResult.confidence >= 50 ? 'MEDIUM' : 'LOW';
-        candidate.geminiReason = geminiResult.reason || '';
-
-        // Only add PLAY signals
-        if (candidate.verdict === 'PLAY') {
-            candidate.id = `${matchId}_${candidate.strategyCode}`;
-            log.success(`      ✅ PLAY - ${candidate.confidencePercent}% - ${geminiResult.reason?.substring(0, 50)}...`);
-            signals.push(candidate);
-
-            // Record signal for daily limit tracking
-            recordSignal(matchId, candidate.strategyCode);
-
-            // Auto-approve live signals (no admin approval needed)
-            APPROVED_IDS.add(candidate.id);
-
-            // 📝 Record bet to history (for Dashboard tracking)
-            const homeScore = match.home_team?.score || 0;
-            const awayScore = match.away_team?.score || 0;
-            const entryScore = `${homeScore}-${awayScore}`;
-
-            await betTracker.recordBet({
-                match_id: matchId,
-                home_team: match.home_team?.name || 'Unknown',
-                away_team: match.away_team?.name || 'Unknown'
-            }, candidate.market || 'Next Goal', candidate.strategyCode, candidate.confidencePercent, 'live', entryScore);
-
-            // Send Telegram notification
-            await sendTelegramNotification(candidate);
-        } else {
-            log.warn(`      ⏭️ SKIP - ${geminiResult.reason?.substring(0, 50) || 'No reason'}...`);
-        }
-
-        // Small delay between API calls
-        await new Promise(r => setTimeout(r, 200));
-    }
-
-    // Update cache
-    CACHED_DATA = {
-        signals,
-        lastUpdated: new Date().toISOString(),
-        quotaRemaining: DAILY_LIMIT - dailyRequestCount,
-        quotaLimit: DAILY_LIMIT,
-        isLive: true
-    };
-
-    log.info(`───────────────────────────────────────────────────────`);
-    log.success(`📊 SCAN COMPLETE: ${signals.length} signals found`);
-    log.info(`═══════════════════════════════════════════════════════\n`);
-
-    return signals;
 }
 
 // ============================================
