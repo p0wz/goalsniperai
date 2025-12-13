@@ -921,6 +921,29 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
         }
     }
 
+    // ========== HT/FT DETAIL ANALYSIS ==========
+    let htGoalGames = 0, shGoalGames = 0, detailsChecked = 0;
+    const allFormMatches = [...homeTeamForm.slice(0, 3), ...awayTeamForm.slice(0, 3)];
+    const uniqueMatchIds = [...new Set(allFormMatches.map(m => m.match_id).filter(Boolean))].slice(0, 4);
+
+    for (const matchId of uniqueMatchIds) {
+        const details = await fetchMatchDetails(matchId);
+        if (details) {
+            detailsChecked++;
+            const htHome = details.home_team?.score_1st_half || 0;
+            const htAway = details.away_team?.score_1st_half || 0;
+            const ftHome = parseInt(details.home_team?.score) || 0;
+            const ftAway = parseInt(details.away_team?.score) || 0;
+
+            if (htHome + htAway >= 1) htGoalGames++;
+            if ((ftHome - htHome) + (ftAway - htAway) >= 1) shGoalGames++;
+        }
+    }
+
+    const htGoalRate = detailsChecked > 0 ? (htGoalGames / detailsChecked) * 100 : null;
+    const shGoalRate = detailsChecked > 0 ? (shGoalGames / detailsChecked) * 100 : null;
+    const isFirstHalf = elapsed <= 45;
+
     // Averages
     const homeFormAvg = homeTeamForm.length > 0 ? homeGoals / homeTeamForm.length : 0;
     const awayFormAvg = awayTeamForm.length > 0 ? awayGoals / awayTeamForm.length : 0;
@@ -945,10 +968,16 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
     const requiredAvg = isZeroZero ? 1.2 : 1.0;  // Need higher form if 0-0
     const requiredGoalRate = isZeroZero ? 70 : 60;  // Need higher goal rate if 0-0
 
+    // Extra check: If first half and HT goal rate is low, reject
+    let htCheckPassed = true;
+    if (isFirstHalf && htGoalRate !== null && htGoalRate < 40) {
+        htCheckPassed = false;
+    }
+
     // Validation: At least one team should have decent form
     const homeFormOK = homeFormAvg >= requiredAvg || homeGoalRate >= requiredGoalRate;
     const awayFormOK = awayFormAvg >= requiredAvg || awayGoalRate >= requiredGoalRate;
-    const isValid = homeFormOK || awayFormOK;
+    const isValid = (homeFormOK || awayFormOK) && htCheckPassed;
 
     // Build stats object
     const stats = {
@@ -956,15 +985,21 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
         awayForm: `${awayFormAvg.toFixed(1)}scored/${awayConcededAvg.toFixed(1)}conceded`,
         homeGoalRate: homeGoalRate.toFixed(0),
         awayGoalRate: awayGoalRate.toFixed(0),
+        htGoalRate: htGoalRate !== null ? htGoalRate.toFixed(0) : 'N/A',
+        shGoalRate: shGoalRate !== null ? shGoalRate.toFixed(0) : 'N/A',
         expectedTotal: expectedTotal.toFixed(1),
         homeMatches: homeTeamForm.length,
-        awayMatches: awayTeamForm.length
+        awayMatches: awayTeamForm.length,
+        detailsChecked
     };
 
     // Build reason string
     let reason;
     if (isValid) {
         reason = `Form✓ ${homeTeam}:${homeFormAvg.toFixed(1)}gpg(${homeGoalRate.toFixed(0)}%) | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg(${awayGoalRate.toFixed(0)}%)`;
+        if (htGoalRate !== null) reason += ` | 1H:${htGoalRate.toFixed(0)}%`;
+    } else if (!htCheckPassed) {
+        reason = `Form✗ 1H Goal Rate too low (${htGoalRate?.toFixed(0) || 0}% < 40%)`;
     } else {
         reason = `Form✗ Weak: ${homeTeam}:${homeFormAvg.toFixed(1)}gpg | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg (need ${requiredAvg}+ or ${requiredGoalRate}%+)`;
     }
