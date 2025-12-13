@@ -18,8 +18,8 @@ function LiveBotPanel() {
         const fetchData = async () => {
             try {
                 const [statusRes, signalsRes] = await Promise.all([
-                    fetch(`${BASE_URL}/api/status`),
-                    fetch(`${BASE_URL}/api/signals`)
+                    fetch(`${BASE_URL}/api/status`, { credentials: 'include' }),
+                    fetch(`${BASE_URL}/api/signals`, { credentials: 'include' })
                 ]);
                 if (statusRes.ok) setStatus(await statusRes.json());
                 if (signalsRes.ok) setSignals(await signalsRes.json());
@@ -36,7 +36,7 @@ function LiveBotPanel() {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const res = await fetch(`${BASE_URL}/api/logs?limit=100`);
+                const res = await fetch(`${BASE_URL}/api/logs?limit=100`, { credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     setLogs(data.logs || []);

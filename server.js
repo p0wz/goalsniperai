@@ -86,29 +86,53 @@ app.use(express.static('frontend/dist'));
 app.use(express.static('public'));
 
 // ============================================
-// 🎨 Console Styling
+// 🎨 Console Styling + In-Memory Log Storage
 // ============================================
+const LOG_STORAGE = [];
+const MAX_LOG_ENTRIES = 200;
+
+function addLogEntry(level, message) {
+    LOG_STORAGE.push({
+        timestamp: new Date().toLocaleTimeString('tr-TR'),
+        level,
+        message
+    });
+    // Keep only last N entries
+    if (LOG_STORAGE.length > MAX_LOG_ENTRIES) {
+        LOG_STORAGE.shift();
+    }
+}
+
 // Helper for logging
 const log = {
     info: (msg, meta = {}) => {
         console.log(`[INFO] ${msg}`, meta);
-        database.addLog('info', msg, meta);
+        addLogEntry('info', msg);
     },
     error: (msg, error = null) => {
         console.error(`[ERROR] ${msg}`, error);
-        database.addLog('error', msg, { error: error?.message || error });
+        addLogEntry('error', msg);
     },
     success: (msg, meta = {}) => {
         console.log(`[SUCCESS] ${msg}`, meta);
-        database.addLog('success', msg, meta);
+        addLogEntry('success', msg);
     },
     warn: (msg, meta = {}) => {
         console.warn(`[WARN] ${msg}`, meta);
-        database.addLog('warn', msg, meta);
+        addLogEntry('warn', msg);
     },
-    api: (msg) => console.log(`\x1b[35m[API]\x1b[0m ${msg}`),
-    signal: (msg) => console.log(`\x1b[32m[SIGNAL]\x1b[0m ${msg}`),
-    gemini: (msg) => console.log(`\x1b[33m[GEMINI]\x1b[0m ${msg}`)
+    api: (msg) => {
+        console.log(`\x1b[35m[API]\x1b[0m ${msg}`);
+        addLogEntry('api', msg);
+    },
+    signal: (msg) => {
+        console.log(`\x1b[32m[SIGNAL]\x1b[0m ${msg}`);
+        addLogEntry('signal', msg);
+    },
+    gemini: (msg) => {
+        console.log(`\x1b[33m[GEMINI]\x1b[0m ${msg}`);
+        addLogEntry('gemini', msg);
+    }
 };
 
 // ============================================
@@ -1834,14 +1858,11 @@ app.get('/api/status', optionalAuth, (req, res) => {
 // ============================================
 // 📜 Logs Endpoint
 // ============================================
-app.get('/api/logs', requireAuth, async (req, res) => {
+app.get('/api/logs', optionalAuth, (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
-    try {
-        const logs = await database.getRecentLogs(limit);
-        res.json({ logs });
-    } catch (error) {
-        res.json({ logs: [] });
-    }
+    // Use in-memory LOG_STORAGE (most recent first)
+    const logs = LOG_STORAGE.slice(-limit).reverse();
+    res.json({ logs });
 });
 
 app.post('/api/bet-history/:id/settle', requireAuth, async (req, res) => {
