@@ -863,26 +863,17 @@ async function fetchMatchDetails(matchId) {
     }
 }
 
-// Helper: Analyze H2H for goal patterns (ADVANCED with HT Analysis)
+// Helper: Analyze Team Form (SIMPLIFIED - No Direct H2H)
 async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0-0', elapsed = 0) {
-    if (!h2hData) return { valid: true, reason: 'No H2H data (defaulting to valid)' };
+    if (!h2hData) return { valid: true, reason: 'No form data (defaulting to valid)' };
 
     const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
-    if (sections.length === 0) return { valid: true, reason: 'Empty H2H data' };
+    if (sections.length === 0) return { valid: true, reason: 'Empty form data' };
 
-    // Filter mutual matches (both teams played each other)
-    // ALSO filter OUT friendly matches and OLD matches (>2 years)
+    // Filter: Only recent matches (< 2 years), no friendlies
     const TWO_YEARS_AGO = Math.floor(Date.now() / 1000) - (2 * 365 * 24 * 60 * 60);
 
-    const mutualMatches = sections.filter(m => {
-        const isMutual = (m.home_team?.name === homeTeam && m.away_team?.name === awayTeam) ||
-            (m.home_team?.name === awayTeam && m.away_team?.name === homeTeam);
-        const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
-        const isRecent = m.timestamp && m.timestamp > TWO_YEARS_AGO;
-        return isMutual && !isFriendly && isRecent;
-    }).slice(0, 6); // Take 6 matches for better sample
-
-    // ========== TEAM FORM ANALYSIS (Last 5 matches each) ==========
+    // ========== HOME TEAM FORM (Last 5 matches) ==========
     const homeTeamForm = sections.filter(m => {
         const isHomeTeamMatch = m.home_team?.name === homeTeam || m.away_team?.name === homeTeam;
         const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
@@ -890,6 +881,7 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
         return isHomeTeamMatch && !isFriendly && isRecent;
     }).slice(0, 5);
 
+    // ========== AWAY TEAM FORM (Last 5 matches) ==========
     const awayTeamForm = sections.filter(m => {
         const isAwayTeamMatch = m.home_team?.name === awayTeam || m.away_team?.name === awayTeam;
         const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
@@ -897,170 +889,84 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
         return isAwayTeamMatch && !isFriendly && isRecent;
     }).slice(0, 5);
 
-    // Calculate form stats
-    let homeTeamFormGoals = 0, homeTeamFormConceded = 0;
+    // Calculate HOME team stats
+    let homeGoals = 0, homeConceded = 0, homeGoalGames = 0;
     for (const m of homeTeamForm) {
         const hs = parseInt(m.home_team?.score) || 0;
         const as = parseInt(m.away_team?.score) || 0;
         if (m.home_team?.name === homeTeam) {
-            homeTeamFormGoals += hs;
-            homeTeamFormConceded += as;
+            homeGoals += hs;
+            homeConceded += as;
+            if (hs > 0) homeGoalGames++;
         } else {
-            homeTeamFormGoals += as;
-            homeTeamFormConceded += hs;
+            homeGoals += as;
+            homeConceded += hs;
+            if (as > 0) homeGoalGames++;
         }
     }
 
-    let awayTeamFormGoals = 0, awayTeamFormConceded = 0;
+    // Calculate AWAY team stats
+    let awayGoals = 0, awayConceded = 0, awayGoalGames = 0;
     for (const m of awayTeamForm) {
         const hs = parseInt(m.home_team?.score) || 0;
         const as = parseInt(m.away_team?.score) || 0;
         if (m.home_team?.name === awayTeam) {
-            awayTeamFormGoals += hs;
-            awayTeamFormConceded += as;
+            awayGoals += hs;
+            awayConceded += as;
+            if (hs > 0) awayGoalGames++;
         } else {
-            awayTeamFormGoals += as;
-            awayTeamFormConceded += hs;
+            awayGoals += as;
+            awayConceded += hs;
+            if (as > 0) awayGoalGames++;
         }
     }
 
-    const homeFormAvg = homeTeamForm.length > 0 ? homeTeamFormGoals / homeTeamForm.length : 0;
-    const awayFormAvg = awayTeamForm.length > 0 ? awayTeamFormGoals / awayTeamForm.length : 0;
-    const homeFormConcededAvg = homeTeamForm.length > 0 ? homeTeamFormConceded / homeTeamForm.length : 0;
-    const awayFormConcededAvg = awayTeamForm.length > 0 ? awayTeamFormConceded / awayTeamForm.length : 0;
+    // Averages
+    const homeFormAvg = homeTeamForm.length > 0 ? homeGoals / homeTeamForm.length : 0;
+    const awayFormAvg = awayTeamForm.length > 0 ? awayGoals / awayTeamForm.length : 0;
+    const homeConcededAvg = homeTeamForm.length > 0 ? homeConceded / homeTeamForm.length : 0;
+    const awayConcededAvg = awayTeamForm.length > 0 ? awayConceded / awayTeamForm.length : 0;
 
-    // If no mutual H2H but teams have good form, still allow signal
-    if (mutualMatches.length === 0) {
-        const formCheck = (homeFormAvg >= 1.0 || awayFormAvg >= 1.0);
-        return {
-            valid: formCheck,
-            reason: formCheck
-                ? `No H2H but Form OK: ${homeTeam}:${homeFormAvg.toFixed(1)}gpg | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg`
-                : `No H2H and weak form`
-        };
-    }
+    // Goal scoring rate (% of games they scored)
+    const homeGoalRate = homeTeamForm.length > 0 ? (homeGoalGames / homeTeamForm.length) * 100 : 0;
+    const awayGoalRate = awayTeamForm.length > 0 ? (awayGoalGames / awayTeamForm.length) * 100 : 0;
 
-    // Parse current score
+    // Combined expected goals = what home scores + what away concedes (and vice versa)
+    const expectedHomeGoals = (homeFormAvg + awayConcededAvg) / 2;
+    const expectedAwayGoals = (awayFormAvg + homeConcededAvg) / 2;
+    const expectedTotal = expectedHomeGoals + expectedAwayGoals;
+
+    // Parse current score for context
     const [curHome, curAway] = currentScore.split('-').map(s => parseInt(s) || 0);
     const currentTotal = curHome + curAway;
     const isZeroZero = currentTotal === 0;
-    const isFirstHalf = elapsed <= 45;
 
-    // Stats accumulators
-    let combinedGoals = 0;
-    let homeTeamGoalsAtHome = 0;
-    let awayTeamGoalsAtAway = 0;
-    let homeTeamMatches = 0;
-    let awayTeamMatches = 0;
-    let goalGames = 0;
-    let bttsGames = 0;
+    // Dynamic thresholds
+    const requiredAvg = isZeroZero ? 1.2 : 1.0;  // Need higher form if 0-0
+    const requiredGoalRate = isZeroZero ? 70 : 60;  // Need higher goal rate if 0-0
 
-    // HT Analysis (when details available)
-    let htGoalGames = 0;
-    let secondHalfGoalGames = 0;
-    let detailsChecked = 0;
-
-    for (const match of mutualMatches) {
-        const s1 = parseInt(match.home_team?.score) || 0;
-        const s2 = parseInt(match.away_team?.score) || 0;
-        if (isNaN(s1) || isNaN(s2)) continue;
-
-        const total = s1 + s2;
-        combinedGoals += total;
-        if (total >= 1) goalGames++;
-        if (s1 > 0 && s2 > 0) bttsGames++;
-
-        // Track home/away specific goals
-        if (match.home_team?.name === homeTeam) {
-            homeTeamGoalsAtHome += s1;
-            homeTeamMatches++;
-        }
-        if (match.away_team?.name === awayTeam) {
-            awayTeamGoalsAtAway += s2;
-            awayTeamMatches++;
-        }
-
-        // Fetch HT details for this match (deep analysis)
-        if (match.match_id && detailsChecked < 4) { // Limit to 4 detail checks
-            const details = await fetchMatchDetails(match.match_id);
-            if (details) {
-                detailsChecked++;
-                const htHome = details.home_team?.score_1st_half || 0;
-                const htAway = details.away_team?.score_1st_half || 0;
-                const htTotal = htHome + htAway;
-
-                if (htTotal >= 1) htGoalGames++;
-
-                // Second half = FT - HT
-                const shHome = s1 - htHome;
-                const shAway = s2 - htAway;
-                if ((shHome + shAway) >= 1) secondHalfGoalGames++;
-            }
-        }
-    }
-
-    // Calculate averages
-    const avgCombined = mutualMatches.length > 0 ? combinedGoals / mutualMatches.length : 0;
-    const avgHomeAtHome = homeTeamMatches > 0 ? homeTeamGoalsAtHome / homeTeamMatches : 0;
-    const avgAwayAtAway = awayTeamMatches > 0 ? awayTeamGoalsAtAway / awayTeamMatches : 0;
-    const goalRate = mutualMatches.length > 0 ? (goalGames / mutualMatches.length) * 100 : 0;
-    const bttsRate = mutualMatches.length > 0 ? (bttsGames / mutualMatches.length) * 100 : 0;
-
-    // HT/SH rates (if we have data)
-    const htGoalRate = detailsChecked > 0 ? (htGoalGames / detailsChecked) * 100 : null;
-    const shGoalRate = detailsChecked > 0 ? (secondHalfGoalGames / detailsChecked) * 100 : null;
-
-    // Dynamic Thresholds based on current match state
-    let requiredAvg = 1.5;
-    let requiredRate = 60;
-
-    // Stricter if 0-0
-    if (isZeroZero) {
-        requiredAvg = 2.0;
-        requiredRate = 70;
-    }
-
-    // If first half and we have HT data, also check HT rate
-    let htCheckPassed = true;
-    if (isFirstHalf && htGoalRate !== null && htGoalRate < 40) {
-        htCheckPassed = false; // H2H shows low 1H goals
-    }
-
-    // Validation criteria
-    const basicCheck = goalRate >= requiredRate &&
-        avgCombined >= requiredAvg &&
-        (avgHomeAtHome >= 0.5 || avgAwayAtAway >= 0.5);
-
-    const isValid = basicCheck && htCheckPassed;
+    // Validation: At least one team should have decent form
+    const homeFormOK = homeFormAvg >= requiredAvg || homeGoalRate >= requiredGoalRate;
+    const awayFormOK = awayFormAvg >= requiredAvg || awayGoalRate >= requiredGoalRate;
+    const isValid = homeFormOK || awayFormOK;
 
     // Build stats object
     const stats = {
-        avgCombined: avgCombined.toFixed(2),
-        avgHomeAtHome: avgHomeAtHome.toFixed(2),
-        avgAwayAtAway: avgAwayAtAway.toFixed(2),
-        goalRate: goalRate.toFixed(0),
-        bttsRate: bttsRate.toFixed(0),
-        htGoalRate: htGoalRate !== null ? htGoalRate.toFixed(0) : 'N/A',
-        shGoalRate: shGoalRate !== null ? shGoalRate.toFixed(0) : 'N/A',
-        matchCount: mutualMatches.length,
-        detailsChecked,
-        // Team Form Stats
-        homeForm: `${homeFormAvg.toFixed(1)}scored/${homeFormConcededAvg.toFixed(1)}conceded`,
-        awayForm: `${awayFormAvg.toFixed(1)}scored/${awayFormConcededAvg.toFixed(1)}conceded`
+        homeForm: `${homeFormAvg.toFixed(1)}scored/${homeConcededAvg.toFixed(1)}conceded`,
+        awayForm: `${awayFormAvg.toFixed(1)}scored/${awayConcededAvg.toFixed(1)}conceded`,
+        homeGoalRate: homeGoalRate.toFixed(0),
+        awayGoalRate: awayGoalRate.toFixed(0),
+        expectedTotal: expectedTotal.toFixed(1),
+        homeMatches: homeTeamForm.length,
+        awayMatches: awayTeamForm.length
     };
 
     // Build reason string
     let reason;
     if (isValid) {
-        reason = `H2H✓ Avg:${avgCombined.toFixed(1)} | Rate:${goalRate.toFixed(0)}%`;
-        if (htGoalRate !== null) reason += ` | 1H:${htGoalRate.toFixed(0)}%`;
-        if (bttsRate >= 50) reason += ` | BTTS:${bttsRate.toFixed(0)}%`;
+        reason = `Form✓ ${homeTeam}:${homeFormAvg.toFixed(1)}gpg(${homeGoalRate.toFixed(0)}%) | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg(${awayGoalRate.toFixed(0)}%)`;
     } else {
-        if (!htCheckPassed) {
-            reason = `H2H✗ 1H Goal Rate too low (${htGoalRate?.toFixed(0) || 0}% < 40%)`;
-        } else {
-            reason = `H2H✗ Avg:${avgCombined.toFixed(1)}(need ${requiredAvg}+) | Rate:${goalRate.toFixed(0)}%(need ${requiredRate}%+)`;
-        }
+        reason = `Form✗ Weak: ${homeTeam}:${homeFormAvg.toFixed(1)}gpg | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg (need ${requiredAvg}+ or ${requiredGoalRate}%+)`;
     }
 
     return { valid: isValid, ...stats, reason };
