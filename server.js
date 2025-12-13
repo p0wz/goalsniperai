@@ -882,7 +882,63 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
         return isMutual && !isFriendly && isRecent;
     }).slice(0, 6); // Take 6 matches for better sample
 
-    if (mutualMatches.length === 0) return { valid: true, reason: 'No competitive H2H found' };
+    // ========== TEAM FORM ANALYSIS (Last 5 matches each) ==========
+    const homeTeamForm = sections.filter(m => {
+        const isHomeTeamMatch = m.home_team?.name === homeTeam || m.away_team?.name === homeTeam;
+        const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
+        const isRecent = m.timestamp && m.timestamp > TWO_YEARS_AGO;
+        return isHomeTeamMatch && !isFriendly && isRecent;
+    }).slice(0, 5);
+
+    const awayTeamForm = sections.filter(m => {
+        const isAwayTeamMatch = m.home_team?.name === awayTeam || m.away_team?.name === awayTeam;
+        const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
+        const isRecent = m.timestamp && m.timestamp > TWO_YEARS_AGO;
+        return isAwayTeamMatch && !isFriendly && isRecent;
+    }).slice(0, 5);
+
+    // Calculate form stats
+    let homeTeamFormGoals = 0, homeTeamFormConceded = 0;
+    for (const m of homeTeamForm) {
+        const hs = parseInt(m.home_team?.score) || 0;
+        const as = parseInt(m.away_team?.score) || 0;
+        if (m.home_team?.name === homeTeam) {
+            homeTeamFormGoals += hs;
+            homeTeamFormConceded += as;
+        } else {
+            homeTeamFormGoals += as;
+            homeTeamFormConceded += hs;
+        }
+    }
+
+    let awayTeamFormGoals = 0, awayTeamFormConceded = 0;
+    for (const m of awayTeamForm) {
+        const hs = parseInt(m.home_team?.score) || 0;
+        const as = parseInt(m.away_team?.score) || 0;
+        if (m.home_team?.name === awayTeam) {
+            awayTeamFormGoals += hs;
+            awayTeamFormConceded += as;
+        } else {
+            awayTeamFormGoals += as;
+            awayTeamFormConceded += hs;
+        }
+    }
+
+    const homeFormAvg = homeTeamForm.length > 0 ? homeTeamFormGoals / homeTeamForm.length : 0;
+    const awayFormAvg = awayTeamForm.length > 0 ? awayTeamFormGoals / awayTeamForm.length : 0;
+    const homeFormConcededAvg = homeTeamForm.length > 0 ? homeTeamFormConceded / homeTeamForm.length : 0;
+    const awayFormConcededAvg = awayTeamForm.length > 0 ? awayTeamFormConceded / awayTeamForm.length : 0;
+
+    // If no mutual H2H but teams have good form, still allow signal
+    if (mutualMatches.length === 0) {
+        const formCheck = (homeFormAvg >= 1.0 || awayFormAvg >= 1.0);
+        return {
+            valid: formCheck,
+            reason: formCheck
+                ? `No H2H but Form OK: ${homeTeam}:${homeFormAvg.toFixed(1)}gpg | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg`
+                : `No H2H and weak form`
+        };
+    }
 
     // Parse current score
     const [curHome, curAway] = currentScore.split('-').map(s => parseInt(s) || 0);
@@ -987,7 +1043,10 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
         htGoalRate: htGoalRate !== null ? htGoalRate.toFixed(0) : 'N/A',
         shGoalRate: shGoalRate !== null ? shGoalRate.toFixed(0) : 'N/A',
         matchCount: mutualMatches.length,
-        detailsChecked
+        detailsChecked,
+        // Team Form Stats
+        homeForm: `${homeFormAvg.toFixed(1)}scored/${homeFormConcededAvg.toFixed(1)}conceded`,
+        awayForm: `${awayFormAvg.toFixed(1)}scored/${awayFormConcededAvg.toFixed(1)}conceded`
     };
 
     // Build reason string
