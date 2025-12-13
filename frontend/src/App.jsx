@@ -274,10 +274,36 @@ function App() {
         {/* Tab Content: HISTORY */}
         {activeTab === 'history' && (
           <div className="space-y-4">
-            {/* ... existing history code ... */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Signal History</h2>
-              <button onClick={fetchHistory} className="px-3 py-1 text-xs rounded border hover:bg-accent">Refresh</button>
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold">Signal History</h2>
+                {betHistory.length > 0 && (
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-green-500/10 text-green-500 rounded text-sm font-bold border border-green-500/20">
+                      Win Rate: {(() => {
+                        const settled = betHistory.filter(b => ['WON', 'LOST'].includes(b.status));
+                        if (settled.length === 0) return '0%';
+                        const wins = settled.filter(b => b.status === 'WON').length;
+                        return Math.round((wins / settled.length) * 100) + '%';
+                      })()}
+                    </span>
+                    <span className="px-3 py-1 bg-muted rounded text-sm font-medium border">
+                      {betHistory.filter(b => b.status === 'WON').length}W - {betHistory.filter(b => b.status === 'LOST').length}L
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={async () => {
+                  if (!confirm('Delete ALL history?')) return;
+                  await betService.clearHistory();
+                  fetchHistory();
+                }} className="px-3 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded border border-red-900/50">
+                  Clear History
+                </button>
+                <button onClick={fetchHistory} className="px-3 py-1 text-xs rounded border hover:bg-accent">Refresh</button>
+              </div>
             </div>
 
             <div className="rounded-lg border overflow-hidden">

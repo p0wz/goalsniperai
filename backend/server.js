@@ -599,29 +599,31 @@ Current Time: ${candidate.elapsed}' | Score: ${candidate.score}
 === KEY STATISTICS ===
 Shots: ${candidate.stats.shots} total | ${candidate.stats.shots_on_target} on target
 Corners: ${candidate.stats.corners}
-Dangerous Attacks: ${candidate.stats.dangerous_attacks} (${candidate.stats.da_per_min}/min)
-Expected Goals (xG): ${candidate.stats.xG}
-Possession: ${candidate.stats.possession || 'N/A'}
+Dangerous Attacks: ${candidate.stats.dangerousAttacks || 'N/A'}
+xG: ${candidate.stats.xG || 'N/A'}
 
-=== ODDS ANALYSIS ===
-Home Win: ${candidate.stats.homeOdds} | Away Win: ${candidate.stats.awayOdds}${candidate.stats.drawOdds ? ` | Draw: ${candidate.stats.drawOdds}` : ''}
-Favorite: ${parseFloat(candidate.stats.homeOdds) < parseFloat(candidate.stats.awayOdds) ? candidate.home : candidate.away}
+=== MOMENTUM TRIGGERS ===
+Trigger: ${candidate.momentumTrigger || 'None'}
+Reason: ${candidate.reason}
 
-=== SCOUT ANALYSIS ===
-${candidate.reason}
+=== H2H & FORM ANALYSIS ===
+${candidate.h2h ? `
+Home Form: ${candidate.h2h.homeForm}
+Away Form: ${candidate.h2h.awayForm}
+Home Goal Rate: ${candidate.h2h.homeGoalRate}%
+Away Goal Rate: ${candidate.h2h.awayGoalRate}%
+1H Goal Rate (H2H): ${candidate.h2h.htGoalRate}%
+2H Goal Rate (H2H): ${candidate.h2h.shGoalRate}%
+Expected Total Goals: ${candidate.h2h.expectedTotal}
+` : 'No Historical Data Available'}
 
-=== YOUR TASK ===
-Based on ALL statistics above, determine if a goal is IMMINENT in the next 10-15 minutes.
+=== PREDICTION TASK ===
+Analyze the match context, momentum, and historical form.
+Verdict options: "PLAY" or "SKIP".
+Confidence: 0-100%.
 
-Consider:
-1. Shot conversion rate (SoT/Shots ratio)
-2. Pressure indicators (DA/min, corners)
-3. xG vs actual goals
-4. Time remaining in strategic window
-5. Odds movement indicating market sentiment
+Output JSON only: { "verdict": "PLAY" | "SKIP", "confidence": number, "reason": "brief explanation" }`;
 
-RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
-{"verdict": "PLAY", "confidence": 75, "reason": "Your analysis here"}`;
 
     const MAX_RETRIES = 3;
 
@@ -640,7 +642,7 @@ RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${GROQ_API_KEY}`,
+                        'Authorization': `Bearer ${GROQ_API_KEY} `,
                         'Content-Type': 'application/json'
                     },
                     timeout: 15000
@@ -1555,6 +1557,21 @@ async function processMatches() {
         // Cap confidence
         if (candidate.confidencePercent > 95) candidate.confidencePercent = 95;
         if (candidate.confidencePercent < 30) candidate.confidencePercent = 30;
+
+        // 🔒 SCORE SAFETY CHECK (Double-check before AI)
+        // Prevent "Ghost Signals" if a goal happened during processing
+        const latestDetails = await fetchMatchDetails(matchId, 1);
+        if (latestDetails && latestDetails.home_team && latestDetails.away_team) {
+            const latestHome = parseInt(latestDetails.home_team.score) || 0;
+            const latestAway = parseInt(latestDetails.away_team.score) || 0;
+            const currentHome = parseInt(match.home_team?.score) || 0;
+            const currentAway = parseInt(match.away_team?.score) || 0;
+
+            if (latestHome !== currentHome || latestAway !== currentAway) {
+                log.warn(`      🛑 ABORTING: Score changed during analysis! (Was ${currentHome}-${currentAway}, Now ${latestHome}-${latestAway})`);
+                continue;
+            }
+        }
 
         // Send to Gemini for AI validation
         log.gemini(`      🤖 Asking Gemini AI...`);

@@ -228,4 +228,18 @@ router.delete('/coupons/:id', async (req, res) => {
     }
 });
 
+// Clear History (Hard Reset)
+router.delete('/history', async (req, res) => {
+    try {
+        const { source } = req.body; // Optional: 'live' or 'daily'
+        const { clearAllBets } = require('../betTrackerRedis');
+
+        const result = await clearAllBets(source);
+        res.json(result);
+    } catch (error) {
+        console.error('[ADMIN] Clear history error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

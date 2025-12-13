@@ -88,6 +88,10 @@ export const betService = {
     settleBet: async (id, status, resultScore) => {
         const response = await api.post(`/bet-history/${id}/settle`, { status, resultScore });
         return response.data;
+    },
+    clearHistory: async (source) => {
+        const response = await api.delete('/admin/history', { data: { source } });
+        return response.data;
     }
 };
 
