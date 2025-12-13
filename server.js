@@ -179,6 +179,13 @@ const MATCH_HISTORY = {};
 const MAX_HISTORY_LENGTH = 4;
 const MAX_LOOKBACK_MS = 12 * 60 * 1000; // 12 minutes
 
+// Bot state for status API
+const BOT_STATE = {
+    isRunning: false,
+    lastScan: null,
+    matchesProcessed: 0
+};
+
 // ============================================
 // 🔒 Daily Signal Limiter (Max 1 per match per strategy)
 // ============================================
@@ -1710,6 +1717,98 @@ app.get('/api/bet-history', optionalAuth, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// 📡 Signals API (wraps bet-history with friendly format)
+// ============================================
+app.get('/api/signals', optionalAuth, async (req, res) => {
+    try {
+        const bets = await betTracker.getAllBets();
+        // Transform bets to signals format
+        const signals = bets.map(bet => ({
+            id: bet.id,
+            home: bet.home_team,
+            away: bet.away_team,
+            league: bet.league || 'Unknown',
+            strategyCode: bet.category,
+            market: bet.market,
+            confidencePercent: bet.confidence,
+            elapsed: bet.elapsed || 0,
+            result: bet.status === 'PENDING' ? null : bet.status,
+            timestamp: bet.timestamp,
+            source: bet.source
+        }));
+        res.json(signals);
+    } catch (error) {
+        res.status(500).json([]);
+    }
+});
+
+// Mark signal result (WON/LOST)
+app.post('/api/signals/:id/result', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { result } = req.body;
+
+        if (!result || !['WON', 'LOST'].includes(result)) {
+            return res.status(400).json({ success: false, error: 'Result must be WON or LOST' });
+        }
+
+        const settled = await betTracker.manualSettle(id, result);
+
+        if (!settled.success) {
+            return res.status(400).json(settled);
+        }
+
+        log.success(`Signal ${id} marked as ${result}`);
+        res.json({ success: true, id, result });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Reset all signals
+app.post('/api/signals/reset', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    try {
+        await betTracker.clearBetHistory();
+        log.warn('All signals cleared by admin');
+        res.json({ success: true, message: 'All signals cleared' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// 🔴 Bot Status Endpoint
+// ============================================
+app.get('/api/status', optionalAuth, (req, res) => {
+    // Bot running status from global state
+    res.json({
+        running: BOT_STATE.isRunning || false,
+        lastScan: BOT_STATE.lastScan || null,
+        matchesProcessed: BOT_STATE.matchesProcessed || 0,
+        quotaRemaining: DAILY_LIMIT - dailyRequestCount,
+        signalsToday: Object.values(DAILY_SIGNAL_COUNTS).reduce((sum, count) => sum + count, 0),
+        uptime: process.uptime()
+    });
+});
+
+// ============================================
+// 📜 Logs Endpoint
+// ============================================
+app.get('/api/logs', requireAuth, async (req, res) => {
+    const limit = parseInt(req.query.limit) || 100;
+    try {
+        const logs = await database.getRecentLogs(limit);
+        res.json({ logs });
+    } catch (error) {
+        res.json({ logs: [] });
     }
 });
 

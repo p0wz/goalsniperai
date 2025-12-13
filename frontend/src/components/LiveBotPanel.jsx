@@ -55,6 +55,41 @@ function LiveBotPanel() {
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
 
+    // Mark signal result (WON/LOST)
+    const markResult = async (signalId, result) => {
+        try {
+            const res = await fetch(`${BASE_URL}/api/signals/${signalId}/result`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ result })
+            });
+            if (res.ok) {
+                setSignals(prev => prev.map(s =>
+                    s.id === signalId ? { ...s, result } : s
+                ));
+            }
+        } catch (e) {
+            console.error('Mark result error:', e);
+        }
+    };
+
+    // Reset all signal stats
+    const resetStats = async () => {
+        if (!confirm('Tüm sinyal geçmişini sıfırlamak istediğinize emin misiniz?')) return;
+        try {
+            const res = await fetch(`${BASE_URL}/api/signals/reset`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (res.ok) {
+                setSignals([]);
+            }
+        } catch (e) {
+            console.error('Reset stats error:', e);
+        }
+    };
+
     const subTabs = [
         { id: 'status', label: 'Durum', icon: '🔴' },
         { id: 'signals', label: 'Sinyaller', icon: '📡' },
@@ -144,18 +179,31 @@ function LiveBotPanel() {
             {/* History Panel */}
             {activeSubTab === 'history' && (
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold text-white">Maç Geçmişi</h3>
-                        <div className="flex gap-2">
-                            <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
-                                ✅ {signals.filter(s => s.result === 'WON').length} WON
-                            </span>
-                            <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">
-                                ❌ {signals.filter(s => s.result === 'LOST').length} LOST
-                            </span>
-                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                                ⏳ {signals.filter(s => !s.result || s.result === 'PENDING').length} PENDING
-                            </span>
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+                        <div className="flex flex-wrap justify-between items-center gap-3">
+                            <h3 className="text-lg font-semibold text-white">📊 Maç Geçmişi</h3>
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
+                                    ✅ {signals.filter(s => s.result === 'WON').length} WON
+                                </span>
+                                <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">
+                                    ❌ {signals.filter(s => s.result === 'LOST').length} LOST
+                                </span>
+                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                                    ⏳ {signals.filter(s => !s.result || s.result === 'PENDING').length} PENDING
+                                </span>
+                                {signals.filter(s => s.result === 'WON' || s.result === 'LOST').length > 0 && (
+                                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">
+                                        🎯 {Math.round((signals.filter(s => s.result === 'WON').length / signals.filter(s => s.result === 'WON' || s.result === 'LOST').length) * 100)}% WIN
+                                    </span>
+                                )}
+                                <button
+                                    onClick={resetStats}
+                                    className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-xs transition-all"
+                                >
+                                    🔄 Sıfırla
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -167,8 +215,8 @@ function LiveBotPanel() {
                         <div className="space-y-3">
                             {signals.map((signal, i) => (
                                 <div key={signal.id || i} className={`bg-gray-800/50 border rounded-lg p-4 ${signal.result === 'WON' ? 'border-green-500/50' :
-                                        signal.result === 'LOST' ? 'border-red-500/50' :
-                                            'border-gray-700'
+                                    signal.result === 'LOST' ? 'border-red-500/50' :
+                                        'border-gray-700'
                                     }`}>
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
@@ -187,6 +235,23 @@ function LiveBotPanel() {
                                         <div>⏱️ {signal.elapsed}'</div>
                                         <div>📅 {signal.timestamp ? new Date(signal.timestamp).toLocaleDateString('tr-TR') : '-'}</div>
                                     </div>
+                                    {/* Mark WON/LOST buttons */}
+                                    {(!signal.result || signal.result === 'PENDING') && (
+                                        <div className="flex gap-2 mt-3">
+                                            <button
+                                                onClick={() => markResult(signal.id, 'WON')}
+                                                className="flex-1 py-1.5 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 text-xs font-medium transition-all"
+                                            >
+                                                ✅ Kazandı
+                                            </button>
+                                            <button
+                                                onClick={() => markResult(signal.id, 'LOST')}
+                                                className="flex-1 py-1.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-all"
+                                            >
+                                                ❌ Kaybetti
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
