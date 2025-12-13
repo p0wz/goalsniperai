@@ -29,6 +29,9 @@ const betTracker = require('./betTrackerRedis');
 
 const app = express();
 
+// Trust proxy for rate limiting behind reverse proxies (Render, Vercel, etc.)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
     contentSecurityPolicy: {
