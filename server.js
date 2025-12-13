@@ -29,9 +29,6 @@ const betTracker = require('./betTrackerRedis');
 
 const app = express();
 
-// Trust proxy for rate limiting behind reverse proxies (Render, Vercel, etc.)
-app.set('trust proxy', 1);
-
 // Security middleware
 app.use(helmet({
     contentSecurityPolicy: {
@@ -86,53 +83,29 @@ app.use(express.static('frontend/dist'));
 app.use(express.static('public'));
 
 // ============================================
-// 🎨 Console Styling + In-Memory Log Storage
+// 🎨 Console Styling
 // ============================================
-const LOG_STORAGE = [];
-const MAX_LOG_ENTRIES = 200;
-
-function addLogEntry(level, message) {
-    LOG_STORAGE.push({
-        timestamp: new Date().toLocaleTimeString('tr-TR'),
-        level,
-        message
-    });
-    // Keep only last N entries
-    if (LOG_STORAGE.length > MAX_LOG_ENTRIES) {
-        LOG_STORAGE.shift();
-    }
-}
-
 // Helper for logging
 const log = {
     info: (msg, meta = {}) => {
         console.log(`[INFO] ${msg}`, meta);
-        addLogEntry('info', msg);
+        database.addLog('info', msg, meta);
     },
     error: (msg, error = null) => {
         console.error(`[ERROR] ${msg}`, error);
-        addLogEntry('error', msg);
+        database.addLog('error', msg, { error: error?.message || error });
     },
     success: (msg, meta = {}) => {
         console.log(`[SUCCESS] ${msg}`, meta);
-        addLogEntry('success', msg);
+        database.addLog('success', msg, meta);
     },
     warn: (msg, meta = {}) => {
         console.warn(`[WARN] ${msg}`, meta);
-        addLogEntry('warn', msg);
+        database.addLog('warn', msg, meta);
     },
-    api: (msg) => {
-        console.log(`\x1b[35m[API]\x1b[0m ${msg}`);
-        addLogEntry('api', msg);
-    },
-    signal: (msg) => {
-        console.log(`\x1b[32m[SIGNAL]\x1b[0m ${msg}`);
-        addLogEntry('signal', msg);
-    },
-    gemini: (msg) => {
-        console.log(`\x1b[33m[GEMINI]\x1b[0m ${msg}`);
-        addLogEntry('gemini', msg);
-    }
+    api: (msg) => console.log(`\x1b[35m[API]\x1b[0m ${msg}`),
+    signal: (msg) => console.log(`\x1b[32m[SIGNAL]\x1b[0m ${msg}`),
+    gemini: (msg) => console.log(`\x1b[33m[GEMINI]\x1b[0m ${msg}`)
 };
 
 // ============================================
@@ -203,13 +176,6 @@ const MATCH_HISTORY = {};
 const MAX_HISTORY_LENGTH = 4;
 const MAX_LOOKBACK_MS = 12 * 60 * 1000; // 12 minutes
 
-// Bot state for status API
-const BOT_STATE = {
-    isRunning: false,
-    lastScan: null,
-    matchesProcessed: 0
-};
-
 // ============================================
 // 🔒 Daily Signal Limiter (Max 1 per match per strategy)
 // ============================================
@@ -274,25 +240,6 @@ function cleanOldHistory() {
 
 let dailyRequestCount = 0;
 const DAILY_LIMIT = 1000;
-
-// ============================================
-// ⏱️ Global Rate Limiter (30 RPM = 1 request per 2 seconds)
-// ============================================
-const RPM_LIMIT = 30;
-const MIN_REQUEST_INTERVAL_MS = Math.ceil(60000 / RPM_LIMIT); // ~2000ms = 2 seconds
-let lastRequestTime = 0;
-
-async function rateLimitedWait() {
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTime;
-
-    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
-        const waitTime = MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    lastRequestTime = Date.now();
-}
 
 // ============================================
 // 🕐 Parse Match Time
@@ -648,14 +595,6 @@ Possession: ${candidate.stats.possession || 'N/A'}
 Home Win: ${candidate.stats.homeOdds} | Away Win: ${candidate.stats.awayOdds}${candidate.stats.drawOdds ? ` | Draw: ${candidate.stats.drawOdds}` : ''}
 Favorite: ${parseFloat(candidate.stats.homeOdds) < parseFloat(candidate.stats.awayOdds) ? candidate.home : candidate.away}
 
-=== H2H & FORM STATS ===
-${candidate.h2h ? `Home Form (@H): ${candidate.h2h.homeForm || 'N/A'} | Goal Rate: ${candidate.h2h.homeGoalRate || 'N/A'}%
-Away Form (@A): ${candidate.h2h.awayForm || 'N/A'} | Goal Rate: ${candidate.h2h.awayGoalRate || 'N/A'}%
-1st Half Goal Rate: ${candidate.h2h.htGoalRate || 'N/A'}%
-2nd Half Goal Rate: ${candidate.h2h.shGoalRate || 'N/A'}%
-Expected Total Goals: ${candidate.h2h.expectedTotal || 'N/A'}
-Recent Matches Analyzed: Home(${candidate.h2h.homeMatches || 0}) Away(${candidate.h2h.awayMatches || 0})` : 'H2H data not available'}
-
 === SCOUT ANALYSIS ===
 ${candidate.reason}
 
@@ -668,8 +607,6 @@ Consider:
 3. xG vs actual goals
 4. Time remaining in strategic window
 5. Odds movement indicating market sentiment
-6. H2H form - Are these teams historically high-scoring?
-7. Half-specific goal rates (1H vs 2H patterns)
 
 RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
 {"verdict": "PLAY", "confidence": 75, "reason": "Your analysis here"}`;
@@ -811,12 +748,14 @@ RESPOND WITH ONLY A JSON OBJECT. NO EXPLANATION. NO TEXT BEFORE OR AFTER.
 // ============================================
 // 📡 Fetch Match Statistics
 // ============================================
+const API_DELAY = 2000; // 2 seconds between API calls (30 RPM quota)
+
 async function fetchMatchStats(matchId, retries = 3) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            await rateLimitedWait(); // Enforce 30 RPM limit
+            await new Promise(r => setTimeout(r, API_DELAY)); // Rate limit delay
             const response = await axios.get(
                 `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/stats/${matchId}`,
                 { headers: FLASHSCORE_API.headers, timeout: 15000 }
@@ -826,7 +765,7 @@ async function fetchMatchStats(matchId, retries = 3) {
         } catch (error) {
             const is429 = error.response?.status === 429 || error.message?.includes('429');
             if (is429 && attempt < retries) {
-                const delay = Math.pow(3, attempt) * 1000; // 3s, 9s, 27s (slower to avoid rate limits)
+                const delay = Math.pow(2, attempt) * 2000; // 4s, 8s, 16s
                 log.warn(`[Stats] 429 Rate Limit - Retrying in ${delay / 1000}s (${attempt}/${retries})`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
@@ -897,7 +836,7 @@ async function fetchMatchH2H(matchId, retries = 3) {
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            await rateLimitedWait(); // Enforce 30 RPM limit
+            await new Promise(r => setTimeout(r, API_DELAY)); // Rate limit delay
             const response = await axios.get(
                 `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
                 { headers: FLASHSCORE_API.headers, timeout: 10000 }
@@ -907,7 +846,7 @@ async function fetchMatchH2H(matchId, retries = 3) {
         } catch (error) {
             const is429 = error.response?.status === 429 || error.message?.includes('429');
             if (is429 && attempt < retries) {
-                const delay = Math.pow(3, attempt) * 1000;
+                const delay = Math.pow(2, attempt) * 2000; // 4s, 8s, 16s
                 log.warn(`[H2H] 429 Rate Limit - Retrying in ${delay / 1000}s (${attempt}/${retries})`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
@@ -922,21 +861,31 @@ async function fetchMatchH2H(matchId, retries = 3) {
 // ============================================
 // 📋 Fetch Match Details (HT/FT Scores)
 // ============================================
-async function fetchMatchDetails(matchId) {
+async function fetchMatchDetails(matchId, retries = 2) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
 
-    try {
-        await rateLimitedWait(); // Enforce 30 RPM limit
-        const response = await axios.get(
-            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${matchId}`,
-            { headers: FLASHSCORE_API.headers, timeout: 10000 }
-        );
-        dailyRequestCount++;
-        return response.data;
-    } catch (error) {
-        // Silent fail - details are optional enhancement
-        return null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            await new Promise(r => setTimeout(r, API_DELAY)); // Rate limit delay
+            const response = await axios.get(
+                `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${matchId}`,
+                { headers: FLASHSCORE_API.headers, timeout: 10000 }
+            );
+            dailyRequestCount++;
+            return response.data;
+        } catch (error) {
+            const is429 = error.response?.status === 429 || error.message?.includes('429');
+            if (is429 && attempt < retries) {
+                const delay = Math.pow(2, attempt) * 2000; // 4s, 8s
+                log.warn(`[Details] 429 Rate Limit - Retrying in ${delay / 1000}s (${attempt}/${retries})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            // Silent fail - details are optional enhancement
+            return null;
+        }
     }
+    return null;
 }
 
 // Helper: Analyze Team Form (SIMPLIFIED - No Direct H2H)
@@ -1562,13 +1511,7 @@ async function processMatches() {
             continue;
         }
         log.info(`      ✅ ${h2hAnalysis.reason}`);
-
-        // 📊 DETAILED H2H STATS LOGGING
-        if (h2hAnalysis.homeForm && h2hAnalysis.awayForm) {
-            log.info(`      📈 H2H STATS: Home(${h2hAnalysis.homeMatches || 0} matches): ${h2hAnalysis.homeForm} | Goal%: ${h2hAnalysis.homeGoalRate || 0}%`);
-            log.info(`      📈 H2H STATS: Away(${h2hAnalysis.awayMatches || 0} matches): ${h2hAnalysis.awayForm} | Goal%: ${h2hAnalysis.awayGoalRate || 0}%`);
-            log.info(`      📈 H2H STATS: HT Goal Rate: ${h2hAnalysis.htGoalRate || 'N/A'}% | SH Goal Rate: ${h2hAnalysis.shGoalRate || 'N/A'}% | Expected: ${h2hAnalysis.expectedTotal || 'N/A'}`);
-        }
+        log.info(`      📊 Form Stats: Home[${h2hAnalysis.homeForm}] Away[${h2hAnalysis.awayForm}] | 1H:${h2hAnalysis.htGoalRate}% 2H:${h2hAnalysis.shGoalRate}% | Details:${h2hAnalysis.detailsChecked || 0}`);
 
         // Add H2H context to candidate
         candidate.h2h = h2hAnalysis;
@@ -1600,22 +1543,6 @@ async function processMatches() {
         // Cap confidence
         if (candidate.confidencePercent > 95) candidate.confidencePercent = 95;
         if (candidate.confidencePercent < 30) candidate.confidencePercent = 30;
-
-        // 🚨 SCORE RE-VERIFICATION (Post-Momentum Goal Check)
-        // Re-check the current score to make sure no goal was scored after momentum was detected
-        const freshMatchData = await fetchMatchDetails(matchId);
-        if (freshMatchData) {
-            const freshHomeScore = freshMatchData.home_team?.score || 0;
-            const freshAwayScore = freshMatchData.away_team?.score || 0;
-            const originalHomeScore = match.home_team?.score || 0;
-            const originalAwayScore = match.away_team?.score || 0;
-
-            if (freshHomeScore !== originalHomeScore || freshAwayScore !== originalAwayScore) {
-                log.warn(`      🚨 SCORE CHANGED! Original: ${originalHomeScore}-${originalAwayScore} → Now: ${freshHomeScore}-${freshAwayScore} - Skipping stale signal`);
-                continue; // Goal was scored AFTER momentum detection, skip!
-            }
-            log.info(`      ✅ Score verified: ${freshHomeScore}-${freshAwayScore} (no change)`);
-        }
 
         // Send to Gemini for AI validation
         log.gemini(`      🤖 Asking Gemini AI...`);
@@ -1776,95 +1703,6 @@ app.get('/api/bet-history', optionalAuth, async (req, res) => {
     }
 });
 
-// ============================================
-// 📡 Signals API (wraps bet-history with friendly format)
-// ============================================
-app.get('/api/signals', optionalAuth, async (req, res) => {
-    try {
-        const bets = await betTracker.getAllBets();
-        // Transform bets to signals format
-        const signals = bets.map(bet => ({
-            id: bet.id,
-            home: bet.home_team,
-            away: bet.away_team,
-            league: bet.league || 'Unknown',
-            strategyCode: bet.category,
-            market: bet.market,
-            confidencePercent: bet.confidence,
-            elapsed: bet.elapsed || 0,
-            result: bet.status === 'PENDING' ? null : bet.status,
-            timestamp: bet.timestamp,
-            source: bet.source
-        }));
-        res.json(signals);
-    } catch (error) {
-        res.status(500).json([]);
-    }
-});
-
-// Mark signal result (WON/LOST)
-app.post('/api/signals/:id/result', requireAuth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { result } = req.body;
-
-        if (!result || !['WON', 'LOST'].includes(result)) {
-            return res.status(400).json({ success: false, error: 'Result must be WON or LOST' });
-        }
-
-        const settled = await betTracker.manualSettle(id, result);
-
-        if (!settled.success) {
-            return res.status(400).json(settled);
-        }
-
-        log.success(`Signal ${id} marked as ${result}`);
-        res.json({ success: true, id, result });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Reset all signals
-app.post('/api/signals/reset', requireAuth, async (req, res) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ success: false, error: 'Admin only' });
-    }
-
-    try {
-        await betTracker.clearBetHistory();
-        log.warn('All signals cleared by admin');
-        res.json({ success: true, message: 'All signals cleared' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ============================================
-// 🔴 Bot Status Endpoint
-// ============================================
-app.get('/api/status', optionalAuth, (req, res) => {
-    // Bot running status from global state
-    res.json({
-        running: BOT_STATE.isRunning || false,
-        lastScan: BOT_STATE.lastScan || null,
-        matchesProcessed: BOT_STATE.matchesProcessed || 0,
-        quotaRemaining: DAILY_LIMIT - dailyRequestCount,
-        signalsToday: Object.values(DAILY_SIGNAL_COUNTS).reduce((sum, count) => sum + count, 0),
-        uptime: process.uptime()
-    });
-});
-
-// ============================================
-// 📜 Logs Endpoint
-// ============================================
-app.get('/api/logs', optionalAuth, (req, res) => {
-    const limit = parseInt(req.query.limit) || 100;
-    // Use in-memory LOG_STORAGE (most recent first)
-    const logs = LOG_STORAGE.slice(-limit).reverse();
-    res.json({ logs });
-});
-
 app.post('/api/bet-history/:id/settle', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -2012,28 +1850,6 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
         }
 
         log.success(`Daily candidate approved: ${id}`);
-        res.json({ success: true, id });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ============================================
-// ❌ Reject Daily Candidate
-// ============================================
-app.post('/api/daily-analysis/reject/:id', requireAuth, async (req, res) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ success: false, error: 'Admin only' });
-    }
-
-    const { id } = req.params;
-
-    try {
-        // Remove from approved IDs if exists
-        APPROVED_IDS.delete(id);
-        saveApprovals();
-
-        log.warn(`Daily candidate rejected: ${id}`);
         res.json({ success: true, id });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
