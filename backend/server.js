@@ -56,7 +56,18 @@ app.use(cors({
         // Normalize incoming origin
         const cleanOrigin = origin.replace(/\/$/, '');
 
+        // 1. Check strict allowed list
         if (allowedOrigins.indexOf(cleanOrigin) !== -1) {
+            return callback(null, true);
+        }
+
+        // 2. Allow any Cloudflare Pages domain (Dynamic wildcard)
+        if (cleanOrigin.endsWith('.pages.dev')) {
+            return callback(null, true);
+        }
+
+        // 3. Allow localhost (Vite default port)
+        if (cleanOrigin.includes('localhost')) {
             return callback(null, true);
         }
 
