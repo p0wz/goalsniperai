@@ -1,11 +1,9 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Admin from './pages/Admin';
+import ControlPanel from './pages/ControlPanel';
 import Pricing from './pages/Pricing';
-import DailyAnalyst from './pages/DailyAnalyst';
 
 import { useState, useEffect } from 'react';
 
@@ -46,13 +44,13 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/admin" element={<Admin />} />
+        <Route path="/admin" element={<ControlPanel />} />
+        <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
         <Route path="/pricing" element={<Pricing />} />
-        <Route path="/daily-analyst" element={<DailyAnalyst />} />
       </Routes>
     </BrowserRouter>
   );
 }
 
 export default App;
+
