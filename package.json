@@ -2,10 +2,10 @@
     "name": "goalsniper-pro",
     "version": "1.0.0",
     "description": "AI Powered Live Betting Dashboard - First Half Over 0.5 Goal Signals",
-    "main": "server.js",
+    "main": "backend/server.js",
     "scripts": {
-        "start": "node server.js",
-        "dev": "node server.js",
+        "start": "node backend/server.js",
+        "dev": "node backend/server.js",
         "build": "cd frontend && npm install && npm run build"
     },
     "keywords": [

@@ -78,9 +78,9 @@ app.use(xss());
 app.use(hpp());
 
 // Static files - React build (priority)
-app.use(express.static('frontend/dist'));
+app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 // Fallback to public folder for legacy HTML
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ============================================
 // 🎨 Console Styling

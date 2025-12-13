@@ -5,7 +5,7 @@ services:
     repo: https://github.com/p0wz/oddssniper # Change this if repo name differs
     plan: free
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: node backend/server.js
     envVars:
       - key: NODE_ENV
         value: production
