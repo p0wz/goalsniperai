@@ -124,7 +124,7 @@ const log = {
 // ⚙️ Configuration
 // ============================================
 const PORT = process.env.PORT || 3000;
-const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const POLL_INTERVAL = 3 * 60 * 1000; // 3 minutes
 
 // Validate required environment variables
 if (!process.env.RAPIDAPI_KEY) {
