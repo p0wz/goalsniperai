@@ -14,8 +14,15 @@ const getBaseUrl = () => {
     return url ? `${url}/api` : '/api';
 };
 
+const baseUrl = getBaseUrl();
+console.log('🔌 API Configuration:', {
+    envVar: import.meta.env.VITE_API_URL,
+    resolvedBaseUrl: baseUrl,
+    mode: import.meta.env.MODE
+});
+
 const api = axios.create({
-    baseURL: getBaseUrl(),
+    baseURL: baseUrl,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
