@@ -17,7 +17,9 @@ function App() {
   // Data
   const [liveSignals, setLiveSignals] = useState([]);
   const [betHistory, setBetHistory] = useState([]);
+
   const [dailyAnalysis, setDailyAnalysis] = useState(null);
+  const [selectedDailyMatch, setSelectedDailyMatch] = useState(null);
 
   // Loaders
   const [refreshing, setRefreshing] = useState(false);
@@ -130,6 +132,104 @@ function App() {
     );
   }
 
+  // Modal Component for Daily Analysis Details
+  const MatchDetailsModal = ({ match, onClose }) => {
+    if (!match) return null;
+
+    const copyToClipboard = (text) => {
+      navigator.clipboard.writeText(text);
+      alert('Prompt copied to clipboard!');
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold">{match.event_home_team} vs {match.event_away_team}</h2>
+              <p className="text-sm text-muted-foreground">{match.league} • {match.market}</p>
+            </div>
+            <button onClick={onClose} className="rounded-full p-2 hover:bg-accent">✕</button>
+          </div>
+
+          <div className="space-y-6">
+            {/* Detailed Analysis Section */}
+            {match.detailed_analysis && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-primary border-b pb-1">📊 Detailed Analysis</h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded bg-muted/30 p-3 text-sm">
+                    <div className="font-semibold mb-1">Form</div>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                      <li>{match.detailed_analysis.form.home}</li>
+                      <li>{match.detailed_analysis.form.away}</li>
+                    </ul>
+                  </div>
+                  <div className="rounded bg-muted/30 p-3 text-sm">
+                    <div className="font-semibold mb-1">Stats</div>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                      <li>League Avg Goals: {match.detailed_analysis.stats.leagueAvg}</li>
+                      <li>Home @ Home: {match.detailed_analysis.stats.homeAtHome}</li>
+                      <li>Away @ Away: {match.detailed_analysis.stats.awayAtAway}</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {match.detailed_analysis.h2h && (
+                  <div className="rounded bg-muted/30 p-3 text-sm">
+                    <div className="font-semibold mb-1">Head-to-Head</div>
+                    <p className="mb-2 text-muted-foreground">{match.detailed_analysis.h2h.summary}</p>
+                    <div className="space-y-1">
+                      {match.detailed_analysis.h2h.games.map((g, i) => (
+                        <div key={i} className="text-xs font-mono bg-background/50 p-1 rounded border">{g}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI Prompts Section */}
+            {match.ai_prompts && match.ai_prompts.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-primary border-b pb-1">🤖 AI Prompts</h3>
+                <p className="text-xs text-muted-foreground">Click to copy prompt and paste into ChatGPT/Claude.</p>
+
+                <div className="space-y-2">
+                  {match.ai_prompts.map((prompt, idx) => (
+                    <div key={idx} className="flex items-center gap-2 rounded border bg-muted/20 p-2 text-sm transition-colors hover:bg-accent/20">
+                      <div className="flex-1 truncate font-mono text-xs text-muted-foreground" title={prompt}>
+                        {prompt.substring(0, 80)}...
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(prompt)}
+                        className="shrink-0 px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:bg-primary/90"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!match.detailed_analysis && !match.ai_prompts && (
+              <div className="p-4 text-center text-muted-foreground italic">
+                No detailed analysis available for this match.
+              </div>
+            )}
+
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button onClick={onClose} className="px-4 py-2 rounded bg-muted hover:bg-muted/80 text-foreground text-sm font-medium">Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Helper to render Daily Analysis Tables
   const renderDailyTable = (title, items) => {
     if (!items || items.length === 0) return null;
@@ -148,7 +248,11 @@ function App() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="border-t hover:bg-accent/10">
+                <tr
+                  key={item.id}
+                  className="border-t hover:bg-accent/10 cursor-pointer transition-colors"
+                  onClick={() => setSelectedDailyMatch(item)}
+                >
                   <td className="p-2">{new Date(item.startTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="p-2 font-medium">{item.event_home_team} vs {item.event_away_team}</td>
                   <td className="p-2 text-muted-foreground">{item.league}</td>
@@ -421,6 +525,14 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Modal */}
+      {selectedDailyMatch && (
+        <MatchDetailsModal
+          match={selectedDailyMatch}
+          onClose={() => setSelectedDailyMatch(null)}
+        />
+      )}
     </div>
   );
 }

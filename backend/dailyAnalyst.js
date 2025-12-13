@@ -492,6 +492,45 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
         over25: [], doubleChance: [], homeOver15: [], under35: [], under25: []
     };
 
+    // Helper: Generate Detailed Analysis Text
+    function generateAnalysisDetails(match, stats) {
+        const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = stats;
+
+        return {
+            form: {
+                home: `Home Form (Last 5): scored ${homeForm.avgScored.toFixed(1)} avg, conceded ${homeForm.avgConceded.toFixed(1)} avg. Over 2.5 in ${homeForm.over25Rate}% of games.`,
+                away: `Away Form (Last 5): scored ${awayForm.avgScored.toFixed(1)} avg, conceded ${awayForm.avgConceded.toFixed(1)} avg. Over 2.5 in ${awayForm.over25Rate}% of games.`
+            },
+            h2h: {
+                summary: `Mutual Games: ${mutual.length} played.`,
+                games: mutual.map(g => `${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name} (${new Date(g.timestamp * 1000).toLocaleDateString()})`)
+            },
+            stats: {
+                leagueAvg: ((homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2).toFixed(2),
+                homeAtHome: `Scoring Rate: ${homeHomeStats.scoringRate}%, Win Rate: ${homeHomeStats.winRate}%`,
+                awayAtAway: `Conceding Rate: ${Math.max(0, 100 - awayAwayStats.cleanSheetRate || 0)}%, Loss Rate: ${awayAwayStats.lossCount / (awayAwayStats.matches || 1) * 100}%`
+            }
+        };
+    }
+
+    // Helper: Generate AI Prompts
+    function generateAIPrompts(match, stats, market) {
+        const basePrompt = `Analyze this football match: ${match.event_home_team} vs ${match.event_away_team}. League: ${match.league_name}. Market: ${market}.`;
+
+        const statsPrompt = `
+Stats Context:
+- Home Team (${match.event_home_team}) Last 5 Avg Goals: ${stats.homeForm.avgScored.toFixed(2)}
+- Away Team (${match.event_away_team}) Last 5 Avg Goals: ${stats.awayForm.avgScored.toFixed(2)}
+- H2H: ${stats.mutual.length > 0 ? 'Available' : 'None'}
+`;
+
+        return [
+            `${basePrompt} Give me a probability estimation for ${market} based on team forms.`,
+            `${basePrompt} ${statsPrompt} What are the key risk factors for this bet?`,
+            `Act as a professional sports bettor. Why might I want to AVOID betting on ${market} for ${match.event_home_team} vs ${match.event_away_team}?`
+        ];
+    }
+
     // Convert candidates to results format (no AI validation)
     for (const cat of Object.keys(candidates)) {
         if (!candidates[cat] || candidates[cat].length === 0) continue;
@@ -503,6 +542,9 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
         for (const match of candidates[cat]) {
             const generatedId = `${match.event_key || match.match_id}_${cat}`;
+            const analysisDetails = generateAnalysisDetails(match, match.filterStats);
+            const aiPrompts = generateAIPrompts(match, match.filterStats, match.market);
+
             results[cat].push({
                 match: `${match.event_home_team} vs ${match.event_away_team}`,
                 event_home_team: match.event_home_team,
@@ -513,6 +555,8 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
                 league: match.league_name,
                 market: match.market,
                 stats: match.filterStats,
+                detailed_analysis: analysisDetails,
+                ai_prompts: aiPrompts,
                 status: 'PENDING_APPROVAL' // Admin needs to approve
             });
             log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
