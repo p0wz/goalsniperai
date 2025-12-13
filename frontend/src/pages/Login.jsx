@@ -27,8 +27,14 @@ export default function Login() {
             const data = await res.json();
 
             if (data.success) {
-                // Token is securely stored in httpOnly cookie by backend
-                navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
+                // Store token and user info for client-side auth checks
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                }
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                // Navigate to appropriate page
+                navigate(data.user.role === 'admin' ? '/admin' : '/admin');
             } else {
                 setError(data.error || 'Giriş başarısız');
             }

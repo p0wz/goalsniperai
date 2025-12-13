@@ -8,15 +8,27 @@ import SettingsPanel from '../components/SettingsPanel';
 function ControlPanel() {
     const [activeTab, setActiveTab] = useState('livebot');
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
-    // Auth check
+    // Auth check - verify user is logged in
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
+        const user = localStorage.getItem('user');
+        if (!user) {
             navigate('/login');
+        } else {
+            setIsLoading(false);
         }
     }, [navigate]);
+
+    // Show loading while checking auth
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                <div className="text-gray-400">Yükleniyor...</div>
+            </div>
+        );
+    }
 
     // Menu icon for mobile
     const MenuIcon = () => (
