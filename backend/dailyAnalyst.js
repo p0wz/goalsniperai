@@ -515,19 +515,39 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
     // Helper: Generate AI Prompts
     function generateAIPrompts(match, stats, market) {
-        const basePrompt = `Analyze this football match: ${match.event_home_team} vs ${match.event_away_team}. League: ${match.league_name}. Market: ${market}.`;
+        const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = stats;
 
-        const statsPrompt = `
-Stats Context:
-- Home Team (${match.event_home_team}) Last 5 Avg Goals: ${stats.homeForm.avgScored.toFixed(2)}
-- Away Team (${match.event_away_team}) Last 5 Avg Goals: ${stats.awayForm.avgScored.toFixed(2)}
-- H2H: ${stats.mutual.length > 0 ? 'Available' : 'None'}
+        const basePrompt = `Act as a professional football betting analyst (English/Turkish). Analyze this match:
+Match: ${match.event_home_team} vs ${match.event_away_team}
+League: ${match.league_name}
+Market Candidate: ${market}
+
+DETAILED STATISTICS:
+1. LEAGUE CONTEXT
+   - League Average Goals: ${((homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2).toFixed(2)}
+
+2. HOME TEAM (${match.event_home_team})
+   - General Form (Last 5): Scored ${homeForm.avgScored.toFixed(2)}/game, Conceded ${homeForm.avgConceded.toFixed(2)}/game.
+   - Over 2.5 Rate: ${homeForm.over25Rate}%
+   - Under 2.5 Rate: ${homeForm.under25Rate}%
+   - BTTS Rate: ${homeForm.bttsRate}%
+   - AT HOME (Last 8): Scored in ${homeHomeStats.scoringRate}% of games, Win Rate ${homeHomeStats.winRate}%. Avg Scored ${homeHomeStats.avgScored.toFixed(2)}.
+
+3. AWAY TEAM (${match.event_away_team})
+   - General Form (Last 5): Scored ${awayForm.avgScored.toFixed(2)}/game, Conceded ${awayForm.avgConceded.toFixed(2)}/game.
+   - Over 2.5 Rate: ${awayForm.over25Rate}%
+   - Under 2.5 Rate: ${awayForm.under25Rate}%
+   - BTTS Rate: ${awayForm.bttsRate}%
+   - AWAY FROM HOME (Last 8): Conceded in ${Math.max(0, 100 - awayAwayStats.cleanSheetRate || 0)}% of games. Avg Conceded ${awayAwayStats.avgConceded.toFixed(2)}.
+
+4. HEAD-TO-HEAD (Last ${mutual.length})
+   ${mutual.map(g => `- ${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name} (${new Date(g.timestamp * 1000).toLocaleDateString()})`).join('\n   ')}
 `;
 
         return [
-            `${basePrompt} Give me a probability estimation for ${market} based on team forms.`,
-            `${basePrompt} ${statsPrompt} What are the key risk factors for this bet?`,
-            `Act as a professional sports bettor. Why might I want to AVOID betting on ${market} for ${match.event_home_team} vs ${match.event_away_team}?`
+            `${basePrompt}\n\nTASK: Based on these detailed statistics, provide a comprehensive analysis for the '${market}' bet. Is it a solid value? Give a probability percentage.`,
+            `${basePrompt}\n\nTASK: Identify the biggest RISK factors for this specific '${market}' bet given the H2H and recent form. What could go wrong?`,
+            `${basePrompt}\n\nTASK: Ignore the '${market}' suggestion for a moment. Based purely on the data, what is the single BEST value bet for this match (e.g. Winner, Goals, BTTS) and why?`
         ];
     }
 
