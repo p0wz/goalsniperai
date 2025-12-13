@@ -2,7 +2,7 @@ services:
   - type: web
     name: goalsniper-api
     env: node
-    repo: https://github.com/p0wz/oddssniper # Change this if repo name differs
+    repo: https://github.com/p0wz/goalsniperai
     plan: free
     buildCommand: npm install
     startCommand: node backend/server.js
