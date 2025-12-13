@@ -1,29 +1,38 @@
-export function Input({ className = '', ...props }) {
-    return (
-        <input
-            className={`
-        w-full h-12 px-4 bg-transparent border border-border rounded-lg
-        text-foreground placeholder:text-muted-foreground/50
-        transition-all duration-200
-        focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background
-        ${className}
-      `}
-            {...props}
-        />
-    );
-}
+import { forwardRef } from 'react';
 
-export function FormGroup({ children, className = '' }) {
-    return <div className={`mb-5 ${className}`}>{children}</div>;
-}
-
-export function Label({ children, htmlFor, className = '' }) {
+const Input = forwardRef(({
+    label,
+    error,
+    icon,
+    className = '',
+    ...props
+}, ref) => {
     return (
-        <label
-            htmlFor={htmlFor}
-            className={`block text-sm font-medium text-muted-foreground mb-2 ${className}`}
-        >
-            {children}
-        </label>
+        <div className="space-y-1">
+            {label && (
+                <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                    {label}
+                </label>
+            )}
+            <div className="relative">
+                {icon && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                        {icon}
+                    </span>
+                )}
+                <input
+                    ref={ref}
+                    className={`input ${icon ? 'pl-10' : ''} ${error ? 'border-[var(--accent-red)]' : ''} ${className}`}
+                    {...props}
+                />
+            </div>
+            {error && (
+                <p className="text-xs text-[var(--accent-red)]">{error}</p>
+            )}
+        </div>
     );
-}
+});
+
+Input.displayName = 'Input';
+
+export default Input;

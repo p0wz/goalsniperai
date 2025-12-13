@@ -1,106 +1,106 @@
-import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Button } from '../ui';
+import { useAuth } from '../../context/AuthContext';
 
-export function Navbar() {
-    const [scrolled, setScrolled] = useState(false);
-    const [user, setUser] = useState(null);
+const Navbar = () => {
+    const { isAuthenticated, isAdmin, user, logout } = useAuth();
     const location = useLocation();
-    const isHome = location.pathname === '/';
 
-    useEffect(() => {
-        const handleScroll = () => setScrolled(window.scrollY > 50);
-        window.addEventListener('scroll', handleScroll);
-
-        // Check Auth
-        checkUser();
-
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    const checkUser = async () => {
-        try {
-            // Assumes API_URL is accessible or using relative path proxy if set up. 
-            // Using relative path for simplicity if proxy exists, else might need config.
-            // Admin.jsx used API_URL from ../config. Let's try to grab it or use relative.
-            // Ideally we need API_URL. I will check if I can import it.
-            // For now, I'll use a relative fetch assuming Vite proxy or same origin. 
-            // If strictly needed, I'll add the import.
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/me`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success) setUser(data.user);
-            }
-        } catch (e) {
-            console.error("Auth check failed", e);
-        }
-    };
+    const isActive = (path) => location.pathname === path;
 
     return (
-        <motion.nav
-            initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            className={`
-        fixed top-0 left-0 right-0 z-50 h-[72px] px-8 lg:px-12
-        flex items-center justify-between
-        transition-all duration-300
-        ${scrolled
-                    ? 'bg-background/90 backdrop-blur-xl border-b border-border'
-                    : 'bg-transparent'
-                }
-      `}
-        >
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 group">
-                <div className="w-9 h-9 rounded-lg gradient-bg flex items-center justify-center text-lg shadow-accent">
-                    ⚽
-                </div>
-                <span className="font-display text-xl text-foreground group-hover:text-accent transition-colors">
-                    GoalGPT
-                </span>
-            </Link>
-
-            {/* Nav Links - Desktop */}
-            {isHome && (
-                <div className="hidden md:flex items-center gap-10">
-                    <NavLink href="#features">Özellikler</NavLink>
-                    <NavLink href="#how-it-works">Nasıl Çalışır</NavLink>
-                    <NavLink href="#pricing">Fiyatlar</NavLink>
-                </div>
-            )}
-
-            {/* CTA Buttons */}
-            <div className="flex items-center gap-3">
-                {user ? (
-                    <Link to="/dashboard">
-                        <Button variant="primary" className="shadow-accent">
-                            Dashboard <span className="ml-2">→</span>
-                        </Button>
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-b border-[var(--border-color)]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-16">
+                    {/* Logo */}
+                    <Link to="/" className="flex items-center gap-2">
+                        <span className="text-2xl">⚽</span>
+                        <span className="text-xl font-bold text-gradient">GoalSniper</span>
+                        <span className="text-xs bg-[var(--accent-green)]/20 text-[var(--accent-green)] px-2 py-0.5 rounded-full font-semibold">PRO</span>
                     </Link>
-                ) : (
-                    <>
-                        <Link to="/login">
-                            <Button variant="ghost">Giriş</Button>
-                        </Link>
-                        <Link to="/register">
-                            <Button variant="primary">Başlayın</Button>
-                        </Link>
-                    </>
-                )}
-            </div>
-        </motion.nav>
-    );
-}
 
-function NavLink({ href, children }) {
-    return (
-        <a
-            href={href}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative group"
-        >
-            {children}
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent transition-all duration-300 group-hover:w-full" />
-        </a>
+                    {/* Desktop Nav */}
+                    <div className="hidden md:flex items-center gap-6">
+                        {isAuthenticated ? (
+                            <>
+                                <Link
+                                    to="/dashboard"
+                                    className={`text-sm font-medium transition-colors ${isActive('/dashboard') ? 'text-[var(--accent-green)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                                >
+                                    Dashboard
+                                </Link>
+                                <Link
+                                    to="/signals"
+                                    className={`text-sm font-medium transition-colors ${isActive('/signals') ? 'text-[var(--accent-green)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                                >
+                                    Canlı Sinyaller
+                                </Link>
+                                <Link
+                                    to="/history"
+                                    className={`text-sm font-medium transition-colors ${isActive('/history') ? 'text-[var(--accent-green)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                                >
+                                    Geçmiş
+                                </Link>
+                                <Link
+                                    to="/coupons"
+                                    className={`text-sm font-medium transition-colors ${isActive('/coupons') ? 'text-[var(--accent-green)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                                >
+                                    Kupon
+                                </Link>
+                                {isAdmin && (
+                                    <Link
+                                        to="/admin"
+                                        className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/admin') ? 'text-[var(--accent-gold)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                                    >
+                                        Admin
+                                    </Link>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/" className={`text-sm font-medium ${isActive('/') ? 'text-white' : 'text-[var(--text-secondary)] hover:text-white'}`}>
+                                    Ana Sayfa
+                                </Link>
+                                <Link to="/pricing" className={`text-sm font-medium ${isActive('/pricing') ? 'text-white' : 'text-[var(--text-secondary)] hover:text-white'}`}>
+                                    Fiyatlandırma
+                                </Link>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Right Side */}
+                    <div className="flex items-center gap-4">
+                        {isAuthenticated ? (
+                            <div className="flex items-center gap-4">
+                                <Link to="/profile" className="flex items-center gap-2 text-sm">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--accent-green)]/20 flex items-center justify-center">
+                                        <span className="text-[var(--accent-green)] font-bold">
+                                            {user?.name?.charAt(0).toUpperCase() || 'U'}
+                                        </span>
+                                    </div>
+                                    <span className="hidden sm:block text-[var(--text-secondary)]">{user?.name}</span>
+                                </Link>
+                                <button
+                                    onClick={logout}
+                                    className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-red)] transition-colors"
+                                >
+                                    Çıkış
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-3">
+                                <Link to="/login" className="btn btn-ghost text-sm">
+                                    Giriş Yap
+                                </Link>
+                                <Link to="/register" className="btn btn-primary text-sm">
+                                    Kayıt Ol
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </nav>
     );
-}
+};
+
+export default Navbar;

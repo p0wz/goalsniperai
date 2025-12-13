@@ -1,42 +1,37 @@
-import { motion } from 'framer-motion';
-
-const variants = {
-    primary: 'gradient-bg text-white font-semibold shadow-sm hover:shadow-accent hover:-translate-y-0.5 hover:brightness-110',
-    secondary: 'bg-transparent border border-border text-foreground hover:bg-muted hover:border-accent/30',
-    ghost: 'bg-transparent text-muted-foreground hover:text-foreground',
-};
-
-const sizes = {
-    default: 'h-12 px-6 text-sm',
-    lg: 'h-14 px-8 text-base',
-    sm: 'h-10 px-4 text-sm',
-};
-
-export function Button({
+const Button = ({
     children,
     variant = 'primary',
-    size = 'default',
+    size = 'md',
+    disabled = false,
+    loading = false,
     className = '',
-    asChild = false,
     ...props
-}) {
-    const Component = asChild ? 'span' : motion.button;
+}) => {
+    const variants = {
+        primary: 'btn-primary',
+        secondary: 'btn-secondary',
+        danger: 'btn-danger',
+        ghost: 'btn-ghost'
+    };
+
+    const sizes = {
+        sm: 'px-4 py-2 text-xs',
+        md: 'px-6 py-3 text-sm',
+        lg: 'px-8 py-4 text-base'
+    };
 
     return (
-        <Component
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={`
-        inline-flex items-center justify-center gap-2 rounded-xl font-medium
-        transition-all duration-200 cursor-pointer btn-ripple
-        disabled:opacity-50 disabled:cursor-not-allowed
-        ${variants[variant]}
-        ${sizes[size]}
-        ${className}
-      `}
+        <button
+            className={`btn ${variants[variant]} ${sizes[size]} ${disabled || loading ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+            disabled={disabled || loading}
             {...props}
         >
+            {loading && (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            )}
             {children}
-        </Component>
+        </button>
     );
-}
+};
+
+export default Button;

@@ -1,156 +1,190 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Navbar, Footer } from '../components/layout';
-import { Button, Card, Badge } from '../components/ui';
+import { Card, Button, Badge } from '../components/ui';
 
-const fadeInUp = {
-    hidden: { opacity: 0, y: 28 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] } }
-};
+const Pricing = () => {
+    const [billing, setBilling] = useState('monthly');
 
-const stagger = {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.1 } }
-};
+    const plans = [
+        {
+            name: 'Free',
+            price: { monthly: 0, yearly: 0 },
+            description: 'Başlamak için ideal',
+            features: [
+                'Günde 3 sinyal',
+                'Temel istatistikler',
+                'Email destek'
+            ],
+            notIncluded: [
+                'Kupon oluşturucu',
+                'Sinyal geçmişi',
+                'API erişimi',
+                'Öncelikli destek'
+            ],
+            cta: 'Ücretsiz Başla',
+            popular: false
+        },
+        {
+            name: 'Pro',
+            price: { monthly: 99, yearly: 79 },
+            description: 'Ciddi analistler için',
+            features: [
+                'Günde 25 sinyal',
+                'Kupon oluşturucu',
+                'Sinyal geçmişi',
+                'Detaylı istatistikler',
+                'Öncelikli destek'
+            ],
+            notIncluded: [
+                'API erişimi',
+                'Sınırsız sinyal'
+            ],
+            cta: 'Pro\'ya Başla',
+            popular: true
+        },
+        {
+            name: 'Premium',
+            price: { monthly: 199, yearly: 159 },
+            description: 'Profesyoneller için',
+            features: [
+                'Sınırsız sinyal',
+                'Kupon oluşturucu',
+                'Sinyal geçmişi',
+                'Detaylı istatistikler',
+                'API erişimi',
+                '7/24 öncelikli destek',
+                'Erken erişim özellikleri'
+            ],
+            notIncluded: [],
+            cta: 'Premium\'a Başla',
+            popular: false
+        }
+    ];
 
-export default function Pricing() {
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-[var(--bg-primary)]">
             <Navbar />
 
-            <section className="pt-32 pb-20 px-8 lg:px-12">
+            <main className="pt-24 pb-20 px-4">
                 <div className="max-w-6xl mx-auto">
-                    <motion.div
-                        initial="hidden"
-                        animate="visible"
-                        variants={stagger}
-                        className="text-center max-w-xl mx-auto mb-16"
-                    >
-                        <motion.div variants={fadeInUp} className="flex justify-center">
-                            <Badge>Fiyatlandırma</Badge>
-                        </motion.div>
-                        <motion.h1 variants={fadeInUp} className="font-display text-4xl lg:text-5xl mt-4">
-                            Basit ve <span className="gradient-text">şeffaf</span>
-                        </motion.h1>
-                        <motion.p variants={fadeInUp} className="text-muted-foreground mt-4 text-lg">
-                            Gizli ücret yok. İstediğiniz zaman iptal edin.
-                        </motion.p>
-                    </motion.div>
+                    {/* Header */}
+                    <div className="text-center mb-12">
+                        <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                            Sana Uygun <span className="text-gradient">Planı Seç</span>
+                        </h1>
+                        <p className="text-[var(--text-secondary)] max-w-xl mx-auto mb-8">
+                            İhtiyacına göre planını seç. İstediğin zaman yükselt veya iptal et.
+                        </p>
 
-                    <motion.div
-                        initial="hidden"
-                        animate="visible"
-                        variants={stagger}
-                        className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-20"
-                    >
-                        <PricingCard
-                            name="Başlangıç"
-                            price="0₺"
-                            period="Sonsuza kadar ücretsiz"
-                            features={[
-                                { text: 'Günlük 3 sinyal', included: true },
-                                { text: 'IY 0.5 stratejisi', included: true },
-                                { text: 'Temel istatistikler', included: true },
-                                { text: 'MS Gol stratejisi', included: false },
-                                { text: 'Yapay zeka analizi', included: false },
-                            ]}
-                            buttonText="Ücretsiz başla"
-                            buttonVariant="secondary"
-                        />
-                        <PricingCard
-                            name="Pro"
-                            price="99₺"
-                            period="aylık"
-                            featured
-                            features={[
-                                { text: 'Sınırsız sinyal', included: true },
-                                { text: 'Tüm stratejiler', included: true },
-                                { text: 'Detaylı istatistikler', included: true },
-                                { text: 'Gerçek zamanlı veri', included: true },
-                                { text: 'Yapay zeka analizi', included: true },
-                            ]}
-                            buttonText="Pro'ya geçin"
-                            buttonVariant="primary"
-                        />
+                        {/* Billing Toggle */}
+                        <div className="inline-flex items-center gap-2 p-1 rounded-lg bg-[var(--bg-secondary)]">
+                            <button
+                                onClick={() => setBilling('monthly')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${billing === 'monthly' ? 'bg-[var(--accent-green)] text-black' : 'text-[var(--text-secondary)]'
+                                    }`}
+                            >
+                                Aylık
+                            </button>
+                            <button
+                                onClick={() => setBilling('yearly')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${billing === 'yearly' ? 'bg-[var(--accent-green)] text-black' : 'text-[var(--text-secondary)]'
+                                    }`}
+                            >
+                                Yıllık
+                                <Badge variant="success" className="ml-2">-20%</Badge>
+                            </button>
+                        </div>
+                    </div>
 
-                    </motion.div>
+                    {/* Plans Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {plans.map((plan) => (
+                            <Card
+                                key={plan.name}
+                                className={`relative ${plan.popular ? 'border-[var(--accent-green)] ring-2 ring-[var(--accent-green)]/20' : ''}`}
+                                hover={false}
+                            >
+                                {plan.popular && (
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                        <Badge variant="success">En Popüler</Badge>
+                                    </div>
+                                )}
+
+                                <div className="text-center mb-6">
+                                    <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
+                                    <p className="text-sm text-[var(--text-secondary)]">{plan.description}</p>
+                                </div>
+
+                                <div className="text-center mb-6">
+                                    <span className="text-4xl font-bold">
+                                        {plan.price[billing]}₺
+                                    </span>
+                                    <span className="text-[var(--text-secondary)]">/ay</span>
+                                    {billing === 'yearly' && plan.price.monthly > 0 && (
+                                        <p className="text-xs text-[var(--text-muted)] line-through">
+                                            {plan.price.monthly}₺/ay
+                                        </p>
+                                    )}
+                                </div>
+
+                                <Link to="/register">
+                                    <Button
+                                        variant={plan.popular ? 'primary' : 'secondary'}
+                                        className="w-full mb-6"
+                                    >
+                                        {plan.cta}
+                                    </Button>
+                                </Link>
+
+                                <div className="space-y-3">
+                                    {plan.features.map((feature, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-sm">
+                                            <span className="text-[var(--accent-green)]">✓</span>
+                                            <span>{feature}</span>
+                                        </div>
+                                    ))}
+                                    {plan.notIncluded.map((feature, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                                            <span>✕</span>
+                                            <span>{feature}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
 
                     {/* FAQ */}
-                    <motion.div
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true }}
-                        variants={stagger}
-                        className="max-w-2xl mx-auto"
-                    >
-                        <motion.h2 variants={fadeInUp} className="font-display text-2xl text-center mb-8">
-                            Sıkça Sorulan Sorular
-                        </motion.h2>
-
-                        <div className="space-y-4">
-                            <FAQItem
-                                question="Sinyaller ne kadar güvenilir?"
-                                answer="Sistem gerçek zamanlı maç verilerini analiz eder. Tarihsel veriler %85+ başarı oranı göstermektedir."
-                            />
-                            <FAQItem
-                                question="Planlar arasında geçiş yapabilir miyim?"
-                                answer="Evet, istediğiniz zaman yükseltme veya düşürme yapabilirsiniz."
-                            />
-                            <FAQItem
-                                question="Ödeme yöntemleri nelerdir?"
-                                answer="Kredi kartı, banka kartı ve havale ile ödeme yapabilirsiniz."
-                            />
+                    <div className="mt-20">
+                        <h2 className="text-2xl font-bold text-center mb-8">Sık Sorulan Sorular</h2>
+                        <div className="max-w-3xl mx-auto space-y-4">
+                            <Card hover={false}>
+                                <h4 className="font-semibold mb-2">Ücretsiz plan ne kadar süre geçerli?</h4>
+                                <p className="text-sm text-[var(--text-secondary)]">
+                                    Ücretsiz plan süresiz! İstediğin kadar kullanabilirsin, günlük sinyal limiti var.
+                                </p>
+                            </Card>
+                            <Card hover={false}>
+                                <h4 className="font-semibold mb-2">Planımı nasıl yükseltirim?</h4>
+                                <p className="text-sm text-[var(--text-secondary)]">
+                                    Profil sayfasından veya bu sayfadan istediğin plana geçebilirsin. Ödemen anında aktif olur.
+                                </p>
+                            </Card>
+                            <Card hover={false}>
+                                <h4 className="font-semibold mb-2">İptal edebilir miyim?</h4>
+                                <p className="text-sm text-[var(--text-secondary)]">
+                                    Evet, istediğin zaman iptal edebilirsin. Dönem sonuna kadar premium özellikler aktif kalır.
+                                </p>
+                            </Card>
                         </div>
-                    </motion.div>
+                    </div>
                 </div>
-            </section>
+            </main>
 
             <Footer />
         </div>
     );
-}
+};
 
-function PricingCard({ name, price, period, features, buttonText, buttonVariant, featured = false }) {
-    return (
-        <motion.div variants={fadeInUp}>
-            <Card featured={featured} className={`h-full ${featured ? 'relative' : ''}`}>
-                {featured && (
-                    <div className="absolute -top-3 left-6 px-3 py-1 gradient-bg rounded text-xs font-bold text-white">
-                        Önerilen
-                    </div>
-                )}
-                <div className="text-sm text-muted-foreground uppercase tracking-wide">{name}</div>
-                <div className="font-display text-4xl mt-2">{price}</div>
-                <div className="text-sm text-muted-foreground mt-1 mb-6">{period}</div>
-
-                <ul className="space-y-3 mb-8">
-                    {features.map((feature, i) => (
-                        <li key={i} className={`flex items-center gap-3 text-sm ${feature.included ? 'text-foreground' : 'text-muted-foreground/50'}`}>
-                            <span className={feature.included ? 'text-accent' : 'text-muted-foreground/30'}>
-                                {feature.included ? '✓' : '✕'}
-                            </span>
-                            {feature.text}
-                        </li>
-                    ))}
-                </ul>
-
-                <Link to={`/register?plan=${name.toLowerCase()}`} className="block">
-                    <Button variant={buttonVariant} className="w-full">
-                        {buttonText}
-                    </Button>
-                </Link>
-            </Card>
-        </motion.div>
-    );
-}
-
-function FAQItem({ question, answer }) {
-    return (
-        <motion.div variants={fadeInUp}>
-            <Card hover={false} className="p-6">
-                <h3 className="font-semibold mb-2">{question}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{answer}</p>
-            </Card>
-        </motion.div>
-    );
-}
+export default Pricing;

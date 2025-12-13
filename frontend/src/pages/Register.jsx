@@ -1,213 +1,206 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { API_URL } from '../config';
-import { motion } from 'framer-motion';
-import { Button, Input, FormGroup, Label } from '../components/ui';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Navbar, Footer } from '../components/layout';
+import { Button, Input, Card } from '../components/ui';
 
-export default function Register() {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+const Register = () => {
+    const { register, error } = useAuth();
+    const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+    const [formError, setFormError] = useState('');
 
-    const passwordStrength = () => {
-        if (password.length === 0) return { level: 0, text: '', color: '' };
-        if (password.length < 6) return { level: 1, text: 'Zayıf', color: 'bg-red-500' };
-        if (password.length < 8) return { level: 2, text: 'Orta', color: 'bg-orange-500' };
-        if (/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) return { level: 4, text: 'Güçlü', color: 'bg-green-500' };
-        return { level: 3, text: 'İyi', color: 'bg-accent' };
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+        setFormError('');
     };
 
-    const strength = passwordStrength();
+    const validatePassword = (password) => {
+        if (password.length < 8) return 'Şifre en az 8 karakter olmalı';
+        if (!/[A-Z]/.test(password)) return 'Şifre en az 1 büyük harf içermeli';
+        if (!/[0-9]/.test(password)) return 'Şifre en az 1 rakam içermeli';
+        return null;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+
+        if (!formData.name || !formData.email || !formData.password) {
+            setFormError('Tüm alanları doldurun');
+            return;
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+            setFormError('Şifreler eşleşmiyor');
+            return;
+        }
+
+        const passwordError = validatePassword(formData.password);
+        if (passwordError) {
+            setFormError(passwordError);
+            return;
+        }
+
         setLoading(true);
+        const result = await register(formData.email, formData.password, formData.name);
+        setLoading(false);
 
-        try {
-            const res = await fetch(`${API_URL}/api/auth/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, password }),
-                credentials: 'include'
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                // Token is securely stored in httpOnly cookie by backend
-                navigate('/dashboard');
-            } else {
-                setError(data.error || 'Kayıt başarısız');
-            }
-        } catch (err) {
-            setError('Bağlantı hatası');
-        } finally {
-            setLoading(false);
+        if (!result.success) {
+            setFormError(result.error);
         }
     };
 
+    // Password strength indicator
+    const getPasswordStrength = () => {
+        const { password } = formData;
+        if (!password) return { level: 0, text: '', color: '' };
+
+        let score = 0;
+        if (password.length >= 8) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[0-9]/.test(password)) score++;
+        if (/[^A-Za-z0-9]/.test(password)) score++;
+
+        if (score <= 1) return { level: 25, text: 'Zayıf', color: 'var(--accent-red)' };
+        if (score === 2) return { level: 50, text: 'Orta', color: 'var(--accent-gold)' };
+        if (score === 3) return { level: 75, text: 'İyi', color: 'var(--accent-blue)' };
+        return { level: 100, text: 'Güçlü', color: 'var(--accent-green)' };
+    };
+
+    const strength = getPasswordStrength();
+
     return (
-        <div className="min-h-screen bg-background flex">
-            {/* Left: Promo */}
-            <div className="hidden lg:flex flex-1 items-center justify-center p-12 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-accent/10 rounded-full blur-[120px]" />
-                <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-accent-secondary/10 rounded-full blur-[100px]" />
+        <div className="min-h-screen flex flex-col bg-[var(--bg-primary)]">
+            <Navbar />
 
-                <motion.div
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className="relative z-10 max-w-lg"
-                >
-                    <div className="section-badge mb-6">
-                        <span className="section-badge-dot pulse-dot" />
-                        <span className="section-badge-text">Hemen başlayın</span>
-                    </div>
-
-                    <h1 className="font-display text-5xl leading-tight mb-4">
-                        <span className="gradient-text">Ücretsiz</span> hesap oluşturun
-                    </h1>
-
-                    <p className="text-muted-foreground text-lg leading-relaxed mb-10">
-                        Kredi kartı gerektirmez. Anında erişim sağlayın.
-                    </p>
-
-                    <div className="space-y-4">
-                        <Feature icon="✓" text="Günlük 3 ücretsiz sinyal" />
-                        <Feature icon="✓" text="IY 0.5 stratejisi" />
-                        <Feature icon="✓" text="Temel istatistikler" />
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 5, repeat: Infinity }}
-                    className="absolute bottom-[20%] right-[10%] bg-card border border-border rounded-xl p-4 shadow-lg"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg gradient-bg flex items-center justify-center">🚀</div>
-                        <div>
-                            <div className="text-sm font-semibold">Ücretsiz</div>
-                            <div className="text-xs text-muted-foreground">Başlangıç</div>
+            <main className="flex-1 flex items-center justify-center pt-16 px-4 py-8">
+                <div className="w-full max-w-md">
+                    {/* Header */}
+                    <div className="text-center mb-8">
+                        <div className="inline-flex items-center gap-2 mb-4">
+                            <span className="text-4xl">⚽</span>
+                            <span className="text-2xl font-bold text-gradient">GoalSniper Pro</span>
                         </div>
+                        <h1 className="text-2xl font-bold mb-2">Hesap Oluştur</h1>
+                        <p className="text-[var(--text-secondary)]">Ücretsiz başla, istediğin zaman yükselt</p>
                     </div>
-                </motion.div>
-            </div>
 
-            {/* Right: Form */}
-            <div className="flex-1 flex items-center justify-center p-8 lg:p-12 bg-muted/30 border-l border-border relative">
-                <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden">
-                    <motion.div
-                        animate={{ x: ['-100%', '100%'] }}
-                        transition={{ duration: 3, repeat: Infinity }}
-                        className="w-full h-full gradient-bg"
-                    />
-                </div>
-
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="w-full max-w-sm"
-                >
-                    <Link to="/" className="flex items-center gap-3 mb-12 group">
-                        <div className="w-9 h-9 rounded-lg gradient-bg flex items-center justify-center shadow-accent">
-                            ⚽
-                        </div>
-                        <span className="font-display text-xl group-hover:text-accent transition-colors">
-                            GoalGPT
-                        </span>
-                    </Link>
-
-                    <h2 className="font-display text-3xl mb-2">Hesap oluştur</h2>
-                    <p className="text-muted-foreground mb-8">Ücretsiz başlayın</p>
-
-                    {error && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-red-500/10 border border-red-500/30 text-red-600 rounded-lg px-4 py-3 mb-6 text-sm"
-                        >
-                            {error}
-                        </motion.div>
-                    )}
-
-                    <form onSubmit={handleSubmit}>
-                        <FormGroup>
-                            <Label htmlFor="name">Ad Soyad</Label>
-                            <Input
-                                id="name"
-                                type="text"
-                                placeholder="John Doe"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                required
-                            />
-                        </FormGroup>
-
-                        <FormGroup>
-                            <Label htmlFor="email">E-posta</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="ornek@email.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </FormGroup>
-
-                        <FormGroup>
-                            <Label htmlFor="password">Şifre</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                            {password && (
-                                <div className="mt-2">
-                                    <div className="flex gap-1 mb-1">
-                                        {[1, 2, 3, 4].map((level) => (
-                                            <div
-                                                key={level}
-                                                className={`h-1 flex-1 rounded ${level <= strength.level ? strength.color : 'bg-border'}`}
-                                            />
-                                        ))}
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">{strength.text}</span>
+                    {/* Form Card */}
+                    <Card hover={false} className="animate-fadeIn">
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            {/* Error Message */}
+                            {(formError || error) && (
+                                <div className="p-3 rounded-lg bg-[var(--accent-red)]/20 border border-[var(--accent-red)]/30">
+                                    <p className="text-sm text-[var(--accent-red)]">{formError || error}</p>
                                 </div>
                             )}
-                        </FormGroup>
 
-                        <Button type="submit" className="w-full mt-2" disabled={loading}>
-                            {loading ? 'Kayıt yapılıyor...' : 'Kayıt ol'}
-                        </Button>
-                    </form>
+                            {/* Name */}
+                            <Input
+                                label="Ad Soyad"
+                                type="text"
+                                name="name"
+                                placeholder="Ahmet Yılmaz"
+                                value={formData.name}
+                                onChange={handleChange}
+                                icon="👤"
+                            />
 
-                    <p className="text-center text-muted-foreground mt-6 text-sm">
-                        Zaten hesabınız var mı?{' '}
-                        <Link to="/login" className="text-accent hover:underline font-medium">
-                            Giriş yapın
-                        </Link>
-                    </p>
-                </motion.div>
-            </div>
+                            {/* Email */}
+                            <Input
+                                label="Email"
+                                type="email"
+                                name="email"
+                                placeholder="ornek@email.com"
+                                value={formData.email}
+                                onChange={handleChange}
+                                icon="📧"
+                            />
+
+                            {/* Password */}
+                            <div>
+                                <Input
+                                    label="Şifre"
+                                    type="password"
+                                    name="password"
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    icon="🔒"
+                                />
+                                {/* Strength Indicator */}
+                                {formData.password && (
+                                    <div className="mt-2">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                            <span className="text-[var(--text-muted)]">Şifre Gücü</span>
+                                            <span style={{ color: strength.color }}>{strength.text}</span>
+                                        </div>
+                                        <div className="h-1 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full transition-all duration-300"
+                                                style={{ width: `${strength.level}%`, backgroundColor: strength.color }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Confirm Password */}
+                            <Input
+                                label="Şifre Tekrar"
+                                type="password"
+                                name="confirmPassword"
+                                placeholder="••••••••"
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                                icon="🔒"
+                                error={formData.confirmPassword && formData.password !== formData.confirmPassword ? 'Şifreler eşleşmiyor' : ''}
+                            />
+
+                            {/* Terms */}
+                            <p className="text-xs text-[var(--text-muted)]">
+                                Kayıt olarak{' '}
+                                <a href="#" className="text-[var(--accent-blue)] hover:underline">Kullanım Şartlarını</a>
+                                {' '}ve{' '}
+                                <a href="#" className="text-[var(--accent-blue)] hover:underline">Gizlilik Politikasını</a>
+                                {' '}kabul etmiş olursunuz.
+                            </p>
+
+                            {/* Submit */}
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                className="w-full"
+                                loading={loading}
+                            >
+                                Kayıt Ol
+                            </Button>
+                        </form>
+
+                        {/* Divider */}
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-[var(--border-color)]" />
+                            </div>
+                            <div className="relative flex justify-center">
+                                <span className="px-4 text-sm text-[var(--text-muted)] bg-[var(--bg-card)]">veya</span>
+                            </div>
+                        </div>
+
+                        {/* Login Link */}
+                        <p className="text-center text-sm text-[var(--text-secondary)]">
+                            Zaten hesabın var mı?{' '}
+                            <Link to="/login" className="text-[var(--accent-green)] font-semibold hover:underline">
+                                Giriş Yap
+                            </Link>
+                        </p>
+                    </Card>
+                </div>
+            </main>
+
+            <Footer />
         </div>
     );
-}
+};
 
-function Feature({ icon, text }) {
-    return (
-        <div className="flex items-center gap-3">
-            <span className="text-accent font-bold">{icon}</span>
-            <span className="text-foreground">{text}</span>
-        </div>
-    );
-}
+export default Register;

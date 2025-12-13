@@ -1,59 +1,17 @@
-import { motion } from 'framer-motion';
-
-export function Card({
-    children,
-    className = '',
-    hover = true,
-    featured = false,
-    ...props
-}) {
-    if (featured) {
-        return (
-            <div className="rounded-xl bg-gradient-to-br from-accent via-accent-secondary to-accent p-[2px]">
-                <motion.div
-                    whileHover={hover ? { y: -4 } : undefined}
-                    className={`
-            h-full w-full rounded-[calc(12px-2px)] bg-card p-6
-            transition-shadow duration-300
-            ${hover ? 'hover:shadow-xl' : ''}
-            ${className}
-          `}
-                    {...props}
-                >
-                    {children}
-                </motion.div>
-            </div>
-        );
-    }
-
+const Card = ({ children, className = '', hover = true, glow = false, ...props }) => {
     return (
-        <motion.div
-            whileHover={hover ? { y: -4 } : undefined}
+        <div
             className={`
-        bg-card border border-border rounded-xl p-6
-        transition-all duration-300 card-hover-gradient
-        ${hover ? 'hover:shadow-xl hover:border-muted-foreground/20' : ''}
+        bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6
+        ${hover ? 'transition-all duration-300 hover:border-[var(--accent-green)] hover:shadow-[0_0_20px_rgba(0,255,136,0.1)]' : ''}
+        ${glow ? 'shadow-[0_0_20px_rgba(0,255,136,0.2)]' : ''}
         ${className}
       `}
             {...props}
         >
             {children}
-        </motion.div>
+        </div>
     );
-}
+};
 
-export function CardHeader({ children, className = '' }) {
-    return <div className={`mb-4 ${className}`}>{children}</div>;
-}
-
-export function CardTitle({ children, className = '' }) {
-    return <h3 className={`text-lg font-semibold ${className}`}>{children}</h3>;
-}
-
-export function CardDescription({ children, className = '' }) {
-    return <p className={`text-sm text-muted-foreground ${className}`}>{children}</p>;
-}
-
-export function CardContent({ children, className = '' }) {
-    return <div className={className}>{children}</div>;
-}
+export default Card;

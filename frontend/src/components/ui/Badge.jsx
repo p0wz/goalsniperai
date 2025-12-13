@@ -1,27 +1,18 @@
-export function Badge({ children, pulse = false, className = '' }) {
-    return (
-        <div className={`section-badge ${className}`}>
-            <span className={`section-badge-dot ${pulse ? 'pulse-dot' : ''}`} />
-            <span className="section-badge-text">{children}</span>
-        </div>
-    );
-}
-
-export function StatusBadge({ children, variant = 'default', className = '' }) {
+const Badge = ({ children, variant = 'default', className = '' }) => {
     const variants = {
-        default: 'bg-muted text-muted-foreground',
-        accent: 'bg-accent/10 text-accent border border-accent/30',
-        success: 'bg-green-500/10 text-green-600 border border-green-500/30',
-        warning: 'bg-orange-500/10 text-orange-600 border border-orange-500/30',
+        default: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
+        success: 'bg-[var(--accent-green)]/20 text-[var(--accent-green)]',
+        danger: 'bg-[var(--accent-red)]/20 text-[var(--accent-red)]',
+        warning: 'bg-[var(--accent-gold)]/20 text-[var(--accent-gold)]',
+        info: 'bg-[var(--accent-blue)]/20 text-[var(--accent-blue)]',
+        premium: 'bg-[var(--accent-purple)]/20 text-[var(--accent-purple)]'
     };
 
     return (
-        <span className={`
-      inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
-      ${variants[variant]}
-      ${className}
-    `}>
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${variants[variant]} ${className}`}>
             {children}
         </span>
     );
-}
+};
+
+export default Badge;
