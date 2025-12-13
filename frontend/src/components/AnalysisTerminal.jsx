@@ -158,7 +158,7 @@ export default function AnalysisTerminal({ onComplete }) {
                         🧪 Test (1 Maç)
                     </button>
                     <button
-                        onClick={() => startAnalysis(50)}
+                        onClick={() => startAnalysis(150)}
                         disabled={isRunning}
                         className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${isRunning
                             ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
@@ -174,7 +174,7 @@ export default function AnalysisTerminal({ onComplete }) {
                                 Analiz Ediliyor...
                             </span>
                         ) : (
-                            '🚀 Tam Analiz (50)'
+                            '🚀 Tam Analiz (150)'
                         )}
                     </button>
                 </div>
