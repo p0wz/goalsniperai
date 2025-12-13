@@ -58,6 +58,7 @@ function LiveBotPanel() {
     const subTabs = [
         { id: 'status', label: 'Durum', icon: '🔴' },
         { id: 'signals', label: 'Sinyaller', icon: '📡' },
+        { id: 'history', label: 'Geçmiş', icon: '📊' },
         { id: 'filters', label: 'Filtreler', icon: '🎛️' },
         { id: 'logs', label: 'Loglar', icon: '📜' },
     ];
@@ -71,8 +72,8 @@ function LiveBotPanel() {
                         key={tab.id}
                         onClick={() => setActiveSubTab(tab.id)}
                         className={`px-4 py-2 rounded-lg font-medium transition-all ${activeSubTab === tab.id
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/50'
-                                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-800'
                             }`}
                     >
                         {tab.icon} {tab.label}
@@ -134,6 +135,59 @@ function LiveBotPanel() {
                         <div className="grid gap-4">
                             {signals.slice(0, 20).map((signal, i) => (
                                 <SignalCard key={signal.id || i} signal={signal} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* History Panel */}
+            {activeSubTab === 'history' && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold text-white">Maç Geçmişi</h3>
+                        <div className="flex gap-2">
+                            <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
+                                ✅ {signals.filter(s => s.result === 'WON').length} WON
+                            </span>
+                            <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">
+                                ❌ {signals.filter(s => s.result === 'LOST').length} LOST
+                            </span>
+                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                                ⏳ {signals.filter(s => !s.result || s.result === 'PENDING').length} PENDING
+                            </span>
+                        </div>
+                    </div>
+
+                    {signals.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                            Henüz geçmiş maç yok
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {signals.map((signal, i) => (
+                                <div key={signal.id || i} className={`bg-gray-800/50 border rounded-lg p-4 ${signal.result === 'WON' ? 'border-green-500/50' :
+                                        signal.result === 'LOST' ? 'border-red-500/50' :
+                                            'border-gray-700'
+                                    }`}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <div className="text-white font-semibold">{signal.home} vs {signal.away}</div>
+                                            <div className="text-gray-400 text-sm">{signal.league}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            {signal.result === 'WON' && <span className="text-green-400 font-bold">✅ WON</span>}
+                                            {signal.result === 'LOST' && <span className="text-red-400 font-bold">❌ LOST</span>}
+                                            {(!signal.result || signal.result === 'PENDING') && <span className="text-yellow-400">⏳ Bekliyor</span>}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2 text-xs text-gray-400 mt-2">
+                                        <div>📍 {signal.strategyCode}</div>
+                                        <div>💯 {signal.confidencePercent}%</div>
+                                        <div>⏱️ {signal.elapsed}'</div>
+                                        <div>📅 {signal.timestamp ? new Date(signal.timestamp).toLocaleDateString('tr-TR') : '-'}</div>
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     )}

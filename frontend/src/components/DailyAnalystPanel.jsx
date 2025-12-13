@@ -22,7 +22,7 @@ function DailyAnalystPanel() {
 
     const fetchCandidates = async () => {
         try {
-            const res = await fetch(`${BASE_URL}/api/daily-signals`);
+            const res = await fetch(`${BASE_URL}/api/daily-analysis`, { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
                 setCandidates(data);
@@ -37,7 +37,7 @@ function DailyAnalystPanel() {
         setLogs([{ time: new Date().toLocaleTimeString(), msg: '🚀 Analiz başlatılıyor...' }]);
 
         try {
-            const eventSource = new EventSource(`${BASE_URL}/api/run-daily-analysis?limit=${analysisLimit}`);
+            const eventSource = new EventSource(`${BASE_URL}/api/daily-analysis/stream?limit=${analysisLimit}`);
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -63,7 +63,7 @@ function DailyAnalystPanel() {
 
     const approveSignal = async (id) => {
         try {
-            const res = await fetch(`${BASE_URL}/api/approve-signal/${id}`, { method: 'POST' });
+            const res = await fetch(`${BASE_URL}/api/daily-analysis/approve/${id}`, { method: 'POST', credentials: 'include' });
             if (res.ok) {
                 fetchCandidates();
             }
@@ -74,7 +74,7 @@ function DailyAnalystPanel() {
 
     const rejectSignal = async (id) => {
         try {
-            const res = await fetch(`${BASE_URL}/api/reject-signal/${id}`, { method: 'POST' });
+            const res = await fetch(`${BASE_URL}/api/daily-analysis/reject/${id}`, { method: 'POST', credentials: 'include' });
             if (res.ok) {
                 fetchCandidates();
             }
@@ -120,8 +120,8 @@ function DailyAnalystPanel() {
                         key={tab.id}
                         onClick={() => setActiveSubTab(tab.id)}
                         className={`px-4 py-2 rounded-lg font-medium transition-all ${activeSubTab === tab.id
-                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-                                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-800'
                             }`}
                     >
                         {tab.icon} {tab.label}
@@ -152,8 +152,8 @@ function DailyAnalystPanel() {
                                     onClick={runAnalysis}
                                     disabled={isRunning}
                                     className={`w-full py-3 rounded-lg font-semibold transition-all ${isRunning
-                                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
+                                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
                                         }`}
                                 >
                                     {isRunning ? '⏳ Analiz Devam Ediyor...' : '▶️ Analiz Başlat'}
@@ -186,8 +186,8 @@ function DailyAnalystPanel() {
                                 key={market.id}
                                 onClick={() => setSelectedMarket(market.id)}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${selectedMarket === market.id
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-gray-800 text-gray-400 hover:text-white'
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-800 text-gray-400 hover:text-white'
                                     }`}
                             >
                                 {market.label} <span className="ml-1 opacity-60">({market.count})</span>

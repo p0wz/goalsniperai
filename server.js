@@ -1834,6 +1834,28 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// ❌ Reject Daily Candidate
+// ============================================
+app.post('/api/daily-analysis/reject/:id', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+
+    try {
+        // Remove from approved IDs if exists
+        APPROVED_IDS.delete(id);
+        saveApprovals();
+
+        log.warn(`Daily candidate rejected: ${id}`);
+        res.json({ success: true, id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
 // 📡 SSE Streaming Endpoint for Live Analysis
 // ============================================
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
