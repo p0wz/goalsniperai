@@ -1,8 +1,21 @@
 import axios from 'axios';
 
 // Create axios instance with default config
+// Construct Base URL:
+// 1. Production: VITE_API_URL should be the domain (e.g. https://server.com) -> result https://server.com/api
+// 2. Development: VITE_API_URL is empty -> result /api (which proxies to localhost:3000/api)
+const getBaseUrl = () => {
+    let url = import.meta.env.VITE_API_URL || '';
+    if (url && url.endsWith('/')) {
+        url = url.slice(0, -1); // Remove trailing slash if present
+    }
+    // If VITE_API_URL provides full path with /api, use it, otherwise append.
+    // Simplifying assumption: User provides DOMAIN only.
+    return url ? `${url}/api` : '/api';
+};
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '/api', // Use env var in prod, proxy in dev
+    baseURL: getBaseUrl(),
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
