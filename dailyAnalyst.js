@@ -301,9 +301,7 @@ function calculateAdvancedStats(history, teamName) {
 // 3. Process & Filter
 async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     const candidates = {
-        firstHalfOver05: [],  // NEW: Replaces over15
         over25: [],
-        // btts: [], // REMOVED
         doubleChance: [],
         homeOver15: [],
         under35: [],
@@ -390,17 +388,7 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         // Check each filter
         const passedFilters = [];
 
-        // Logic A: First Half Over 0.5 (NEW - Replaces Over 1.5)
-        // Both teams have high HT goal rate, aggressive early play
-        const homeHtRate = homeForm.htGoalRate || 0;
-        const awayHtRate = awayForm.htGoalRate || 0;
-        if (homeHtRate >= 60 && awayHtRate >= 60 &&
-            homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 60) {
-            candidates.firstHalfOver05.push({ ...m, filterStats: stats, market: 'First Half Over 0.5' });
-            passedFilters.push('1H Over 0.5');
-        }
-
-        // Logic B: Over 2.5 (IMPROVED)
+        // Logic A: Over 2.5 (IMPROVED)
         // Lig ort ≥3.0, Her iki takım O2.5 ≥70%, Ev avgScored ≥1.5
         if (proxyLeagueAvg >= 3.0 &&
             homeForm.over25Rate >= 70 && awayForm.over25Rate >= 70 &&
@@ -462,9 +450,7 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`   • Processed: ${processed}/${limit}`);
     log.info(`   • Skipped (No H2H): ${skippedNoH2H}`);
     log.info(`   • Skipped (No Stats): ${skippedNoStats}`);
-    log.info(`   • 1H Over 0.5 candidates: ${candidates.firstHalfOver05.length}`);
     log.info(`   • Over 2.5 candidates: ${candidates.over25.length}`);
-    // log.info(`   • BTTS candidates: ${candidates.btts.length}`); // REMOVED
     log.info(`   • 1X DC candidates: ${candidates.doubleChance.length}`);
     log.info(`   • Home O1.5 candidates: ${candidates.homeOver15.length}`);
     log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
@@ -564,7 +550,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { firstHalfOver05: [], btts: [], doubleChance: [], homeOver15: [], under35: [], under25: [] };
+        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [] };
     }
 
     log.info(`✅ Found ${matches.length} upcoming fixtures. Processing top ${customLimit}...`);
@@ -581,7 +567,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        firstHalfOver05: [], over25: [], doubleChance: [], homeOver15: [], under35: [], under25: []
+        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: []
     };
 
     // Convert candidates to results format (no AI validation)
