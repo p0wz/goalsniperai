@@ -765,7 +765,7 @@ async function fetchMatchStats(matchId, retries = 3) {
         } catch (error) {
             const is429 = error.response?.status === 429 || error.message?.includes('429');
             if (is429 && attempt < retries) {
-                const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+                const delay = Math.pow(3, attempt) * 1000; // 3s, 9s, 27s (slower to avoid rate limits)
                 log.warn(`[Stats] 429 Rate Limit - Retrying in ${delay / 1000}s (${attempt}/${retries})`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
@@ -831,20 +831,30 @@ async function fetchMatchOdds(matchId) {
 // ============================================
 // 🤝 Fetch Match H2H (Head-to-Head History)
 // ============================================
-async function fetchMatchH2H(matchId) {
+async function fetchMatchH2H(matchId, retries = 3) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
 
-    try {
-        const response = await axios.get(
-            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
-            { headers: FLASHSCORE_API.headers, timeout: 10000 }
-        );
-        dailyRequestCount++;
-        return response.data;
-    } catch (error) {
-        log.warn(`H2H fetch failed for ${matchId}: ${error.message}`);
-        return null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await axios.get(
+                `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
+                { headers: FLASHSCORE_API.headers, timeout: 10000 }
+            );
+            dailyRequestCount++;
+            return response.data;
+        } catch (error) {
+            const is429 = error.response?.status === 429 || error.message?.includes('429');
+            if (is429 && attempt < retries) {
+                const delay = Math.pow(3, attempt) * 1000;
+                log.warn(`[H2H] 429 Rate Limit - Retrying in ${delay / 1000}s (${attempt}/${retries})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            log.warn(`H2H fetch failed for ${matchId}: ${error.message}`);
+            return null;
+        }
     }
+    return null;
 }
 
 // ============================================
@@ -1490,6 +1500,13 @@ async function processMatches() {
         }
         log.info(`      ✅ ${h2hAnalysis.reason}`);
 
+        // 📊 DETAILED H2H STATS LOGGING
+        if (h2hAnalysis.homeForm && h2hAnalysis.awayForm) {
+            log.info(`      📈 H2H STATS: Home(${h2hAnalysis.homeMatches || 0} matches): ${h2hAnalysis.homeForm} | Goal%: ${h2hAnalysis.homeGoalRate || 0}%`);
+            log.info(`      📈 H2H STATS: Away(${h2hAnalysis.awayMatches || 0} matches): ${h2hAnalysis.awayForm} | Goal%: ${h2hAnalysis.awayGoalRate || 0}%`);
+            log.info(`      📈 H2H STATS: HT Goal Rate: ${h2hAnalysis.htGoalRate || 'N/A'}% | SH Goal Rate: ${h2hAnalysis.shGoalRate || 'N/A'}% | Expected: ${h2hAnalysis.expectedTotal || 'N/A'}`);
+        }
+
         // Add H2H context to candidate
         candidate.h2h = h2hAnalysis;
 
@@ -1520,6 +1537,22 @@ async function processMatches() {
         // Cap confidence
         if (candidate.confidencePercent > 95) candidate.confidencePercent = 95;
         if (candidate.confidencePercent < 30) candidate.confidencePercent = 30;
+
+        // 🚨 SCORE RE-VERIFICATION (Post-Momentum Goal Check)
+        // Re-check the current score to make sure no goal was scored after momentum was detected
+        const freshMatchData = await fetchMatchDetails(matchId);
+        if (freshMatchData) {
+            const freshHomeScore = freshMatchData.home_team?.score || 0;
+            const freshAwayScore = freshMatchData.away_team?.score || 0;
+            const originalHomeScore = match.home_team?.score || 0;
+            const originalAwayScore = match.away_team?.score || 0;
+
+            if (freshHomeScore !== originalHomeScore || freshAwayScore !== originalAwayScore) {
+                log.warn(`      🚨 SCORE CHANGED! Original: ${originalHomeScore}-${originalAwayScore} → Now: ${freshHomeScore}-${freshAwayScore} - Skipping stale signal`);
+                continue; // Goal was scored AFTER momentum detection, skip!
+            }
+            log.info(`      ✅ Score verified: ${freshHomeScore}-${freshAwayScore} (no change)`);
+        }
 
         // Send to Gemini for AI validation
         log.gemini(`      🤖 Asking Gemini AI...`);
