@@ -1490,6 +1490,34 @@ async function processMatches() {
         // Add H2H context to candidate
         candidate.h2h = h2hAnalysis;
 
+        // 📊 HALF-SPECIFIC CONFIDENCE ADJUSTMENT (Soft Bonus/Penalty)
+        const htRate = parseFloat(h2hAnalysis.htGoalRate) || 0;
+        const shRate = parseFloat(h2hAnalysis.shGoalRate) || 0;
+
+        if (candidate.strategyCode === 'FIRST_HALF' && h2hAnalysis.htGoalRate !== 'N/A') {
+            if (htRate < 30) {
+                candidate.confidencePercent -= 10;
+                candidate.reason += ` | ⚠️ Low 1H rate (${htRate}%)`;
+            } else if (htRate > 60) {
+                candidate.confidencePercent += 5;
+                candidate.reason += ` | 📈 High 1H rate (${htRate}%)`;
+            }
+        }
+
+        if (candidate.strategyCode === 'LATE_GAME' && h2hAnalysis.shGoalRate !== 'N/A') {
+            if (shRate < 30) {
+                candidate.confidencePercent -= 10;
+                candidate.reason += ` | ⚠️ Low 2H rate (${shRate}%)`;
+            } else if (shRate > 60) {
+                candidate.confidencePercent += 5;
+                candidate.reason += ` | 📈 High 2H rate (${shRate}%)`;
+            }
+        }
+
+        // Cap confidence
+        if (candidate.confidencePercent > 95) candidate.confidencePercent = 95;
+        if (candidate.confidencePercent < 30) candidate.confidencePercent = 30;
+
         // Send to Gemini for AI validation
         log.gemini(`      🤖 Asking Gemini AI...`);
         const geminiResult = await askAIAnalyst(candidate);
