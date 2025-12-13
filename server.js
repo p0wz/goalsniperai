@@ -844,33 +844,62 @@ async function fetchMatchH2H(matchId) {
     }
 }
 
-// Helper: Analyze H2H for goal patterns (Enhanced)
-function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0-0') {
+// ============================================
+// 📋 Fetch Match Details (HT/FT Scores)
+// ============================================
+async function fetchMatchDetails(matchId) {
+    if (dailyRequestCount >= DAILY_LIMIT) return null;
+
+    try {
+        const response = await axios.get(
+            `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${matchId}`,
+            { headers: FLASHSCORE_API.headers, timeout: 10000 }
+        );
+        dailyRequestCount++;
+        return response.data;
+    } catch (error) {
+        // Silent fail - details are optional enhancement
+        return null;
+    }
+}
+
+// Helper: Analyze H2H for goal patterns (ADVANCED with HT Analysis)
+async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0-0', elapsed = 0) {
     if (!h2hData) return { valid: true, reason: 'No H2H data (defaulting to valid)' };
 
     const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
     if (sections.length === 0) return { valid: true, reason: 'Empty H2H data' };
 
     // Filter mutual matches (both teams played each other)
-    const mutualMatches = sections.filter(m =>
-        (m.home_team?.name === homeTeam && m.away_team?.name === awayTeam) ||
-        (m.home_team?.name === awayTeam && m.away_team?.name === homeTeam)
-    ).slice(0, 5);
+    // ALSO filter OUT friendly matches
+    const mutualMatches = sections.filter(m => {
+        const isMutual = (m.home_team?.name === homeTeam && m.away_team?.name === awayTeam) ||
+            (m.home_team?.name === awayTeam && m.away_team?.name === homeTeam);
+        const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
+        return isMutual && !isFriendly;
+    }).slice(0, 6); // Take 6 matches for better sample
 
-    if (mutualMatches.length === 0) return { valid: true, reason: 'No direct H2H found' };
+    if (mutualMatches.length === 0) return { valid: true, reason: 'No competitive H2H found' };
 
     // Parse current score
     const [curHome, curAway] = currentScore.split('-').map(s => parseInt(s) || 0);
     const currentTotal = curHome + curAway;
+    const isZeroZero = currentTotal === 0;
+    const isFirstHalf = elapsed <= 45;
 
-    // Calculate SEPARATE stats for each team + combined
+    // Stats accumulators
     let combinedGoals = 0;
-    let homeTeamGoalsAtHome = 0;  // When homeTeam plays at home
-    let awayTeamGoalsAtAway = 0;  // When awayTeam plays away
+    let homeTeamGoalsAtHome = 0;
+    let awayTeamGoalsAtAway = 0;
     let homeTeamMatches = 0;
     let awayTeamMatches = 0;
     let goalGames = 0;
     let bttsGames = 0;
+
+    // HT Analysis (when details available)
+    let htGoalGames = 0;
+    let secondHalfGoalGames = 0;
+    let detailsChecked = 0;
 
     for (const match of mutualMatches) {
         const s1 = parseInt(match.home_team?.score) || 0;
@@ -882,15 +911,32 @@ function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0-0') {
         if (total >= 1) goalGames++;
         if (s1 > 0 && s2 > 0) bttsGames++;
 
-        // Track home team's goals when they were home
+        // Track home/away specific goals
         if (match.home_team?.name === homeTeam) {
             homeTeamGoalsAtHome += s1;
             homeTeamMatches++;
         }
-        // Track away team's goals when they were away
         if (match.away_team?.name === awayTeam) {
             awayTeamGoalsAtAway += s2;
             awayTeamMatches++;
+        }
+
+        // Fetch HT details for this match (deep analysis)
+        if (match.match_id && detailsChecked < 4) { // Limit to 4 detail checks
+            const details = await fetchMatchDetails(match.match_id);
+            if (details) {
+                detailsChecked++;
+                const htHome = details.home_team?.score_1st_half || 0;
+                const htAway = details.away_team?.score_1st_half || 0;
+                const htTotal = htHome + htAway;
+
+                if (htTotal >= 1) htGoalGames++;
+
+                // Second half = FT - HT
+                const shHome = s1 - htHome;
+                const shAway = s2 - htAway;
+                if ((shHome + shAway) >= 1) secondHalfGoalGames++;
+            }
         }
     }
 
@@ -901,32 +947,59 @@ function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0-0') {
     const goalRate = mutualMatches.length > 0 ? (goalGames / mutualMatches.length) * 100 : 0;
     const bttsRate = mutualMatches.length > 0 ? (bttsGames / mutualMatches.length) * 100 : 0;
 
-    // Validation Criteria (Context-Aware):
-    // If current score is 0-0, we need STRONGER evidence (higher thresholds)
-    const isZeroZero = currentTotal === 0;
-    const requiredAvg = isZeroZero ? 2.0 : 1.5;  // Stricter if 0-0
-    const requiredRate = isZeroZero ? 70 : 60;   // Stricter if 0-0
+    // HT/SH rates (if we have data)
+    const htGoalRate = detailsChecked > 0 ? (htGoalGames / detailsChecked) * 100 : null;
+    const shGoalRate = detailsChecked > 0 ? (secondHalfGoalGames / detailsChecked) * 100 : null;
 
-    // Must satisfy:
-    // 1. Combined goal rate >= 60% (or 70% if 0-0)
-    // 2. Combined avg goals >= 1.5 (or 2.0 if 0-0)
-    // 3. At least one team should have avg 0.5+ goals in their position
-    const isValid = goalRate >= requiredRate &&
+    // Dynamic Thresholds based on current match state
+    let requiredAvg = 1.5;
+    let requiredRate = 60;
+
+    // Stricter if 0-0
+    if (isZeroZero) {
+        requiredAvg = 2.0;
+        requiredRate = 70;
+    }
+
+    // If first half and we have HT data, also check HT rate
+    let htCheckPassed = true;
+    if (isFirstHalf && htGoalRate !== null && htGoalRate < 40) {
+        htCheckPassed = false; // H2H shows low 1H goals
+    }
+
+    // Validation criteria
+    const basicCheck = goalRate >= requiredRate &&
         avgCombined >= requiredAvg &&
         (avgHomeAtHome >= 0.5 || avgAwayAtAway >= 0.5);
 
+    const isValid = basicCheck && htCheckPassed;
+
+    // Build stats object
     const stats = {
         avgCombined: avgCombined.toFixed(2),
         avgHomeAtHome: avgHomeAtHome.toFixed(2),
         avgAwayAtAway: avgAwayAtAway.toFixed(2),
         goalRate: goalRate.toFixed(0),
         bttsRate: bttsRate.toFixed(0),
-        matchCount: mutualMatches.length
+        htGoalRate: htGoalRate !== null ? htGoalRate.toFixed(0) : 'N/A',
+        shGoalRate: shGoalRate !== null ? shGoalRate.toFixed(0) : 'N/A',
+        matchCount: mutualMatches.length,
+        detailsChecked
     };
 
-    const reason = isValid
-        ? `H2H✓ Avg:${avgCombined.toFixed(1)} | ${homeTeam}@H:${avgHomeAtHome.toFixed(1)} | ${awayTeam}@A:${avgAwayAtAway.toFixed(1)} | ${goalRate.toFixed(0)}%`
-        : `H2H✗ Avg:${avgCombined.toFixed(1)}(need ${requiredAvg}+) | Rate:${goalRate.toFixed(0)}%(need ${requiredRate}%+)`;
+    // Build reason string
+    let reason;
+    if (isValid) {
+        reason = `H2H✓ Avg:${avgCombined.toFixed(1)} | Rate:${goalRate.toFixed(0)}%`;
+        if (htGoalRate !== null) reason += ` | 1H:${htGoalRate.toFixed(0)}%`;
+        if (bttsRate >= 50) reason += ` | BTTS:${bttsRate.toFixed(0)}%`;
+    } else {
+        if (!htCheckPassed) {
+            reason = `H2H✗ 1H Goal Rate too low (${htGoalRate?.toFixed(0) || 0}% < 40%)`;
+        } else {
+            reason = `H2H✗ Avg:${avgCombined.toFixed(1)}(need ${requiredAvg}+) | Rate:${goalRate.toFixed(0)}%(need ${requiredRate}%+)`;
+        }
+    }
 
     return { valid: isValid, ...stats, reason };
 }
@@ -1415,7 +1488,7 @@ async function processMatches() {
         // 🤝 H2H VALIDATION (Check historical goal patterns)
         log.info(`      🤝 Fetching H2H data...`);
         const h2hData = await fetchMatchH2H(matchId);
-        const h2hAnalysis = analyzeH2HForGoals(h2hData, candidate.home, candidate.away, candidate.score);
+        const h2hAnalysis = await analyzeH2HForGoals(h2hData, candidate.home, candidate.away, candidate.score, elapsed);
 
         if (!h2hAnalysis.valid) {
             log.warn(`      ⛔ ${h2hAnalysis.reason}`);
