@@ -113,7 +113,7 @@ export default function CouponBuilder() {
     // Fetch Candidates Mock (Replace with API)
     useEffect(() => {
         // In production, fetch from /api/daily-analysis
-        fetch('/api/daily-analysis?limit=50').then(res => res.json()).then(data => {
+        fetch('/api/daily-analysis?limit=150').then(res => res.json()).then(data => {
             // Flatten categories to get all unique matches
             const all = [];
             if (data.data) {
