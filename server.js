@@ -252,6 +252,25 @@ let dailyRequestCount = 0;
 const DAILY_LIMIT = 1000;
 
 // ============================================
+// ⏱️ Global Rate Limiter (30 RPM = 1 request per 2 seconds)
+// ============================================
+const RPM_LIMIT = 30;
+const MIN_REQUEST_INTERVAL_MS = Math.ceil(60000 / RPM_LIMIT); // ~2000ms = 2 seconds
+let lastRequestTime = 0;
+
+async function rateLimitedWait() {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
+        const waitTime = MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+
+    lastRequestTime = Date.now();
+}
+
+// ============================================
 // 🕐 Parse Match Time
 // ============================================
 function parseElapsedTime(stage) {
@@ -763,6 +782,7 @@ async function fetchMatchStats(matchId, retries = 3) {
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
+            await rateLimitedWait(); // Enforce 30 RPM limit
             const response = await axios.get(
                 `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/stats/${matchId}`,
                 { headers: FLASHSCORE_API.headers, timeout: 15000 }
@@ -843,6 +863,7 @@ async function fetchMatchH2H(matchId, retries = 3) {
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
+            await rateLimitedWait(); // Enforce 30 RPM limit
             const response = await axios.get(
                 `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/h2h/${matchId}`,
                 { headers: FLASHSCORE_API.headers, timeout: 10000 }
@@ -871,6 +892,7 @@ async function fetchMatchDetails(matchId) {
     if (dailyRequestCount >= DAILY_LIMIT) return null;
 
     try {
+        await rateLimitedWait(); // Enforce 30 RPM limit
         const response = await axios.get(
             `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${matchId}`,
             { headers: FLASHSCORE_API.headers, timeout: 10000 }
