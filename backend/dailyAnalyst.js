@@ -19,86 +19,8 @@ const MATCH_LIMIT = 150; // Increased limit
 
 // Allowed Leagues Filter (Only analyze these leagues)
 // Format: "COUNTRY: League" - matches API format exactly
-const ALLOWED_LEAGUES = [
-    // UEFA - EUROPE prefix
-    'EUROPE: Champions League',
-    'EUROPE: Europa League',
-    'EUROPE: Conference League',
-    // England
-    'ENGLAND: Premier League',
-    'ENGLAND: Championship',
-    // Spain
-    'SPAIN: La Liga',
-    'SPAIN: LaLiga',
-    // Germany
-    'GERMANY: Bundesliga',
-    'GERMANY: 2. Bundesliga',
-    // Italy
-    'ITALY: Serie A',
-    // France
-    'FRANCE: Ligue 1',
-    // Turkey
-    'TURKEY: Super Lig',
-    'TURKIYE: Super Lig',
-    // Netherlands
-    'NETHERLANDS: Eredivisie',
-    // Portugal
-    'PORTUGAL: Liga Portugal',
-    'PORTUGAL: Primeira Liga',
-    // Belgium
-    'BELGIUM: Pro League',
-    'BELGIUM: Jupiler',
-    // Brazil
-    'BRAZIL: Serie A',
-    'BRAZIL: Brasileirao',
-    // Argentina
-    'ARGENTINA: Liga Profesional',
-    'ARGENTINA: Primera Division',
-    // Chile
-    'CHILE: Primera Division',
-    // USA
-    'USA: MLS',
-    // Mexico
-    'MEXICO: Liga MX',
-    // Australia
-    'AUSTRALIA: A-League',
-    // Japan
-    'JAPAN: J1 League',
-    'JAPAN: J. League',
-    // South Korea
-    'SOUTH KOREA: K League',
-    'KOREA: K League',
-    // Saudi Arabia
-    'SAUDI ARABIA: Pro League',
-    'SAUDI ARABIA: Saudi Professional',
-    // Scotland
-    'SCOTLAND: Premiership',
-    // Austria
-    'AUSTRIA: Bundesliga',
-    // Switzerland
-    'SWITZERLAND: Super League',
-    'SWITZERLAND: Challenge League',
-    // Denmark
-    'DENMARK: Superliga',
-    // Sweden
-    'SWEDEN: Allsvenskan',
-    // Norway
-    'NORWAY: Eliteserien',
-    // Finland
-    'FINLAND: Veikkausliiga',
-    // Ireland
-    'IRELAND: Premier Division',
-    // Czech Republic
-    'CZECH REPUBLIC: 1. Liga',
-    'CZECHIA: 1. Liga',
-    // Poland
-    'POLAND: Ekstraklasa',
-    // Greece
-    'GREECE: Super League',
-    // Romania
-    'ROMANIA: Liga I',
-    'ROMANIA: Liga 1'
-];
+// Allowed Leagues Filter (Shared with Live Bot)
+const ALLOWED_LEAGUES = require('./allowed_leagues');
 
 // Helper: Normalize Turkish/special characters
 function normalizeText(text) {

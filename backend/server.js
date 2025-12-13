@@ -26,6 +26,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { runDailyAnalysis } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
+const ALLOWED_LEAGUES = require('./allowed_leagues');
 
 const app = express();
 
@@ -1394,6 +1395,18 @@ async function processMatches() {
 
         // Filter candidates by time ranges (12-38 for First Half, 55-82 for Late Game)
         const candidates = allMatches.filter(m => {
+            // League Filter (Expanded List)
+            const leagueName = m.league_name || '';
+            const fullLeagueName = `${m.country_name}: ${leagueName}`;
+
+            // Check if league is in allowed list (or partial match if beneficial, but exact is safer)
+            const isAllowedLeague = ALLOWED_LEAGUES.some(allowed =>
+                fullLeagueName.toUpperCase().includes(allowed.toUpperCase()) ||
+                leagueName.toUpperCase().includes(allowed.split(': ')[1]?.toUpperCase())
+            );
+
+            if (!isAllowedLeague) return false;
+
             const elapsed = parseElapsedTime(m.stage);
             const homeScore = m.home_team?.score || 0;
             const awayScore = m.away_team?.score || 0;
