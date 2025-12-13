@@ -1973,33 +1973,6 @@ app.post('/api/admin/approve/:id', requireAuth, (req, res) => {
 // ============================================
 // 🔗 API Routes
 // ============================================
-// ============================================
-// 🔗 API Routes
-// ============================================
-app.get('/api/debug/reset-admin', async (req, res) => {
-    try {
-        const adminEmail = 'admin@goalgpt.com';
-        const newPassword = process.env.ADMIN_PASSWORD || 'yousaywhat123@';
-
-        // Hash locally here since we can't import bcrypt easily if not in server.js scope, 
-        // BUT database.js exports 'db' client. 
-        // We will do a direct SQL update.
-        // Actually better to use a database.js helper if possible, but let's just do it raw SQL query via database.db
-
-        // We need bcrypt to hash the password.
-        const bcrypt = require('bcryptjs');
-        const passwordHash = bcrypt.hashSync(newPassword, 12);
-
-        await database.db.execute({
-            sql: "UPDATE users SET password_hash = ? WHERE email = ?",
-            args: [passwordHash, adminEmail]
-        });
-
-        res.json({ success: true, message: `Admin password reset to: ${newPassword}` });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

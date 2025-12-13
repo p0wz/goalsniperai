@@ -232,6 +232,12 @@ router.delete('/coupons/:id', async (req, res) => {
 router.delete('/history', async (req, res) => {
     try {
         const { source } = req.body; // Optional: 'live' or 'daily'
+
+        // Input Validation
+        if (source && !['live', 'daily'].includes(source)) {
+            return res.status(400).json({ success: false, error: 'Invalid source. Must be "live" or "daily".' });
+        }
+
         const { clearAllBets } = require('../betTrackerRedis');
 
         const result = await clearAllBets(source);
