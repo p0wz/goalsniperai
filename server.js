@@ -871,12 +871,15 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
     if (sections.length === 0) return { valid: true, reason: 'Empty H2H data' };
 
     // Filter mutual matches (both teams played each other)
-    // ALSO filter OUT friendly matches
+    // ALSO filter OUT friendly matches and OLD matches (>2 years)
+    const TWO_YEARS_AGO = Math.floor(Date.now() / 1000) - (2 * 365 * 24 * 60 * 60);
+
     const mutualMatches = sections.filter(m => {
         const isMutual = (m.home_team?.name === homeTeam && m.away_team?.name === awayTeam) ||
             (m.home_team?.name === awayTeam && m.away_team?.name === homeTeam);
         const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
-        return isMutual && !isFriendly;
+        const isRecent = m.timestamp && m.timestamp > TWO_YEARS_AGO;
+        return isMutual && !isFriendly && isRecent;
     }).slice(0, 6); // Take 6 matches for better sample
 
     if (mutualMatches.length === 0) return { valid: true, reason: 'No competitive H2H found' };
