@@ -225,26 +225,43 @@ function App() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {liveSignals.map((signal) => (
-                  <div key={signal.id} className="relative overflow-hidden rounded-lg border bg-card p-4 shadow-sm">
+                  <div key={signal.id} className="relative overflow-hidden rounded-lg border bg-card p-4 shadow-sm transition-all hover:shadow-md">
                     <div className="absolute top-0 right-0 p-2 text-xs font-bold text-green-500 bg-green-500/10 rounded-bl-lg">
                       {signal.confidencePercent}% Confidence
                     </div>
-                    <div className="mb-2 text-xs text-muted-foreground uppercase">{signal.country} • {signal.league}</div>
-                    <div className="mb-3 text-lg font-bold">
-                      {signal.home} vs {signal.away}
-                    </div>
-                    <div className="flex items-center gap-3 text-sm mb-3">
-                      <span className="bg-accent px-2 py-0.5 rounded text-xs">Score: {signal.score}</span>
-                      <span className="text-yellow-500 font-mono text-xs">{signal.elapsed}'</span>
+                    <div className="mb-2 flex items-center gap-2">
+                      {signal.leagueLogo && <img src={signal.leagueLogo} alt="League" className="h-4 w-4 object-contain" />}
+                      <span className="text-xs text-muted-foreground uppercase truncate">{signal.country} • {signal.league}</span>
                     </div>
 
-                    <div className="space-y-1 bg-muted/30 p-2 rounded text-xs text-muted-foreground">
-                      <div>Strategy: <span className="text-foreground">{signal.strategy}</span></div>
-                      <div>Reason: {signal.reason}</div>
-                      <div className="pt-1 border-t mt-1 flex gap-2">
-                        <span>SoT: {signal.stats.shots_on_target}</span>
-                        <span>Corners: {signal.stats.corners}</span>
-                        <span>xG: {signal.stats.xG}</span>
+                    <div className="mb-3">
+                      <div className="text-lg font-bold flex items-center gap-2">
+                        {signal.home} <span className="text-muted-foreground text-sm">vs</span> {signal.away}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-sm mb-3">
+                      <span className="bg-accent px-2 py-0.5 rounded text-xs font-mono">Score: {signal.score}</span>
+                      <span className="text-yellow-500 font-mono text-xs animate-pulse">⏱ {signal.elapsed}'</span>
+                    </div>
+
+                    <div className="space-y-2 bg-muted/30 p-3 rounded text-xs">
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-muted-foreground">Strategy</span>
+                        <span className="font-medium text-foreground">{signal.strategy}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-muted-foreground">Momentum</span>
+                        <span className="font-medium text-blue-400">{signal.momentumTrigger || 'Standard'}</span>
+                      </div>
+                      <div className="pt-1 text-muted-foreground italic">
+                        "{signal.reason}"
+                      </div>
+                      <div className="pt-1 mt-1 flex justify-between gap-1 text-xs font-mono text-foreground/80">
+                        <span title="Shots on Target">🎯 {signal.stats.shots_on_target}</span>
+                        <span title="Total Shots">💥 {signal.stats.shots}</span>
+                        <span title="Corners">🚩 {signal.stats.corners}</span>
+                        {signal.stats.xG && <span title="Expected Goals">📊 {signal.stats.xG}</span>}
                       </div>
                     </div>
                   </div>
@@ -257,6 +274,7 @@ function App() {
         {/* Tab Content: HISTORY */}
         {activeTab === 'history' && (
           <div className="space-y-4">
+            {/* ... existing history code ... */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Signal History</h2>
               <button onClick={fetchHistory} className="px-3 py-1 text-xs rounded border hover:bg-accent">Refresh</button>
@@ -268,7 +286,7 @@ function App() {
                   <tr>
                     <th className="p-3">Time</th>
                     <th className="p-3">Match</th>
-                    <th className="p-3">Pick</th>
+                    <th className="p-3">Strategy</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
