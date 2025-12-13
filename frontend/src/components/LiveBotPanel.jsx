@@ -76,7 +76,7 @@ function LiveBotPanel() {
 
     // Reset all signal stats
     const resetStats = async () => {
-        if (!confirm('Tüm sinyal geçmişini sıfırlamak istediğinize emin misiniz?')) return;
+        if (!window.confirm('Tüm sinyal geçmişini sıfırlamak istediğinize emin misiniz?')) return;
         try {
             const res = await fetch(`${BASE_URL}/api/signals/reset`, {
                 method: 'POST',
