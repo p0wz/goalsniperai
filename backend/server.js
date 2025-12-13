@@ -77,10 +77,11 @@ app.use(xss());
 // Security: HTTP Parameter Pollution protection
 app.use(hpp());
 
-// Static files - React build (priority)
-app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
-// Fallback to public folder for legacy HTML
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Static files - React build (Optional, for local dev only if built)
+// On production (Render), we are API-only.
+if (fs.existsSync(path.join(__dirname, '..', 'frontend', 'dist'))) {
+    app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
+}
 
 // ============================================
 // 🎨 Console Styling
@@ -1964,33 +1965,17 @@ app.use('/api/admin', adminRoutes);
 // ============================================
 // 📄 Page Routes
 // ============================================
+// ============================================
+// 📄 Page Routes (Legacy Removed - API Only)
+// ============================================
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.json({
+        message: 'GoalGPT Pro API is running 🚀',
+        info: 'Frontend is hosted separately.',
+        documentation: '/api/docs'
+    });
 });
 
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'register.html'));
-});
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-
-app.get('/pricing', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'pricing.html'));
-});
-
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-
-app.get('/profile', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'profile.html'));
-});
 
 // ============================================
 // ⏰ Auto-Poll System
@@ -2022,27 +2007,19 @@ function startAutoPolling() {
 // 🌐 SPA Fallback (React Router)
 // ============================================
 // All non-API routes serve React index.html
+// All non-API routes return 404 (or basic JSON) since we are API-only
 app.get('*', (req, res) => {
-    // Skip API routes
     if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: 'API endpoint not found' });
     }
 
-    // Check if frontend build exists
-    const fs = require('fs');
-    const indexPath = path.join(__dirname, 'frontend/dist/index.html');
-
-    if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        res.status(200).send(`
-            <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-                <h1>GoalGPT Pro API Server 🚀</h1>
-                <p>Engine is running perfectly.</p>
-                <p>Note: This is the Backend URL. Please visit your <b>Cloudflare Pages URL</b> to use the app.</p>
-            </div>
-        `);
+    // For local dev convenience, if frontend build exists, serve it
+    const frontendIndex = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+    if (fs.existsSync(frontendIndex)) {
+        return res.sendFile(frontendIndex);
     }
+
+    res.status(404).json({ error: 'Not Found. This is the API Backend.' });
 });
 
 
