@@ -270,7 +270,7 @@ function cleanOldHistory() {
 }
 
 let dailyRequestCount = 0;
-const DAILY_LIMIT = 1000;
+const DAILY_LIMIT = 2000;
 
 // ============================================
 // 🕐 Parse Match Time
@@ -2068,6 +2068,71 @@ app.get('*', (req, res) => {
     res.status(404).json({ error: 'Not Found. This is the API Backend.' });
 });
 
+
+// ============================================
+// 🤖 Auto-Settlement Job
+// ============================================
+async function runAutoSettlement() {
+    log.info('🤖 Starting Auto-Settlement Check...');
+
+    // 1. Get Pending Bets
+    const pendingBets = await betTracker.getPendingBets();
+    if (pendingBets.length === 0) {
+        log.info('   ✨ No pending bets to settle.');
+        return;
+    }
+
+    log.info(`   📋 Found ${pendingBets.length} pending bets. Checking results...`);
+
+    // Group by match ID to save API calls
+    const matchesToCheck = {};
+    pendingBets.forEach(bet => {
+        matchesToCheck[bet.api_fixture_id] = matchesToCheck[bet.api_fixture_id] || [];
+        matchesToCheck[bet.api_fixture_id].push(bet);
+    });
+
+    for (const matchId of Object.keys(matchesToCheck)) {
+        // Fetch LIVE details (or finished details)
+        const details = await fetchMatchDetails(matchId);
+
+        if (!details || !details.home_team || !details.away_team) {
+            log.warn(`   ⚠️ Could not fetch details for match ${matchId} (skipping)`);
+            continue;
+        }
+
+        const currentHome = parseInt(details.home_team.score) || 0;
+        const currentAway = parseInt(details.away_team.score) || 0;
+        const currentScore = `${currentHome}-${currentAway}`;
+        const matchStatus = (details.status || '').toUpperCase(); // FINISHED, 1H, 2H, HT...
+        const isFinished = matchStatus.includes('FINISHED') || matchStatus.includes('FT') || matchStatus.includes('AET');
+
+        // Check each bet for this match
+        for (const bet of matchesToCheck[matchId]) {
+            const entryScoreStr = bet.entry_score || '0-0';
+            const [entryHome, entryAway] = entryScoreStr.split('-').map(s => parseInt(s) || 0);
+
+            // LOGIC:
+            // WON IF: Current Total Goals > Entry Total Goals
+            // LOST IF: Match Finished AND Current Total Goals == Entry Total Goals
+
+            const entryTotal = entryHome + entryAway;
+            const currentTotal = currentHome + currentAway;
+
+            if (currentTotal > entryTotal) {
+                // Goal scored! It's a WIN (Result: Over X.5 usually)
+                await betTracker.updateBetStatus(bet.id, 'WON', currentScore);
+                log.success(`   💰 WON: ${bet.match} (Entry: ${entryScoreStr} -> Now: ${currentScore})`);
+            } else if (isFinished) {
+                // Match over, no new goals -> LOSS
+                await betTracker.updateBetStatus(bet.id, 'LOST', currentScore);
+                log.warn(`   ❌ LOST: ${bet.match} (Finished at ${currentScore})`);
+            }
+        }
+    }
+}
+
+// Start Auto-Settlement (Every 20 minutes)
+setInterval(runAutoSettlement, 20 * 60 * 1000);
 
 // ============================================
 // 🚀 Server Startup

@@ -68,6 +68,28 @@ const ALLOWED_LEAGUES = [
     'SLOVAKIA: Nike liga',
     'SLOVENIA: Prva Liga',
 
+    // --- HIGH SCORING 2nd Tiers ---
+    'NETHERLANDS: Eerste Divisie',
+    'AUSTRIA: 2. Liga',
+    'SWITZERLAND: Challenge League',
+    'GERMANY: 3. Liga',
+    'FRANCE: National',
+    'SCOTLAND: Championship',
+
+    // --- LATIN AMERICA (Expanded) ---
+    'MEXICO: Liga MX',
+    'PERU: Liga 1',
+    'ECUADOR: Liga Pro',
+    'BOLIVIA: Primera Division',
+    'PARAGUAY: Primera Division',
+
+    // --- OTHER EUROPE ---
+    'IRELAND: Premier Division',
+    'WALES: Premier League',
+    'ISRAEL: Ligat ha\'Al',
+    'CYPRUS: First Division',
+    'CYPRUS: Cyta Championship',
+
     // --- ASIA / OCEANIA / USA ---
     'USA: MLS',
     'AUSTRALIA: A-League',

@@ -208,28 +208,43 @@ async function settleBets() {
 }
 
 // ============================================
-// 🗑️ Clear All Bets (Admin only)
+// 🗑️ Clear All Bets (Admin)
 // ============================================
 async function clearAllBets(source = null) {
-    const db = await loadDb();
-
-    let clearedCount = 0;
-    let newDb = [];
-
     if (source) {
-        // Clear only specific source (live or daily)
-        newDb = db.filter(b => b.source !== source);
-        clearedCount = db.length - newDb.length;
+        const db = await loadDb();
+        const filtered = db.filter(b => b.source !== source);
+        await saveDb(filtered);
+        return { success: true, message: `Cleared all ${source} bets` };
     } else {
-        // Clear all
-        clearedCount = db.length;
-        newDb = [];
+        await saveDb([]); // Clear full DB
+        return { success: true, message: 'Cleared all history (Live + Daily)' };
     }
+}
 
-    await saveDb(newDb);
-    console.log(`[BetTracker] 🗑️ Cleared ${clearedCount} bets${source ? ` (source: ${source})` : ''}`);
+// ============================================
+// 🤖 Auto-Settlement Helpers
+// ============================================
+async function getPendingBets() {
+    const db = await loadDb();
+    // Return only live bets for now? Or daily too? Daily logic is different?
+    // Let's settle ALL pending bets. logic in server.js will decide what to do.
+    return db.filter(b => b.status === 'PENDING');
+}
 
-    return { success: true, clearedCount };
+async function updateBetStatus(betId, status, resultScore) {
+    const db = await loadDb();
+    const bet = db.find(b => b.id === betId);
+    if (bet) {
+        bet.status = status;
+        bet.result_score = resultScore;
+        bet.settled_at = new Date().toISOString();
+        bet.auto_settled = true;
+        await saveDb(db);
+        console.log(`[BetTracker] 🤖 Auto-Settle: ${bet.match} -> ${status} (${bet.entry_score} -> ${resultScore})`);
+        return true;
+    }
+    return false;
 }
 
 // ============================================
@@ -295,6 +310,8 @@ module.exports = {
     manualSettle,
     startTracking,
     clearAllBets,
+    getPendingBets,
+    updateBetStatus,
     // Coupon Exports
     getCoupons,
     saveCoupon,
