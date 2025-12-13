@@ -873,57 +873,45 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
     // Filter: Only recent matches (< 2 years), no friendlies
     const TWO_YEARS_AGO = Math.floor(Date.now() / 1000) - (2 * 365 * 24 * 60 * 60);
 
-    // ========== HOME TEAM FORM (Last 5 matches) ==========
-    const homeTeamForm = sections.filter(m => {
-        const isHomeTeamMatch = m.home_team?.name === homeTeam || m.away_team?.name === homeTeam;
+    // ========== HOME TEAM HOME FORM (Only matches where they played at HOME) ==========
+    const homeTeamHomeForm = sections.filter(m => {
+        const isHomeTeamAtHome = m.home_team?.name === homeTeam;
         const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
         const isRecent = m.timestamp && m.timestamp > TWO_YEARS_AGO;
-        return isHomeTeamMatch && !isFriendly && isRecent;
+        return isHomeTeamAtHome && !isFriendly && isRecent;
     }).slice(0, 5);
 
-    // ========== AWAY TEAM FORM (Last 5 matches) ==========
-    const awayTeamForm = sections.filter(m => {
-        const isAwayTeamMatch = m.home_team?.name === awayTeam || m.away_team?.name === awayTeam;
+    // ========== AWAY TEAM AWAY FORM (Only matches where they played AWAY) ==========
+    const awayTeamAwayForm = sections.filter(m => {
+        const isAwayTeamOnRoad = m.away_team?.name === awayTeam;
         const isFriendly = m.tournament_name?.toLowerCase().includes('friendly');
         const isRecent = m.timestamp && m.timestamp > TWO_YEARS_AGO;
-        return isAwayTeamMatch && !isFriendly && isRecent;
+        return isAwayTeamOnRoad && !isFriendly && isRecent;
     }).slice(0, 5);
 
-    // Calculate HOME team stats
+    // Calculate HOME team HOME stats (goals scored at home, conceded at home)
     let homeGoals = 0, homeConceded = 0, homeGoalGames = 0;
-    for (const m of homeTeamForm) {
+    for (const m of homeTeamHomeForm) {
         const hs = parseInt(m.home_team?.score) || 0;
         const as = parseInt(m.away_team?.score) || 0;
-        if (m.home_team?.name === homeTeam) {
-            homeGoals += hs;
-            homeConceded += as;
-            if (hs > 0) homeGoalGames++;
-        } else {
-            homeGoals += as;
-            homeConceded += hs;
-            if (as > 0) homeGoalGames++;
-        }
+        homeGoals += hs;
+        homeConceded += as;
+        if (hs > 0) homeGoalGames++;
     }
 
-    // Calculate AWAY team stats
+    // Calculate AWAY team AWAY stats (goals scored away, conceded away)
     let awayGoals = 0, awayConceded = 0, awayGoalGames = 0;
-    for (const m of awayTeamForm) {
+    for (const m of awayTeamAwayForm) {
         const hs = parseInt(m.home_team?.score) || 0;
         const as = parseInt(m.away_team?.score) || 0;
-        if (m.home_team?.name === awayTeam) {
-            awayGoals += hs;
-            awayConceded += as;
-            if (hs > 0) awayGoalGames++;
-        } else {
-            awayGoals += as;
-            awayConceded += hs;
-            if (as > 0) awayGoalGames++;
-        }
+        awayGoals += as;  // Away team scores = away_team score
+        awayConceded += hs;  // Away team concedes = home_team score
+        if (as > 0) awayGoalGames++;
     }
 
     // ========== HT/FT DETAIL ANALYSIS ==========
     let htGoalGames = 0, shGoalGames = 0, detailsChecked = 0;
-    const allFormMatches = [...homeTeamForm.slice(0, 3), ...awayTeamForm.slice(0, 3)];
+    const allFormMatches = [...homeTeamHomeForm.slice(0, 3), ...awayTeamAwayForm.slice(0, 3)];
     const uniqueMatchIds = [...new Set(allFormMatches.map(m => m.match_id).filter(Boolean))].slice(0, 4);
 
     for (const matchId of uniqueMatchIds) {
@@ -944,15 +932,15 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
     const shGoalRate = detailsChecked > 0 ? (shGoalGames / detailsChecked) * 100 : null;
     const isFirstHalf = elapsed <= 45;
 
-    // Averages
-    const homeFormAvg = homeTeamForm.length > 0 ? homeGoals / homeTeamForm.length : 0;
-    const awayFormAvg = awayTeamForm.length > 0 ? awayGoals / awayTeamForm.length : 0;
-    const homeConcededAvg = homeTeamForm.length > 0 ? homeConceded / homeTeamForm.length : 0;
-    const awayConcededAvg = awayTeamForm.length > 0 ? awayConceded / awayTeamForm.length : 0;
+    // Averages (HOME team at HOME, AWAY team on ROAD)
+    const homeFormAvg = homeTeamHomeForm.length > 0 ? homeGoals / homeTeamHomeForm.length : 0;
+    const awayFormAvg = awayTeamAwayForm.length > 0 ? awayGoals / awayTeamAwayForm.length : 0;
+    const homeConcededAvg = homeTeamHomeForm.length > 0 ? homeConceded / homeTeamHomeForm.length : 0;
+    const awayConcededAvg = awayTeamAwayForm.length > 0 ? awayConceded / awayTeamAwayForm.length : 0;
 
     // Goal scoring rate (% of games they scored)
-    const homeGoalRate = homeTeamForm.length > 0 ? (homeGoalGames / homeTeamForm.length) * 100 : 0;
-    const awayGoalRate = awayTeamForm.length > 0 ? (awayGoalGames / awayTeamForm.length) * 100 : 0;
+    const homeGoalRate = homeTeamHomeForm.length > 0 ? (homeGoalGames / homeTeamHomeForm.length) * 100 : 0;
+    const awayGoalRate = awayTeamAwayForm.length > 0 ? (awayGoalGames / awayTeamAwayForm.length) * 100 : 0;
 
     // Combined expected goals = what home scores + what away concedes (and vice versa)
     const expectedHomeGoals = (homeFormAvg + awayConcededAvg) / 2;
@@ -981,22 +969,22 @@ async function analyzeH2HForGoals(h2hData, homeTeam, awayTeam, currentScore = '0
 
     // Build stats object
     const stats = {
-        homeForm: `${homeFormAvg.toFixed(1)}scored/${homeConcededAvg.toFixed(1)}conceded`,
-        awayForm: `${awayFormAvg.toFixed(1)}scored/${awayConcededAvg.toFixed(1)}conceded`,
+        homeForm: `${homeFormAvg.toFixed(1)}scored/${homeConcededAvg.toFixed(1)}conceded@HOME`,
+        awayForm: `${awayFormAvg.toFixed(1)}scored/${awayConcededAvg.toFixed(1)}conceded@AWAY`,
         homeGoalRate: homeGoalRate.toFixed(0),
         awayGoalRate: awayGoalRate.toFixed(0),
         htGoalRate: htGoalRate !== null ? htGoalRate.toFixed(0) : 'N/A',
         shGoalRate: shGoalRate !== null ? shGoalRate.toFixed(0) : 'N/A',
         expectedTotal: expectedTotal.toFixed(1),
-        homeMatches: homeTeamForm.length,
-        awayMatches: awayTeamForm.length,
+        homeMatches: homeTeamHomeForm.length,
+        awayMatches: awayTeamAwayForm.length,
         detailsChecked
     };
 
     // Build reason string
     let reason;
     if (isValid) {
-        reason = `Form✓ ${homeTeam}:${homeFormAvg.toFixed(1)}gpg(${homeGoalRate.toFixed(0)}%) | ${awayTeam}:${awayFormAvg.toFixed(1)}gpg(${awayGoalRate.toFixed(0)}%)`;
+        reason = `Form✓ ${homeTeam}@H:${homeFormAvg.toFixed(1)}gpg(${homeGoalRate.toFixed(0)}%) | ${awayTeam}@A:${awayFormAvg.toFixed(1)}gpg(${awayGoalRate.toFixed(0)}%)`;
         if (htGoalRate !== null) reason += ` | 1H:${htGoalRate.toFixed(0)}%`;
     } else if (!htCheckPassed) {
         reason = `Form✗ 1H Goal Rate too low (${htGoalRate?.toFixed(0) || 0}% < 40%)`;
