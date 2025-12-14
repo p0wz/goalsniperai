@@ -1923,7 +1923,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
     // Helper to filter results based on role & approval
     const filterResults = (results) => {
-        const categories = ['over15', 'over25', 'doubleChance', 'homeOver15', 'under35'];
+        const categories = ['over15', 'over25', 'doubleChance', 'homeOver15', 'under35', 'firstHalfOver05'];
         const filtered = {};
 
         categories.forEach(cat => {
@@ -1967,7 +1967,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
         // Post-processing: Assign IDs immediately for consistency
         const processedResults = { ...results };
-        ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35'].forEach(cat => {
+        ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35', 'firstHalfOver05'].forEach(cat => {
             if (processedResults[cat]) {
                 processedResults[cat].forEach(m => {
                     m.id = `${m.event_key || m.match_id}_${cat}`;
