@@ -132,6 +132,39 @@ function App() {
     );
   }
 
+  // Helper: Copy Market Prompt
+  const copyMarketPrompt = (title, items) => {
+    if (!items || items.length === 0) return;
+
+    let prompt = `Role: Professional Sports Betting Analyst\n`;
+    prompt += `Task: Analyze the following ${items.length} matches for the '${title}' market. Identify the TOP 3 safest picks based on the data provided.\n\n`;
+    prompt += `CRITERIA: Focus on Form consistency, H2H safety, and League averages.\n\n`;
+    prompt += `--------------------------------------------------\n\n`;
+
+    items.forEach((match, index) => {
+      prompt += `MATCH ${index + 1}: ${match.event_home_team} vs ${match.event_away_team}\n`;
+      prompt += `League: ${match.league}\n`;
+
+      if (match.detailed_analysis) {
+        prompt += `STATS:\n`;
+        prompt += `- ${match.detailed_analysis.form.home}\n`;
+        prompt += `- ${match.detailed_analysis.form.away}\n`;
+        prompt += `- League Avg: ${match.detailed_analysis.stats.leagueAvg}\n`;
+        prompt += `- H2H: ${match.detailed_analysis.h2h.summary}\n`;
+        match.detailed_analysis.h2h.games.forEach(g => prompt += `  * ${g}\n`);
+      }
+      prompt += `\n--------------------------------------------------\n\n`;
+    });
+
+    prompt += `OUTPUT FORMAT:\n`;
+    prompt += `1. [Match Name] - [Confidence %] - [Brief Reasoning]\n`;
+    prompt += `2. [Match Name] - [Confidence %] - [Brief Reasoning]\n`;
+    prompt += `3. [Match Name] - [Confidence %] - [Brief Reasoning]\n`;
+
+    navigator.clipboard.writeText(prompt);
+    alert(`Copied prompt for ${items.length} matches in ${title}!`);
+  };
+
   // Modal Component for Daily Analysis Details
   const MatchDetailsModal = ({ match, onClose }) => {
     if (!match) return null;
@@ -235,7 +268,19 @@ function App() {
     if (!items || items.length === 0) return null;
     return (
       <div className="mb-6">
-        <h3 className="mb-2 text-md font-semibold text-primary">{title} ({items.length})</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-md font-semibold text-primary">{title} ({items.length})</h3>
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent modal opening if extracted
+              copyMarketPrompt(title, items);
+            }}
+            className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded flex items-center gap-1"
+            title="Copy a huge prompt to ask AI to analyze ALL these matches together"
+          >
+            🤖 Ask AI (All Matches)
+          </button>
+        </div>
         <div className="overflow-x-auto rounded border">
           <table className="w-full text-sm">
             <thead className="bg-muted text-left">
