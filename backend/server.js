@@ -2140,19 +2140,24 @@ app.get('/', (req, res) => {
 // ============================================
 // ⏰ Auto-Poll System
 // ============================================
-function startAutoPolling() {
-    log.success('Auto-poll started (every 4 minutes)');
+// ============================================
+// ⏰ Auto-Poll System (MANUAL CONTROL)
+// ============================================
+let botInterval = null;
+let isBotRunning = false;
 
-    setInterval(async () => {
+function startPollingInterval() {
+    if (isBotRunning) return false;
+
+    log.success('🤖 Bot started (every 3 minutes)');
+    isBotRunning = true;
+
+    // Run immediately once
+    processMatches().catch(e => log.error(e));
+
+    botInterval = setInterval(async () => {
         const now = new Date();
         const hour = now.getUTCHours();
-
-        // Schedule for TURKEY (UTC+3): 16:00 - 03:00 Turkey = 13:00 - 00:00 UTC
-        // Turkey 16:00 = UTC 13:00
-        // Turkey 03:00 (next day) = UTC 00:00 (next day)
-        // So active window: UTC 13:00 to 23:59 OR UTC 00:00
-        // Simplified: hour >= 13 (covers 13:00 UTC onwards until midnight)
-        // This gives us: 16:00 TR to 03:00 TR
 
         if (hour >= 13 || hour < 0) {
             log.info('Scheduled poll (Turkey: 16:00-03:00)...');
@@ -2161,7 +2166,38 @@ function startAutoPolling() {
             log.info(`Outside active hours (TR 16:00-03:00, current UTC: ${hour}:xx)`);
         }
     }, POLL_INTERVAL);
+
+    return true;
 }
+
+function stopPollingInterval() {
+    if (!isBotRunning) return false;
+
+    if (botInterval) {
+        clearInterval(botInterval);
+        botInterval = null;
+    }
+    isBotRunning = false;
+    log.warn('🛑 Bot stopped by admin');
+    return true;
+}
+
+// Routes for Bot Control
+app.get('/api/admin/bot/status', (req, res) => {
+    res.json({ running: isBotRunning });
+});
+
+app.post('/api/admin/bot/start', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const started = startPollingInterval();
+    res.json({ success: true, running: true, message: started ? 'Bot started' : 'Bot already running' });
+});
+
+app.post('/api/admin/bot/stop', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const stopped = stopPollingInterval();
+    res.json({ success: true, running: false, message: stopped ? 'Bot stopped' : 'Bot already stopped' });
+});
 
 // ============================================
 // 🌐 SPA Fallback (React Router)
@@ -2271,6 +2307,8 @@ app.listen(PORT, async () => {
     log.success(`Server running on http://localhost:${PORT}`);
 
     // Start Services
-    startAutoPolling();
+    // Start Services
+    // startAutoPolling(); // DISABLED - Manual Control Only
+    betTracker.startTracking();
     betTracker.startTracking();
 });

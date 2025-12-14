@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { authService, signalService, betService } from './services/api';
+import { authService, signalService, betService, adminService } from './services/api';
 import clsx from 'clsx';
 
 function App() {
@@ -24,7 +24,10 @@ function App() {
 
   // Loaders
   const [refreshing, setRefreshing] = useState(false);
+
   const [isAnalysing, setIsAnalysing] = useState(false);
+  const [botRunning, setBotRunning] = useState(false);
+  const [botStatusLoading, setBotStatusLoading] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -40,6 +43,7 @@ function App() {
       if (activeTab === 'live') {
         fetchLiveSignals();
         fetchBetHistory(); // Pre-load history for Dashboard and Daily History
+        fetchBotStatus();
       }
     } catch (err) {
       console.log('User not logged in');
@@ -55,9 +59,38 @@ function App() {
     // fetchDaily(); 
   };
 
+  const fetchBotStatus = async () => {
+    try {
+      const res = await adminService.getBotStatus();
+      setBotRunning(res.running);
+    } catch (err) { console.error('Failed to get bot status', err); }
+  };
+
+  const toggleBot = async () => {
+    if (!user) return;
+    setBotStatusLoading(true);
+    try {
+      let res;
+      if (botRunning) {
+        res = await adminService.stopBot();
+      } else {
+        res = await adminService.startBot();
+      }
+      if (res.success) {
+        setBotRunning(res.running);
+        alert(res.message);
+      }
+    } catch (err) {
+      alert('Failed to toggle bot: ' + err.message);
+    } finally {
+      setBotStatusLoading(false);
+    }
+  };
+
   const fetchLiveSignals = async () => {
     try {
       setRefreshing(true);
+      fetchBotStatus(); // Refresh status too
       const data = await signalService.getLiveSignals();
       setLiveSignals(data.data.filter(s => s.verdict === 'PLAY').sort((a, b) => b.confidencePercent - a.confidencePercent));
     } catch (err) { console.error(err); }
@@ -466,7 +499,7 @@ function App() {
             <h1 className="text-xl font-bold">GoalGPT Pro</h1>
           </div>
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground">{user.name}</span>
+            <span className="text-muted-foreground">{user.name} <span className="text-xs opacity-50">({user.role})</span></span>
             <button onClick={handleLogout} className="text-red-400 hover:text-red-300">Logout</button>
           </div>
         </div>
@@ -477,7 +510,7 @@ function App() {
 
         {/* Navigation Tabs */}
         <div className="mb-6 flex gap-2 border-b">
-          {['live', 'history', 'daily'].map((tab) => (
+          {['live', 'history', 'daily', 'iy05'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -491,6 +524,7 @@ function App() {
               {tab === 'live' && '📡 Live Signals'}
               {tab === 'history' && '📜 Signal History'}
               {tab === 'daily' && '📅 Daily Analysis'}
+              {tab === 'iy05' && '⏱️ 1.Y 0.5 Üst'}
             </button>
           ))}
         </div>
@@ -508,6 +542,29 @@ function App() {
                 {refreshing ? 'Refreshing...' : 'Refresh Now'}
               </button>
             </div>
+
+            {/* BOT CONTROL PANEL (Visible to Owner) */}
+            {user && (
+              <div className="mb-6 p-4 rounded-lg border bg-card shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={clsx("h-3 w-3 rounded-full animate-pulse", botRunning ? "bg-green-500" : "bg-red-500")} />
+                  <div>
+                    <h3 className="font-semibold text-sm">Live Bot Status</h3>
+                    <p className="text-xs text-muted-foreground">{botRunning ? 'Running (Checking every 3 mins)' : 'Stopped (Manual Control)'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleBot}
+                  disabled={botStatusLoading}
+                  className={clsx(
+                    "px-4 py-2 rounded text-sm font-bold shadow transition-all",
+                    botRunning ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-green-600 text-white hover:bg-green-700 hover:shadow-lg"
+                  )}
+                >
+                  {botStatusLoading ? 'Processing...' : botRunning ? '🛑 STOP BOT' : '▶ START BOT'}
+                </button>
+              </div>
+            )}
 
             {liveSignals.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">

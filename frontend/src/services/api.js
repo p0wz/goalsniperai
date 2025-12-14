@@ -104,7 +104,18 @@ export const betService = {
 };
 
 export const adminService = {
-    // Add admin methods here
+    getBotStatus: async () => {
+        const response = await api.get('/admin/bot/status');
+        return response.data;
+    },
+    startBot: async () => {
+        const response = await api.post('/admin/bot/start');
+        return response.data;
+    },
+    stopBot: async () => {
+        const response = await api.post('/admin/bot/stop');
+        return response.data;
+    }
 };
 
 export default api;
