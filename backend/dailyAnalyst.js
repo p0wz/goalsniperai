@@ -4,6 +4,7 @@
  */
 const axios = require('axios');
 const betTracker = require('./betTracker');
+const { analyzeFirstHalfPreMatch } = require('./analysis/firstHalfAnalyzer');
 require('dotenv').config();
 
 // Config
@@ -227,7 +228,9 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         doubleChance: [],
         homeOver15: [],
         under35: [],
-        under25: []
+        under35: [],
+        under25: [],
+        firstHalfOver05: []
     };
 
     let processed = 0;
@@ -272,8 +275,12 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         log.info(`   ✅ H2H fetched: ${sections.length} historical matches`);
 
         // Filter History
-        const homeAllHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team)).slice(0, 5);
-        const awayAllHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team)).slice(0, 5);
+        // Use full history for 1H Analysis
+        const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
+        const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
+
+        const homeAllHistory = homeRawHistory.slice(0, 5);
+        const awayAllHistory = awayRawHistory.slice(0, 5);
         const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
         const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
         const mutualH2H = sections.filter(x =>
@@ -359,6 +366,15 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             }
         }
 
+        // Logic G: First Half Over 0.5 (NEW)
+        // Uses separate pure form analysis
+        const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
+        if (fhAnalysis.signal) {
+            // Attach the specific analysis to the match object for later use
+            candidates.firstHalfOver05.push({ ...m, filterStats: stats, fhStats: fhAnalysis, market: 'First Half Over 0.5' });
+            passedFilters.push('1H Over 0.5');
+        }
+
         if (passedFilters.length > 0) {
             log.info(`   ✅ PASSED: ${passedFilters.join(', ')}`);
         } else {
@@ -376,7 +392,9 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`   • 1X DC candidates: ${candidates.doubleChance.length}`);
     log.info(`   • Home O1.5 candidates: ${candidates.homeOver15.length}`);
     log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
+    log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
     log.info(`   • Under 2.5 candidates: ${candidates.under25.length}`);
+    log.info(`   • 1H Over 0.5 candidates: ${candidates.firstHalfOver05.length}`);
     log.info(`═══════════════════════════════════════════════════════`);
 
     return candidates;
@@ -489,7 +507,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: []
+        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], firstHalfOver05: []
     };
 
     // Helper: Generate Detailed Analysis Text
@@ -543,6 +561,34 @@ DETAILED STATISTICS:
 4. HEAD-TO-HEAD (Last ${mutual.length})
    ${mutual.map(g => `- ${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name} (${new Date(g.timestamp * 1000).toLocaleDateString()})`).join('\n   ')}
 `;
+        // CUSTOM PROMPT FOR FIRST HALF OVER 0.5
+        if (market === 'First Half Over 0.5' && match.fhStats) {
+            const fh = match.fhStats;
+            return [
+                `Act as a professional football betting analyst.
+Match: ${match.event_home_team} vs ${match.event_away_team}
+Market: First Half Over 0.5 Goals
+
+PURE FORM SCORE: ${fh.score}/100
+ Confidence: ${fh.confidence}
+ Reason: ${fh.reason}
+
+KEY METRICS:
+- Home Team 1H Goal Rate (Home Games): ${fh.metrics.home_ht_rate}%
+- Away Team 1H Goal Rate (Away Games): ${fh.metrics.away_ht_rate}%
+- H2H 1H Goal Rate: ${fh.metrics.h2h_ht_rate}%
+
+TASK:
+Based on these specific First Half statistics, write a short, punchy analysis for a bettor. Confirm if the statistics make this a "Solid Pick". Mention any risks if standard form (not just 1H) suggests a slow start.`,
+
+                `Match: ${match.event_home_team} vs ${match.event_away_team}
+Market: First Half Over 0.5 Goals
+Score: ${fh.score}/100
+
+TASK:
+What is the "Ice Cold" risk here? Even with high percentage rates, could a recent defensive trend (last 2 games) spoil this? Analyze the "Momentum" based on the provided reason: "${fh.reason}".`
+            ];
+        }
 
         return [
             `${basePrompt}\n\nTASK: Based on these detailed statistics, provide a comprehensive analysis for the '${market}' bet. Is it a solid value? Give a probability percentage.`,
@@ -594,7 +640,7 @@ DETAILED STATISTICS:
     log.info(`║  Matches Scanned: ${customLimit}                               ║`);
     log.info(`║  Candidates Found: ${totalCandidates}                             ║`);
     log.info(`╠═══════════════════════════════════════════════════════╣`);
-    log.info(`║  Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} ║`);
+    log.info(`║  Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} | 1H O0.5: ${results.firstHalfOver05.length} ║`);
     log.info(`╚═══════════════════════════════════════════════════════╝`);
     log.info(`\n⏳ Waiting for Admin Approval in Admin Panel...`);
 
