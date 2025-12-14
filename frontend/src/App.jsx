@@ -788,6 +788,54 @@ function App() {
             )}
           </div>
         )}
+
+        {/* NEW TAB: FIRST HALF OVER 0.5 */}
+        {activeTab === 'iy05' && (
+          <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold tracking-tight">⏱️ First Half Over 0.5</h2>
+                {dailyAnalysis && (
+                  <span className="text-sm text-muted-foreground mt-1">
+                    ({dailyAnalysis.firstHalfOver05?.length || 0} Matches)
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleRunDaily(true)}
+                  disabled={isAnalysing}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 disabled:opacity-50"
+                >
+                  {isAnalysing ? 'Scanning...' : 'Here is the button you asked for ↻ Refresh'}
+                </button>
+              </div>
+            </div>
+
+            {!dailyAnalysis ? (
+              <div className="flex h-64 flex-col items-center justify-center space-y-4 rounded-xl border-2 border-dashed bg-muted/5">
+                <p className="text-muted-foreground">No analysis data found.</p>
+                <button
+                  onClick={() => handleRunDaily(false)}
+                  disabled={isAnalysing}
+                  className="rounded-lg bg-primary px-8 py-3 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium transition-transform active:scale-95"
+                >
+                  {isAnalysing ? 'Running Pure Form Analysis...' : '🚀 Start Analysis'}
+                </button>
+              </div>
+            ) : (
+              <div>
+                {(!dailyAnalysis.firstHalfOver05 || dailyAnalysis.firstHalfOver05.length === 0) ? (
+                  <div className="p-12 text-center text-muted-foreground border rounded-xl bg-muted/5">
+                    No matches met the "First Half Over 0.5" criteria today.
+                  </div>
+                ) : (
+                  renderDailyTable('⏱️ First Half Over 0.5 (Pure Form)', dailyAnalysis.firstHalfOver05, 'firstHalfOver05')
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Modal */}
