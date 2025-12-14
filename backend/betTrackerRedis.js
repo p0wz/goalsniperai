@@ -222,6 +222,16 @@ async function clearAllBets(source = null) {
     }
 }
 
+async function deleteBet(id) {
+    const db = await loadDb();
+    const filtered = db.filter(b => b.id !== id);
+    if (filtered.length === db.length) {
+        return { success: false, error: 'Bet not found' };
+    }
+    await saveDb(filtered);
+    return { success: true, message: 'Bet deleted' };
+}
+
 // ============================================
 // 🤖 Auto-Settlement Helpers
 // ============================================
@@ -316,5 +326,6 @@ module.exports = {
     getCoupons,
     saveCoupon,
     settleCoupon,
-    deleteCoupon
+    deleteCoupon,
+    deleteBet
 };

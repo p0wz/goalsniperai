@@ -19,6 +19,7 @@ function App() {
   const [betHistory, setBetHistory] = useState([]);
 
   const [dailyAnalysis, setDailyAnalysis] = useState(null);
+  const [showDailyHistory, setShowDailyHistory] = useState(false); // New State for Daily History toggle
   const [selectedDailyMatch, setSelectedDailyMatch] = useState(null);
 
   // Loaders
@@ -31,10 +32,14 @@ function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await authService.getProfile();
-      if (res.success) {
-        setUser(res.user);
-        fetchAll();
+      setLoading(true);
+      const profile = await authService.getProfile();
+      setUser(profile);
+
+      // Load data based on active tab
+      if (activeTab === 'live') {
+        fetchLiveSignals();
+        fetchBetHistory(); // Pre-load history for Dashboard and Daily History
       }
     } catch (err) {
       console.log('User not logged in');
@@ -44,19 +49,28 @@ function App() {
   };
 
   const fetchAll = () => {
-    fetchSignals();
-    fetchHistory();
+    fetchLiveSignals();
+    fetchBetHistory();
     // Daily analysis is usually on demand or cached, we can fetch if needed
     // fetchDaily(); 
   };
 
-  const fetchSignals = async () => {
+  const fetchLiveSignals = async () => {
     try {
       setRefreshing(true);
-      const res = await signalService.getLiveSignals();
-      if (res.success) setLiveSignals(res.data);
+      const data = await signalService.getLiveSignals();
+      setLiveSignals(data.data.filter(s => s.verdict === 'PLAY').sort((a, b) => b.confidencePercent - a.confidencePercent));
     } catch (err) { console.error(err); }
     finally { setRefreshing(false); }
+  };
+
+  const fetchBetHistory = async () => {
+    try {
+      const data = await betService.getHistory(); // Use service for consistency
+      setBetHistory(data.data || []);
+    } catch (err) {
+      console.error("Failed to load history", err);
+    }
   };
 
   const fetchHistory = async () => {
@@ -66,11 +80,10 @@ function App() {
     } catch (err) { console.error(err); }
   };
 
-  const handleRunDaily = async () => {
+  const handleRunDaily = async (force = false) => {
     try {
       setIsAnalysing(true);
-      // Force run
-      const res = await signalService.getDailyAnalysis(true);
+      const res = await signalService.getDailyAnalysis(force);
       if (res.success) setDailyAnalysis(res.data);
     } catch (err) {
       alert('Analysis failed: ' + err.message);
@@ -108,6 +121,52 @@ function App() {
   const handleLogout = async () => {
     await authService.logout();
     setUser(null);
+  };
+
+  // Handle Approve/Reject for Daily Analysis
+  const handleDailyAction = async (match, action, category) => {
+    try {
+      if (action === 'approve') {
+        await signalService.approveSignal(match.id, {
+          matchData: {
+            matchId: match.matchId,
+            home_team: match.event_home_team,
+            away_team: match.event_away_team
+          },
+          market: match.market, // Uses market from match data
+          category: category,
+          confidence: 85 // Default high confidence for approved
+        });
+        alert(`Approved: ${match.event_home_team} vs ${match.event_away_team}`);
+        fetchBetHistory(); // Refresh history
+      } else if (action === 'reject') {
+        if (!confirm('Are you sure you want to remove this match?')) return;
+        await signalService.rejectSignal(match.id);
+      }
+
+      // Remove from local state immediately for better UX
+      const newAnalysis = { ...dailyAnalysis };
+      for (const cat in newAnalysis) {
+        if (Array.isArray(newAnalysis[cat])) {
+          newAnalysis[cat] = newAnalysis[cat].filter(m => m.id !== match.id);
+        }
+      }
+      setDailyAnalysis(newAnalysis);
+
+    } catch (err) {
+      console.error(`Action ${action} failed`, err);
+      alert('Action failed');
+    }
+  };
+
+  const handleDeleteHistory = async (id) => {
+    if (!confirm('Delete this record permanently?')) return;
+    try {
+      await betService.deleteBet(id);
+      setBetHistory(prev => prev.filter(b => b.id !== id));
+    } catch (e) {
+      alert('Delete failed');
+    }
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-background text-foreground">Loading...</div>;
@@ -264,7 +323,7 @@ function App() {
   };
 
   // Helper to render Daily Analysis Tables
-  const renderDailyTable = (title, items) => {
+  const renderDailyTable = (title, items, categoryKey) => {
     if (!items || items.length === 0) return null;
     return (
       <div className="mb-6">
@@ -289,6 +348,7 @@ function App() {
                 <th className="p-2">Match</th>
                 <th className="p-2">League</th>
                 <th className="p-2">Stats</th>
+                <th className="p-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -299,11 +359,38 @@ function App() {
                   onClick={() => setSelectedDailyMatch(item)}
                 >
                   <td className="p-2">{new Date(item.startTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                  <td className="p-2 font-medium">{item.event_home_team} vs {item.event_away_team}</td>
-                  <td className="p-2 text-muted-foreground">{item.league}</td>
+                  <td className="p-2 font-medium">
+                    <div className="flex flex-col">
+                      <span>{item.event_home_team}</span>
+                      <span className="text-muted-foreground text-xs">vs {item.event_away_team}</span>
+                    </div>
+                  </td>
+                  <td className="p-2 text-muted-foreground text-xs">{item.league}</td>
                   <td className="p-2 text-xs">
-                    H2H: {(item.stats.mutual || []).length} games
-                    {/* Add more stats if needed */}
+                    <span className={clsx(
+                      "px-1.5 py-0.5 rounded",
+                      (item.detailed_analysis?.stats?.homeGoalRate > 70) ? "bg-green-500/20 text-green-400" : "bg-gray-800"
+                    )}>
+                      Gol: {item.detailed_analysis?.stats?.homeGoalRate}%
+                    </span>
+                  </td>
+                  <td className="p-2 text-right">
+                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleDailyAction(item, 'approve', categoryKey)}
+                        className="p-1.5 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                        title="Approve & Save to History"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => handleDailyAction(item, 'reject', categoryKey)}
+                        className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                        title="Reject & Remove"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -359,7 +446,7 @@ function App() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Active Live Signals</h2>
               <button
-                onClick={fetchSignals}
+                onClick={fetchLiveSignals}
                 disabled={refreshing}
                 className="px-3 py-1 text-xs rounded border hover:bg-accent"
               >
@@ -530,41 +617,120 @@ function App() {
 
         {/* Tab Content: DAILY ANALYSIS */}
         {activeTab === 'daily' && (
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
-              <div>
-                <h2 className="text-xl font-semibold">Daily Pre-Match Analysis</h2>
-                <p className="text-sm text-muted-foreground">Analysis for top leagues based on H2H and Form.</p>
+          <div className="p-4 md:p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex gap-4 items-center">
+                <h2 className="text-2xl font-bold tracking-tight">Daily Analysis</h2>
+                <div className="flex bg-muted rounded-lg p-1">
+                  <button
+                    onClick={() => setShowDailyHistory(false)}
+                    className={clsx("px-3 py-1 text-sm rounded-md transition-all", !showDailyHistory ? "bg-background shadow text-primary" : "text-muted-foreground hover:text-primary")}
+                  >
+                    Active Requests
+                  </button>
+                  <button
+                    onClick={() => setShowDailyHistory(true)}
+                    className={clsx("px-3 py-1 text-sm rounded-md transition-all", showDailyHistory ? "bg-background shadow text-primary" : "text-muted-foreground hover:text-primary")}
+                  >
+                    Approved History
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={handleRunDaily}
-                disabled={isAnalysing}
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded font-medium shadow-sm w-full md:w-auto"
-              >
-                {isAnalysing ? 'Running Analysis (Please Wait)...' : '▶ Run New Analysis'}
-              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleRunDaily(false)}
+                  disabled={isAnalysing}
+                  className="bg-secondary hover:bg-secondary/80 px-4 py-2 rounded text-sm font-medium"
+                >
+                  {isAnalysing ? 'Loading...' : 'Refresh'}
+                </button>
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => handleRunDaily(true)}
+                    disabled={isAnalysing}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium"
+                  >
+                    {isAnalysing ? 'Scanning...' : 'Analiz Et'}
+                  </button>
+                )}
+              </div>
             </div>
 
-            {isAnalysing && (
-              <div className="p-8 text-center border rounded bg-accent/10 animate-pulse">
-                <div className="text-lg font-bold mb-2">Analyzing 40+ Leagues...</div>
-                <div className="text-sm text-muted-foreground">Fetching Data • Calculating Statistics • Comparing Form</div>
-              </div>
-            )}
-
-            {dailyAnalysis && !isAnalysing && (
-              <div className="space-y-4">
-                {renderDailyTable('🔥 Over 2.5 Goals Candidates', dailyAnalysis.over25)}
-                {renderDailyTable('🛡️ 1X Double Chance (Safe)', dailyAnalysis.doubleChance)}
-                {renderDailyTable('🏠 Home Team Over 1.5', dailyAnalysis.homeOver15)}
-                {renderDailyTable('🔒 Under 3.5 Goals', dailyAnalysis.under35)}
-                {renderDailyTable('🧊 Under 2.5 Goals', dailyAnalysis.under25)}
-
-                {Object.values(dailyAnalysis).every(arr => arr.length === 0) && (
-                  <div className="text-center p-8 border rounded text-muted-foreground">
-                    Analysis complete. No matches met the strict criteria for today.
-                  </div>
-                )}
+            {!showDailyHistory ? (
+              // ACTIVE ANALYSIS VIEW
+              isAnalysing ? (
+                <div className="text-center py-20 animate-pulse">
+                  <div className="text-4xl mb-4">🔮</div>
+                  <h3 className="text-xl font-medium">Analyzing Today's Fixtures...</h3>
+                  <p className="text-muted-foreground">This may take up to 30 seconds.</p>
+                </div>
+              ) : dailyAnalysis ? (
+                <div className="grid grid-cols-1 gap-6">
+                  {renderDailyTable('🔥 Over 2.5 Goals Candidates', dailyAnalysis.over25, 'over25')}
+                  {renderDailyTable('🛡️ 1X Double Chance (Safe)', dailyAnalysis.doubleChance, 'doubleChance')}
+                  {renderDailyTable('🏠 Home Team Over 1.5', dailyAnalysis.homeOver15, 'homeOver15')}
+                  {renderDailyTable('🔒 Under 3.5 Goals', dailyAnalysis.under35, 'under35')}
+                  {renderDailyTable('🧊 Under 2.5 Goals', dailyAnalysis.under25, 'under25')}
+                </div>
+              ) : (
+                <div className="text-center py-20 border-2 border-dashed rounded-xl">
+                  <p className="text-muted-foreground">No analysis data found. Click "Analiz Et".</p>
+                </div>
+              )
+            ) : (
+              // HISTORY VIEW
+              <div className="bg-card rounded-xl border shadow-sm">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Approved Matches History</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted text-left">
+                      <tr>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Match</th>
+                        <th className="p-3">Market</th>
+                        <th className="p-3">Result</th>
+                        <th className="p-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {betHistory.filter(b => b.source === 'daily').length === 0 ? (
+                        <tr><td colSpan="5" className="p-8 text-center text-muted-foreground">No approved matches yet.</td></tr>
+                      ) : (
+                        betHistory.filter(b => b.source === 'daily').map(bet => (
+                          <tr key={bet.id} className="border-t hover:bg-accent/10">
+                            <td className="p-3">{new Date(bet.created_at || bet.date).toLocaleDateString()}</td>
+                            <td className="p-3 font-medium">{bet.home_team} vs {bet.away_team}</td>
+                            <td className="p-3">
+                              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">{bet.strategy}</span>
+                            </td>
+                            <td className="p-3">
+                              <span className={clsx(
+                                "px-2 py-0.5 rounded text-xs font-semibold",
+                                bet.status === 'WON' ? "bg-green-500/20 text-green-500" :
+                                  bet.status === 'LOST' ? "bg-red-500/20 text-red-500" :
+                                    "bg-yellow-500/20 text-yellow-500"
+                              )}>
+                                {bet.status} {bet.result_score && `(${bet.result_score})`}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => handleDeleteHistory(bet.id)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Delete Record"
+                              >
+                                Trash
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

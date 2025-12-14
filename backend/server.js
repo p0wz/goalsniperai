@@ -180,6 +180,29 @@ const saveApprovals = () => {
     }
 };
 
+const REJECTED_IDS = new Set();
+const REJECTIONS_FILE = path.join(__dirname, 'rejections.json');
+
+// Load Rejections
+if (fs.existsSync(REJECTIONS_FILE)) {
+    try {
+        const saved = JSON.parse(fs.readFileSync(REJECTIONS_FILE));
+        saved.forEach(id => REJECTED_IDS.add(id));
+        console.log(`Loaded ${saved.length} rejected signals.`);
+    } catch (e) {
+        console.error('Failed to load rejections:', e);
+    }
+}
+
+// Helper to save rejections
+const saveRejections = () => {
+    try {
+        fs.writeFileSync(REJECTIONS_FILE, JSON.stringify([...REJECTED_IDS]));
+    } catch (e) {
+        console.error('Failed to save rejections:', e);
+    }
+};
+
 // ============================================
 // 📊 Match History Buffer (Dynamic Lookback)
 // ============================================
@@ -1819,6 +1842,20 @@ app.delete('/api/bet-history/clear', requireAuth, async (req, res) => {
     }
 });
 
+// Delete Single Bet (Admin)
+app.delete('/api/bet-history/:id', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    try {
+        const { id } = req.params;
+        const result = await betTracker.deleteBet(id);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ============================================
 // 📈 Daily Pre-Match Analyst Endpoint
 // ============================================
@@ -1844,17 +1881,20 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
         categories.forEach(cat => {
             if (!results[cat]) return;
-            // Ensure IDs exist and check approval
+            // Ensure IDs exist and check approval/rejection
             const list = results[cat].map(m => {
                 // Generate consistent ID if missing (e.g. from cache)
                 const mid = m.id || `${m.event_key || m.match_id}_${cat}`;
-                return { ...m, id: mid, isApproved: APPROVED_IDS.has(mid) };
+                return { ...m, id: mid, isApproved: APPROVED_IDS.has(mid), isRejected: REJECTED_IDS.has(mid) };
             });
 
+            // Filter out rejected items for EVERYONE
+            const activeList = list.filter(m => !m.isRejected);
+
             if (userRole === 'pro') {
-                filtered[cat] = list.filter(m => m.isApproved);
+                filtered[cat] = activeList.filter(m => m.isApproved);
             } else {
-                filtered[cat] = list; // Admin sees all (with isApproved flag)
+                filtered[cat] = activeList; // Admin sees all non-rejected
             }
         });
         return filtered;
@@ -1924,6 +1964,33 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
         }
 
         log.success(`Daily candidate approved: ${id}`);
+        res.json({ success: true, id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// 🗑️ Reject Daily Candidate (Admin)
+// ============================================
+app.post('/api/daily-analysis/reject/:id', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+
+    try {
+        REJECTED_IDS.add(id);
+        saveRejections();
+
+        // Also remove from approved if it was there (toggle safety)
+        if (APPROVED_IDS.has(id)) {
+            APPROVED_IDS.delete(id);
+            saveApprovals();
+        }
+
+        log.info(`Daily candidate rejected: ${id}`);
         res.json({ success: true, id });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

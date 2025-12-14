@@ -77,6 +77,10 @@ export const signalService = {
     approveSignal: async (id, data) => {
         const response = await api.post(`/daily-analysis/approve/${id}`, data);
         return response.data;
+    },
+    rejectSignal: async (id) => {
+        const response = await api.post(`/daily-analysis/reject/${id}`);
+        return response.data;
     }
 };
 
@@ -91,6 +95,10 @@ export const betService = {
     },
     clearHistory: async (source) => {
         const response = await api.delete('/admin/history', { data: { source } });
+        return response.data;
+    },
+    deleteBet: async (id) => {
+        const response = await api.delete(`/bet-history/${id}`);
         return response.data;
     }
 };
