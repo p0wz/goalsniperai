@@ -127,6 +127,50 @@ const log = {
 const PORT = process.env.PORT || 3000;
 const POLL_INTERVAL = 3 * 60 * 1000; // 3 minutes
 
+// EXPLICIT EXTRA LEAGUES FOR LIVE BOT (Expanded Coverage)
+const EXTRA_LIVE_LEAGUES = [
+    // --- UK & IRELAND ---
+    'ENGLAND: National League', 'ENGLAND: EFL Trophy', 'SCOTLAND: League One', 'SCOTLAND: League Two',
+    'NORTHERN IRELAND: Premiership', 'WALES: Cymru Premier',
+
+    // --- EUROPE LOWER TIERS ---
+    'ITALY: Serie C', 'SPAIN: Primera RFEF', 'GERMANY: Regionalliga',
+    'FRANCE: National 2', 'NETHERLANDS: Tweede Divisie', 'PORTUGAL: Liga 3',
+    'TURKEY: 2. Lig', 'TURKEY: 3. Lig',
+
+    // --- SCANDINAVIA & BALTICS ---
+    'DENMARK: 1st Division', 'SWEDEN: Superettan', 'NORWAY: 1. Division',
+    'FINLAND: Ykkonen', 'ICELAND: 1. Deild', 'ESTONIA: Meistriliiga',
+    'LATVIA: Virsliga', 'LITHUANIA: A Lyga',
+
+    // --- EASTERN EUROPE ---
+    'POLAND: Division 1', 'CZECH REPUBLIC: FNL', 'ROMANIA: Liga 2',
+    'HUNGARY: Merkantil Bank Liga', 'BULGARIA: Second League',
+    'SLOVAKIA: 2. liga', 'SLOVENIA: 2. SNL', 'UKRAINE: Premier League',
+    'RUSSIA: Premier League', 'BELARUS: Vysshaya Liga',
+
+    // --- SOUTH AMERICA ---
+    'BRAZIL: Serie C', 'BRAZIL: Paulista', 'BRAZIL: Carioca', 'BRAZIL: Mineiro', 'BRAZIL: Gaucho',
+    'ARGENTINA: Primera Nacional', 'COLOMBIA: Primera B', 'CHILE: Primera B',
+    'URUGUAY: Segunda Division', 'PARAGUAY: Division Intermedia',
+    'PERU: Liga 2', 'ECUADOR: Serie B', 'VENEZUELA: Liga FUTVE',
+
+    // --- ASIA & OCEANIA ---
+    'JAPAN: J3 League', 'SOUTH KOREA: K3 League',
+    'THAILAND: Thai League 1', 'VIETNAM: V.League 1', 'INDONESIA: Liga 1',
+    'MALAYSIA: Super League', 'INDIA: ISL', 'INDIA: I-League',
+    'UZBEKISTAN: Super League', 'AUSTRALIA: NPL',
+
+    // --- MENA ---
+    'EGYPT: Premier League', 'MOROCCO: Botola Pro', 'TUNISIA: Ligue 1',
+    'ALGERIA: Ligue 1', 'QATAR: Stars League', 'UAE: Pro League',
+    'IRAN: Pro League',
+
+    // --- CONCACAF ---
+    'USA: USL Championship', 'MEXICO: Liga de Expansion MX',
+    'COSTA RICA: Primera Division'
+];
+
 // Validate required environment variables
 if (!process.env.RAPIDAPI_KEY) {
     console.warn('[WARN] RAPIDAPI_KEY not set - API calls will fail');
@@ -1436,12 +1480,15 @@ async function processMatches() {
 
         // Filter candidates by time ranges (12-38 for First Half, 55-82 for Late Game)
         const candidates = allMatches.filter(m => {
-            // League Filter (Expanded List)
+            // League Filter (Expanded List for Live Bot)
             const leagueName = m.league_name || '';
             const fullLeagueName = `${m.country_name}: ${leagueName}`;
 
+            // Combine Allowlist + Extra List
+            const LIVE_BOT_LEAGUES = [...ALLOWED_LEAGUES, ...EXTRA_LIVE_LEAGUES];
+
             // Check if league is in allowed list (or partial match if beneficial, but exact is safer)
-            const isAllowedLeague = ALLOWED_LEAGUES.some(allowed =>
+            const isAllowedLeague = LIVE_BOT_LEAGUES.some(allowed =>
                 fullLeagueName.toUpperCase().includes(allowed.toUpperCase()) ||
                 leagueName.toUpperCase().includes(allowed.split(': ')[1]?.toUpperCase())
             );
