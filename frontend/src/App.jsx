@@ -645,15 +645,13 @@ function App() {
                 >
                   {isAnalysing ? 'Loading...' : 'Refresh'}
                 </button>
-                {user?.role === 'admin' && (
-                  <button
-                    onClick={() => handleRunDaily(true)}
-                    disabled={isAnalysing}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium"
-                  >
-                    {isAnalysing ? 'Scanning...' : 'Analiz Et'}
-                  </button>
-                )}
+                <button
+                  onClick={() => handleRunDaily(true)}
+                  disabled={isAnalysing}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium"
+                >
+                  {isAnalysing ? 'Scanning...' : 'Analiz Et'}
+                </button>
               </div>
             </div>
 
