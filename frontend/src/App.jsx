@@ -721,7 +721,6 @@ function App() {
               ) : dailyAnalysis ? (
                 <div className="grid grid-cols-1 gap-6">
                   {renderDailyTable('🔥 Over 2.5 Goals Candidates', dailyAnalysis.over25, 'over25')}
-                  {renderDailyTable('⏱️ First Half Over 0.5 (Pure Form)', dailyAnalysis.firstHalfOver05, 'firstHalfOver05')}
                   {renderDailyTable('🛡️ 1X Double Chance (Safe)', dailyAnalysis.doubleChance, 'doubleChance')}
                   {renderDailyTable('🏠 Home Team Over 1.5', dailyAnalysis.homeOver15, 'homeOver15')}
                   {renderDailyTable('🔒 Under 3.5 Goals', dailyAnalysis.under35, 'under35')}
