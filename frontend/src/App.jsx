@@ -246,7 +246,7 @@ function App() {
 
           <div className="space-y-6">
             {/* Detailed Analysis Section */}
-            {match.detailed_analysis && (
+            {match.detailed_analysis && !match.fhStats && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-primary border-b pb-1">📊 Detailed Analysis</h3>
 
@@ -279,6 +279,45 @@ function App() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* PURE FORM ANALYSIS (New 1H Module) */}
+            {match.fhStats && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-primary border-b pb-1">⚡ First Half Pure Form</h3>
+
+                <div className="flex items-center gap-4 mb-4">
+                  <div className={clsx("text-3xl font-bold", match.fhStats.score >= 80 ? "text-green-500" : "text-yellow-500")}>
+                    {match.fhStats.score}<span className="text-sm font-normal text-muted-foreground">/100</span>
+                  </div>
+                  <div className="px-3 py-1 rounded bg-muted text-sm font-mono border">
+                    Confidence: {match.fhStats.confidence}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="p-3 bg-muted/30 rounded border text-center">
+                    <div className="text-xs text-muted-foreground uppercase">Home 1H Goal</div>
+                    <div className="text-lg font-bold text-foreground">{match.fhStats.metrics.home_ht_rate}%</div>
+                    <div className="text-[10px] text-muted-foreground">Last 5-8 Home Games</div>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded border text-center">
+                    <div className="text-xs text-muted-foreground uppercase">Away 1H Goal</div>
+                    <div className="text-lg font-bold text-foreground">{match.fhStats.metrics.away_ht_rate}%</div>
+                    <div className="text-[10px] text-muted-foreground">Last 5-8 Away Games</div>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded border text-center">
+                    <div className="text-xs text-muted-foreground uppercase">H2H 1H Goal</div>
+                    <div className="text-lg font-bold text-foreground">{match.fhStats.metrics.h2h_ht_rate}%</div>
+                    <div className="text-[10px] text-muted-foreground">Last 5 Meetings</div>
+                  </div>
+                </div>
+
+                <div className="rounded bg-indigo-500/10 border border-indigo-500/20 p-3 text-sm">
+                  <div className="font-semibold mb-1 text-indigo-400">Analysis Logic</div>
+                  <p className="text-foreground/80 leading-relaxed">{match.fhStats.reason}</p>
+                </div>
               </div>
             )}
 
@@ -367,12 +406,28 @@ function App() {
                   </td>
                   <td className="p-2 text-muted-foreground text-xs">{item.league}</td>
                   <td className="p-2 text-xs">
-                    <span className={clsx(
-                      "px-1.5 py-0.5 rounded",
-                      (item.detailed_analysis?.stats?.homeGoalRate > 70) ? "bg-green-500/20 text-green-400" : "bg-gray-800"
-                    )}>
-                      Gol: {item.detailed_analysis?.stats?.homeGoalRate}%
-                    </span>
+                    <td className="p-2 text-xs">
+                      {categoryKey === 'firstHalfOver05' ? (
+                        <div className="flex items-center gap-2">
+                          <span className={clsx(
+                            "px-1.5 py-0.5 rounded font-bold",
+                            (item.fhStats?.score >= 80) ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-500"
+                          )}>
+                            Sc: {item.fhStats?.score}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            H{item.fhStats?.metrics?.home_ht_rate}% A{item.fhStats?.metrics?.away_ht_rate}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className={clsx(
+                          "px-1.5 py-0.5 rounded",
+                          (item.detailed_analysis?.stats?.homeGoalRate > 70) ? "bg-green-500/20 text-green-400" : "bg-gray-800"
+                        )}>
+                          Gol: {item.detailed_analysis?.stats?.homeGoalRate}%
+                        </span>
+                      )}
+                    </td>
                   </td>
                   <td className="p-2 text-right">
                     <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -666,6 +721,7 @@ function App() {
               ) : dailyAnalysis ? (
                 <div className="grid grid-cols-1 gap-6">
                   {renderDailyTable('🔥 Over 2.5 Goals Candidates', dailyAnalysis.over25, 'over25')}
+                  {renderDailyTable('⏱️ First Half Over 0.5 (Pure Form)', dailyAnalysis.firstHalfOver05, 'firstHalfOver05')}
                   {renderDailyTable('🛡️ 1X Double Chance (Safe)', dailyAnalysis.doubleChance, 'doubleChance')}
                   {renderDailyTable('🏠 Home Team Over 1.5', dailyAnalysis.homeOver15, 'homeOver15')}
                   {renderDailyTable('🔒 Under 3.5 Goals', dailyAnalysis.under35, 'under35')}
