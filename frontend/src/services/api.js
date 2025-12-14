@@ -74,6 +74,10 @@ export const signalService = {
         const response = await api.get(`/daily-analysis?force=${force}`);
         return response.data;
     },
+    getFirstHalfAnalysis: async () => {
+        const response = await api.get('/analysis/first-half');
+        return response.data;
+    },
     approveSignal: async (id, data) => {
         const response = await api.post(`/daily-analysis/approve/${id}`, data);
         return response.data;

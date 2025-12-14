@@ -19,6 +19,7 @@ function App() {
   const [betHistory, setBetHistory] = useState([]);
 
   const [dailyAnalysis, setDailyAnalysis] = useState(null);
+  const [firstHalfData, setFirstHalfData] = useState(null); // Independent State
   const [showDailyHistory, setShowDailyHistory] = useState(false); // New State for Daily History toggle
   const [selectedDailyMatch, setSelectedDailyMatch] = useState(null);
 
@@ -26,6 +27,7 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [isAnalysing, setIsAnalysing] = useState(false);
+  const [isAnalysingFH, setIsAnalysingFH] = useState(false);
   const [botRunning, setBotRunning] = useState(false);
   const [botStatusLoading, setBotStatusLoading] = useState(false);
 
@@ -125,6 +127,18 @@ function App() {
     }
   };
 
+  const handleRunFirstHalf = async () => {
+    try {
+      setIsAnalysingFH(true);
+      const res = await signalService.getFirstHalfAnalysis();
+      if (res.success) setFirstHalfData(res.data);
+    } catch (err) {
+      alert('FH Analysis failed: ' + err.message);
+    } finally {
+      setIsAnalysingFH(false);
+    }
+  };
+
   const handleSettle = async (id, status, actualScore) => {
     try {
       if (!confirm(`Mark this bet as ${status}?`)) return;
@@ -185,6 +199,13 @@ function App() {
         }
       }
       setDailyAnalysis(newAnalysis);
+
+      // Also support FH removal
+      if (firstHalfData && firstHalfData.firstHalfOver05) {
+        const newFH = { ...firstHalfData };
+        newFH.firstHalfOver05 = newFH.firstHalfOver05.filter(m => m.id !== match.id);
+        setFirstHalfData(newFH);
+      }
 
     } catch (err) {
       console.error(`Action ${action} failed`, err);
@@ -852,42 +873,42 @@ function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-bold tracking-tight">⏱️ First Half Over 0.5</h2>
-                {dailyAnalysis && (
+                {firstHalfData && (
                   <span className="text-sm text-muted-foreground mt-1">
-                    ({dailyAnalysis.firstHalfOver05?.length || 0} Matches)
+                    ({firstHalfData.firstHalfOver05?.length || 0} Matches)
                   </span>
                 )}
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleRunDaily(true)}
-                  disabled={isAnalysing}
+                  onClick={() => handleRunFirstHalf()}
+                  disabled={isAnalysingFH}
                   className="flex items-center gap-2 px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 disabled:opacity-50"
                 >
-                  {isAnalysing ? 'Scanning...' : 'Here is the button you asked for ↻ Refresh'}
+                  {isAnalysingFH ? 'Scanning...' : '↻ Refresh Independent Module'}
                 </button>
               </div>
             </div>
 
-            {!dailyAnalysis ? (
+            {!firstHalfData ? (
               <div className="flex h-64 flex-col items-center justify-center space-y-4 rounded-xl border-2 border-dashed bg-muted/5">
-                <p className="text-muted-foreground">No analysis data found.</p>
+                <p className="text-muted-foreground">Independent First Half Module.</p>
                 <button
-                  onClick={() => handleRunDaily(false)}
-                  disabled={isAnalysing}
-                  className="rounded-lg bg-primary px-8 py-3 text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium transition-transform active:scale-95"
+                  onClick={() => handleRunFirstHalf()}
+                  disabled={isAnalysingFH}
+                  className="rounded-lg bg-indigo-600 px-8 py-3 text-white hover:bg-indigo-700 disabled:opacity-50 font-medium transition-transform active:scale-95"
                 >
-                  {isAnalysing ? 'Running Pure Form Analysis...' : '🚀 Start Analysis'}
+                  {isAnalysingFH ? 'Running Pure Form Scan...' : '🚀 Scan 1H Form Only'}
                 </button>
               </div>
             ) : (
               <div>
-                {(!dailyAnalysis.firstHalfOver05 || dailyAnalysis.firstHalfOver05.length === 0) ? (
+                {(!firstHalfData.firstHalfOver05 || firstHalfData.firstHalfOver05.length === 0) ? (
                   <div className="p-12 text-center text-muted-foreground border rounded-xl bg-muted/5">
                     No matches met the "First Half Over 0.5" criteria today.
                   </div>
                 ) : (
-                  renderDailyTable('⏱️ First Half Over 0.5 (Pure Form)', dailyAnalysis.firstHalfOver05, 'firstHalfOver05')
+                  renderDailyTable('⏱️ First Half Over 0.5 (Pure Form)', firstHalfData.firstHalfOver05, 'firstHalfOver05')
                 )}
               </div>
             )}

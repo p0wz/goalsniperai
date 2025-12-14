@@ -24,7 +24,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 // Routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
-const { runDailyAnalysis } = require('./dailyAnalyst');
+const { runDailyAnalysis, runFirstHalfScan } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
@@ -1905,6 +1905,20 @@ app.delete('/api/bet-history/:id', requireAuth, async (req, res) => {
 
 // ============================================
 // 📈 Daily Pre-Match Analyst Endpoint
+// ----------------------------------------------------------------------
+app.get('/api/analysis/first-half', optionalAuth, async (req, res) => {
+    log.info('🚀 API Request: Independent First Half Analysis');
+    try {
+        const results = await runFirstHalfScan(log);
+        res.json({ success: true, data: results });
+    } catch (error) {
+        log.error('First Half Analysis Failed:', error);
+        res.status(500).json({ success: false, error: 'Analysis failed' });
+    }
+});
+
+// ============================================
+// 📊 DAILY ANALYSIS ENDPOINT (Main)
 // ============================================
 let DAILY_ANALYSIS_CACHE = null;
 let DAILY_ANALYSIS_TIMESTAMP = null;

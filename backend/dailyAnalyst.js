@@ -68,7 +68,7 @@ async function fetchWithRetry(url, options, retries = 2, delay = 1000) {
 }
 
 // Helper: Fetch Day
-async function fetchDay(day, log = console) {
+async function fetchDay(day, log = console, ignoreLeagues = false) {
     try {
         log.info(`[DailyAnalyst] Fetching day ${day}...`);
         const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/${day}/0`, {
@@ -84,8 +84,8 @@ async function fetchDay(day, log = console) {
             if (tournament.matches && Array.isArray(tournament.matches)) {
                 const leagueName = tournament.name || 'Unknown League';
 
-                // Filter: Skip leagues not in allowed list
-                if (!isLeagueAllowed(leagueName)) {
+                // Filter: Skip leagues not in allowed list (UNLESS ignoreLeagues is true)
+                if (!ignoreLeagues && !isLeagueAllowed(leagueName)) {
                     if (skippedLeagues.length < 10) {
                         skippedLeagues.push(leagueName);
                     }
@@ -647,4 +647,111 @@ What is the "Ice Cold" risk here? Even with high percentage rates, could a recen
     return results;
 }
 
-module.exports = { runDailyAnalysis };
+// ============================================
+// ⚡ INDEPENDENT MODULE: FIRST HALF ONLY
+// ============================================
+async function runFirstHalfScan(log = console, customLimit = MATCH_LIMIT) {
+    const startTime = Date.now();
+    log.info(`\n╔═══════════════════════════════════════════════════════╗`);
+    log.info(`║      ⚡ FIRST HALF PURE FORM SCANNER                 ║`);
+    log.info(`╚═══════════════════════════════════════════════════════╝`);
+
+    // 1. Fetch
+    log.info('[FirstHalfScan] Fetching Today\'s Matches (IGNORING LEAGUE FILTER)...');
+    // Pass true for ignoreLeagues
+    let matches = await fetchDay(1, log, true);
+    if (matches.length === 0) return { firstHalfOver05: [] };
+
+    // 2. Process Only First Half
+    const candidates = [];
+    const AnalyzedMatches = [];
+
+    for (const match of matches) {
+        // Basic Stats Check
+        if (!match.event_home_team || !match.event_away_team) continue;
+
+        // Rate Limit Protection
+        await sleep(1000);
+
+        // Fetch History (H2H Endpoint returns Home, Away, and Mutual history in one go)
+        const h2hData = await fetchMatchH2H(match.event_key);
+        if (!h2hData) continue;
+
+        const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+
+        // Filter History
+        const homeHistory = sections.filter(x => (x.home_team?.name === match.event_home_team) || (x.away_team?.name === match.event_home_team));
+        const awayHistory = sections.filter(x => (x.home_team?.name === match.event_away_team) || (x.away_team?.name === match.event_away_team));
+        const mutualH2H = sections.filter(x =>
+            (x.home_team?.name === match.event_home_team && x.away_team?.name === match.event_away_team) ||
+            (x.home_team?.name === match.event_away_team && x.away_team?.name === match.event_home_team)
+        );
+
+        if (homeHistory.length === 0 || awayHistory.length === 0) continue;
+
+        // Run Analyzer
+        const result = analyzeFirstHalfPreMatch(match, homeHistory, awayHistory, mutualH2H);
+
+        // DEBUG: Log first 5 matches analysis
+        if (AnalyzedMatches.length < 1) { // Just need 1 deep inspection
+            log.info(`[DEBUG-DATA] Raw History Item: ${JSON.stringify(homeHistory[0])}`);
+            log.info(`[DEBUG-FH] ${match.event_home_team} vs ${match.event_away_team} -> Score: ${result.score}`);
+            log.info(`[DEBUG-FH]   HomeHist: ${homeHistory.length}, AwayHist: ${awayHistory.length}, Mutual: ${mutualH2H.length}`);
+            log.info(`[DEBUG-FH]   Reason: ${result.reason}`);
+        }
+        AnalyzedMatches.push(match);
+
+        if (result && result.score >= 70) { // Keep even candidates around 70 for review
+            candidates.push({
+                ...match,
+                fhStats: result,
+                market: 'First Half Over 0.5',
+                filterStats: { // Minimal stats for frontend compatibility
+                    homeForm: { avgScored: 0, avgConceded: 0, over25Rate: 0 },
+                    awayForm: { avgScored: 0, avgConceded: 0, over25Rate: 0 },
+                    homeHomeStats: { scoringRate: 0, winRate: 0 },
+                    awayAwayStats: { cleanSheetRate: 0 },
+                    mutual: []
+                }
+            });
+        }
+    }
+
+    // 3. Prepare Results
+    const results = { firstHalfOver05: [] };
+
+    for (const match of candidates) {
+        // Generate AI Prompt just for this
+        const prompt = `Act as a professional football betting analyst.
+Match: ${match.event_home_team} vs ${match.event_away_team}
+Market: First Half Over 0.5 Goals
+PURE FORM SCORE: ${match.fhStats.score}/100
+Reason: ${match.fhStats.reason}
+KEY METRICS:
+- Home Team 1H Goal Rate: ${match.fhStats.metrics.home_ht_rate}%
+- Away Team 1H Goal Rate: ${match.fhStats.metrics.away_ht_rate}%
+- H2H 1H Goal Rate: ${match.fhStats.metrics.h2h_ht_rate}%
+
+TASK:
+Analyze this "First Half Over 0.5 Goal" pick based on the pure form score. Is it a solid value?`;
+
+        results.firstHalfOver05.push({
+            match: `${match.event_home_team} vs ${match.event_away_team}`,
+            event_home_team: match.event_home_team,
+            event_away_team: match.event_away_team,
+            id: `${match.event_key}_fh`,
+            matchId: match.event_key,
+            startTime: match.event_start_time,
+            league: match.league_name,
+            market: 'First Half Over 0.5',
+            fhStats: match.fhStats,
+            ai_prompts: [prompt],
+            status: 'PENDING_APPROVAL'
+        });
+    }
+
+    log.info(`✅ First Half Scan Complete: Found ${results.firstHalfOver05.length} candidates.`);
+    return results;
+}
+
+module.exports = { runDailyAnalysis, runFirstHalfScan };
