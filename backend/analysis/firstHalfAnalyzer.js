@@ -1,189 +1,123 @@
 /**
- * First Half Over 0.5 Goals - Pre-Match Analysis Module
+ * First Half Over 0.5 Goals - Heuristic Analysis Module (Zero-Cost)
  * 
- * OBJECTIVE: Calculate "First Half Potential Score" (0-100) based on Pure Form.
+ * OBJECTIVE: Estimate "First Half Potential" based on FULL TIME scores.
+ * REASON: API does not provide HT scores without costly extra requests.
  * 
- * ALGORITHM:
- * 1. Home Team Factor (Max 40 pts) - Based on Home Team's HOME games
- * 2. Away Team Factor (Max 40 pts) - Based on Away Team's AWAY games
- * 3. H2H Factor (Max 20 pts) - Based on direct meetings
- * 4. ICE COLD PENALTY (-30 pts) - If either team had 0-0 HT in last 2 games
+ * LOGIC:
+ * We use Full Time (FT) Total Goals as a proxy for 1H Goal Probability.
+ * - FT Goals >= 3: Very High chance of 1H Goal (~90%). Weight: 1.0
+ * - FT Goals == 2: Moderate chance (~65%).           Weight: 0.65
+ * - FT Goals == 1: Low chance (~30%).                Weight: 0.30
+ * - FT Goals == 0: No chance (0%).                   Weight: 0.0
+ * 
+ * SCORING:
+ * 1. Home Team Factor (Max 40 pts)
+ * 2. Away Team Factor (Max 40 pts)
+ * 3. H2H Factor (Max 20 pts)
+ * 4. Penalty: Recent 0-0 FT results (-30 pts)
  */
 
 function analyzeFirstHalfPreMatch(match, homeHistory, awayHistory, h2hHistory) {
-    const DEBUG = false;
-    const log = (msg) => DEBUG && console.log(`[1H Analysis] ${msg}`);
 
-    // --- 0. Helper Functions ---
+    // --- Helper: Calculate Weighted 1H Potential ---
+    const calculatePotential = (matches) => {
+        if (!matches || matches.length === 0) return 0;
+        let totalWeight = 0;
 
-    /**
-     * Checks if a match had a goal in the first half.
-     * Supports standard flashscore-style objects where:
-     * - score_1st_half might be present (e.g. "1-0")
-     * - OR we check periods if available (not typical in this simple history)
-     * 
-     * We assume history items have `score_1st_half` property or similar indicating HT score.
-     * The `dailyAnalyst.js` uses `score_1st_half` property which seems to be an integer or string like "1".
-     * Actually, looking at dailyAnalyst.js:201:
-     * const htHome = m.home_team?.score_1st_half || 0;
-     * const htAway = m.away_team?.score_1st_half || 0;
-     * if (htHome + htAway >= 1) htGoalCount++;
-     * 
-     * We will use the same logic.
-     */
-    const hasFirstHalfGoal = (m) => {
-        const htHome = parseInt(m.home_team?.score_1st_half) || 0;
-        const htAway = parseInt(m.away_team?.score_1st_half) || 0;
-        return (htHome + htAway) >= 1;
+        matches.forEach(m => {
+            const hs = parseInt(m.home_team?.score) || 0;
+            const as = parseInt(m.away_team?.score) || 0;
+            const total = hs + as;
+
+            if (total >= 3) totalWeight += 1.0;       // Strong indicator
+            else if (total === 2) totalWeight += 0.65; // Medium indicator
+            else if (total === 1) totalWeight += 0.30; // Weak indicator
+            // 0 goals = 0 weight
+        });
+
+        return (totalWeight / matches.length) * 100;
     };
 
-    /**
-     * Checks if a match finished 0-0 at Half Time.
-     */
-    const isZeroZeroHT = (m) => {
-        const htHome = parseInt(m.home_team?.score_1st_half) || 0;
-        const htAway = parseInt(m.away_team?.score_1st_half) || 0;
-        return (htHome + htAway) === 0;
+    // --- Helper: Check for recent 0-0 FT ---
+    const hasRecentZeroZero = (matches) => {
+        const last2 = matches.slice(0, 2);
+        if (last2.length < 2) return false;
+        return last2.every(m => {
+            const t = (parseInt(m.home_team?.score) || 0) + (parseInt(m.away_team?.score) || 0);
+            return t === 0;
+        });
     };
 
+    // --- 1. Home Team Analysis (at Home) ---
+    const homeLastHome = homeHistory
+        .filter(m => m.home_team?.name === match.event_home_team) // Venue filter
+        .slice(0, 8); // Last 8 games
 
-    // --- 1. Home Team Factor (Max 40 Pts) ---
-    // Filter: Keep only games played at HOME.
-    // Limit: Last 5 to 8 matches.
-    const homeLastHomeGames = homeHistory
-        .filter(m => m.home_team?.name === match.event_home_team) // Ensure they were the home team
-        .slice(0, 8); // Take up to 8, logic says 5-8 is fine. Let's use up to 8 for broader sample if available, but at least 5.
-
-    // Calculate % with 1H Goal
+    const homePotentialRate = calculatePotential(homeLastHome);
     let homeScore = 0;
-    let homeRate = 0;
-    if (homeLastHomeGames.length > 0) {
-        const homeGamesWithGoal = homeLastHomeGames.filter(hasFirstHalfGoal).length;
-        homeRate = (homeGamesWithGoal / homeLastHomeGames.length) * 100;
-
-        if (homeRate === 100) homeScore = 40;
-        else if (homeRate >= 80) homeScore = 32;
-        else if (homeRate >= 60) homeScore = 24;
-        else homeScore = 0;
+    if (homeLastHome.length > 0) {
+        if (homePotentialRate >= 80) homeScore = 40;
+        else if (homePotentialRate >= 60) homeScore = 30;
+        else if (homePotentialRate >= 40) homeScore = 20;
+        else homeScore = 10;
     }
 
-
-    // --- 2. Away Team Factor (Max 40 Pts) ---
-    // Filter: Keep only games played at AWAY.
-    const awayLastAwayGames = awayHistory
-        .filter(m => m.away_team?.name === match.event_away_team) // Ensure they were the away team
+    // --- 2. Away Team Analysis (at Away) ---
+    const awayLastAway = awayHistory
+        .filter(m => m.away_team?.name === match.event_away_team) // Venue filter
         .slice(0, 8);
 
+    const awayPotentialRate = calculatePotential(awayLastAway);
     let awayScore = 0;
-    let awayRate = 0;
-    if (awayLastAwayGames.length > 0) {
-        const awayGamesWithGoal = awayLastAwayGames.filter(hasFirstHalfGoal).length;
-        awayRate = (awayGamesWithGoal / awayLastAwayGames.length) * 100;
-
-        if (awayRate === 100) awayScore = 40;
-        else if (awayRate >= 80) awayScore = 32;
-        else if (awayRate >= 60) awayScore = 24;
-        else awayScore = 0;
+    if (awayLastAway.length > 0) {
+        if (awayPotentialRate >= 80) awayScore = 40;
+        else if (awayPotentialRate >= 60) awayScore = 30;
+        else if (awayPotentialRate >= 40) awayScore = 20;
+        else awayScore = 10;
     }
 
-
-    // --- 3. H2H Factor (Max 20 Pts) ---
-    // Last 5 direct meetings
+    // --- 3. H2H Analysis ---
     const last5H2H = h2hHistory.slice(0, 5);
-
+    const h2hRate = calculatePotential(last5H2H);
     let h2hScore = 0;
-    let h2hRate = 0;
     if (last5H2H.length > 0) {
-        const h2hWithGoal = last5H2H.filter(hasFirstHalfGoal).length;
-        h2hRate = (h2hWithGoal / last5H2H.length) * 100;
-
-        // 5/5 -> 20, 4/5 -> 15, 3/5 -> 10, else 0
-        // Wait, percentage based?
-        // 5/5 is 100%
-        // 4/5 is 80%
-        // 3/5 is 60%
-        if (h2hRate === 100) h2hScore = 20;
-        else if (h2hRate >= 80) h2hScore = 15;
-        else if (h2hRate >= 60) h2hScore = 10;
-        else h2hScore = 0;
-    } else {
-        // If no H2H, maybe treat as neutral or 0? 
-        // Request says "Score 0-100", implies we need points.
-        // If no H2H, we can't award points.
-        h2hScore = 0;
+        if (h2hRate >= 80) h2hScore = 20;
+        else if (h2hRate >= 60) h2hScore = 15;
+        else if (h2hRate >= 40) h2hScore = 10;
     }
 
-
-    // --- Calculate Base Score ---
+    // --- Calculate Total ---
     let totalScore = homeScore + awayScore + h2hScore;
 
+    // --- 4. Penalties ---
+    const homeSlump = hasRecentZeroZero(homeHistory.slice(0, 5)); // Check recent pure form
+    const awaySlump = hasRecentZeroZero(awayHistory.slice(0, 5));
 
-    // --- 4. The "ICE COLD" Penalty ---
-    // Check Last 2 Games for BOTH teams (regardless of Home/Away status in those games)
-    // Need raw latest games from history regardless of venue.
-    // Assuming `homeHistory` and `awayHistory` are passed as ALL recent matches sorted by date (newest first).
-    // If they are filtered or unsorted, this might be an issue. 
-    // We assume they are the standard "ALL" history arrays from valid sources.
-
-    // We need just the very last 2 games played by the home team.
-    const homeLast2 = homeHistory.slice(0, 2);
-    // And very last 2 games by the away team.
-    const awayLast2 = awayHistory.slice(0, 2);
-
-    let penaltyApplied = false;
     let penaltyReason = "";
-
-    // Rule: If HomeTeam OR AwayTeam has finished HT with 0-0 in their last 2 consecutive matches
-    // Check Home Team Slump
-    const homeSlump = homeLast2.length === 2 && homeLast2.every(isZeroZeroHT);
-
-    // Check Away Team Slump
-    const awaySlump = awayLast2.length === 2 && awayLast2.every(isZeroZeroHT);
-
     if (homeSlump || awaySlump) {
         totalScore -= 30;
-        penaltyApplied = true;
-        penaltyReason = "Penalty: ";
-        if (homeSlump) penaltyReason += "Home Team has 2 consecutive 0-0 HTs. ";
-        if (awaySlump) penaltyReason += "Away Team has 2 consecutive 0-0 HTs.";
+        penaltyReason = "Penalty: Recent 0-0 FT results detected.";
     }
 
-    // Clamp score to 0-100 range? 
-    // Logic allows negatives if we subtract 30 from a low score, theoretically.
-    // Request says "0-100".
-    if (totalScore < 0) totalScore = 0;
+    // --- Clamp ---
     if (totalScore > 100) totalScore = 100;
+    if (totalScore < 0) totalScore = 0;
 
-
-    // --- Final Output Construction ---
-    const isSignal = totalScore >= 80;
-
-    let confidence = "LOW";
-    if (totalScore >= 80) confidence = "HIGH";
-    else if (totalScore >= 60) confidence = "MEDIUM";
-
-    // Construct Reason String
-    const reasonParts = [];
-    reasonParts.push(`Home ${homeRate.toFixed(0)}% (1H Goals) in last ${homeLastHomeGames.length} home games.`);
-    reasonParts.push(`Away ${awayRate.toFixed(0)}% (1H Goals) in last ${awayLastAwayGames.length} away games.`);
-    if (last5H2H.length > 0) {
-        reasonParts.push(`H2H ${h2hRate.toFixed(0)}% in last ${last5H2H.length}.`);
-    }
-    if (penaltyApplied) {
-        reasonParts.push(penaltyReason.trim());
-    }
+    // --- Output ---
+    const isSignal = totalScore >= 75; // Slightly lower threshold for heuristic
 
     return {
         signal: isSignal,
         score: totalScore,
-        market: "First Half Over 0.5",
-        confidence: confidence,
+        market: "First Half Over 0.5 (Heuristic)",
+        confidence: totalScore >= 80 ? "HIGH" : "MEDIUM",
         metrics: {
-            home_ht_rate: parseFloat(homeRate.toFixed(2)),
-            away_ht_rate: parseFloat(awayRate.toFixed(2)),
-            h2h_ht_rate: parseFloat(h2hRate.toFixed(2))
+            home_pot: parseFloat(homePotentialRate.toFixed(1)),
+            away_pot: parseFloat(awayPotentialRate.toFixed(1)),
+            h2h_pot: parseFloat(h2hRate.toFixed(1))
         },
-        reason: reasonParts.join(" ")
+        reason: `Home Pot: ${homePotentialRate.toFixed(0)}%, Away Pot: ${awayPotentialRate.toFixed(0)}%. ${penaltyReason}`.trim()
     };
 }
 

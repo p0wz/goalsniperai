@@ -144,6 +144,18 @@ async function fetchMatchH2H(matchId) {
     }
 }
 
+// Helper: Fetch Match Details (Scrapes for HT scores)
+async function fetchMatchDetails(matchId) {
+    try {
+        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${matchId}`, {
+            headers: FLASHSCORE_API.headers
+        });
+        return response.data;
+    } catch (error) {
+        return null;
+    }
+}
+
 // Helper: Calculate Stats
 function calculateAdvancedStats(history, teamName) {
     if (!history || !Array.isArray(history) || history.length === 0) return null;
@@ -689,7 +701,7 @@ async function runFirstHalfScan(log = console, customLimit = MATCH_LIMIT) {
 
         if (homeHistory.length === 0 || awayHistory.length === 0) continue;
 
-        // Run Analyzer
+        // Run Analyzer (Heuristic Mode - Uses FT Scores)
         const result = analyzeFirstHalfPreMatch(match, homeHistory, awayHistory, mutualH2H);
 
         // DEBUG: Log first 5 matches analysis
