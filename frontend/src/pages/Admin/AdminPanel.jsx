@@ -608,7 +608,7 @@ ${prompt}
                     <MarketTab
                         marketKey={activeTab}
                         config={MARKET_CONFIG[activeTab]}
-                        renderDailyTable={renderDailyTable} // We aren't using this internal helper anymore but keeping for prop comp
+                        // renderDailyTable removed as it is not defined and not used inside MarketTab
                         dailyAnalysis={dailyAnalysis?.[activeTab] || []}
                         firstHalfData={firstHalfData}
                         handleRunFirstHalf={handleRunFirstHalf}
