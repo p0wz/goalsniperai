@@ -588,12 +588,38 @@ function App() {
                       <h4 className="font-bold text-lg flex items-center gap-2">
                         {config.icon} {config.name}
                       </h4>
-                      <span className={clsx(
-                        "px-3 py-1 rounded-full text-sm font-bold",
-                        items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
-                      )}>
-                        {items.length} Maç
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {items.length > 0 && (
+                          <button
+                            onClick={() => {
+                              const bulkPrompt = `📊 ${config.name.toUpperCase()} ANALİZİ (${items.length} Maç)
+════════════════════════════════════════
+
+${items.map((m, idx) => {
+                                const prompt = m.aiPrompt || m.ai_prompts?.[0] || '';
+                                return `\n[${idx + 1}/${items.length}] ${m.event_home_team} vs ${m.event_away_team}
+Lig: ${m.league_name}
+${prompt ? `\n${prompt}` : '(Detaylı istatistik yok)'}
+${'─'.repeat(40)}`;
+                              }).join('\n')}
+
+🎯 EN İYİ SEÇENEKLERİ BELİRLE:
+Yukarıdaki ${items.length} maç arasından ${config.name} için en yüksek başarı olasılığına sahip 2-3 maçı belirle ve nedenlerini açıkla.`;
+                              navigator.clipboard.writeText(bulkPrompt);
+                              alert(`${config.name} için ${items.length} maçın AI promptu kopyalandı!`);
+                            }}
+                            className="px-3 py-1 rounded text-xs font-medium bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white transition-all"
+                          >
+                            📋 Tümünü Kopyala
+                          </button>
+                        )}
+                        <span className={clsx(
+                          "px-3 py-1 rounded-full text-sm font-bold",
+                          items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
+                        )}>
+                          {items.length} Maç
+                        </span>
+                      </div>
                     </div>
 
                     {/* Results Table */}
