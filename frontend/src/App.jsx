@@ -3,6 +3,7 @@ import { authService, signalService, betService, adminService } from './services
 import AdminPanel from './pages/Admin/AdminPanel';
 import Landing from './pages/Landing';
 import LoginView from './pages/Auth/LoginView';
+import RegisterView from './pages/Auth/RegisterView';
 import ProDashboard from './pages/Dashboard/ProDashboard';
 import Profile from './pages/Profile';
 import Pricing from './pages/Pricing';
@@ -13,7 +14,7 @@ import NeuButton from './components/ui/NeuButton';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('landing'); // landing, login, dashboard, profile, pricing, checkout, about
+  const [view, setView] = useState('landing'); // landing, login, register, dashboard, profile, pricing, checkout, about
   const [error, setError] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null); // For checkout
 
@@ -43,7 +44,6 @@ function App() {
     setError(null);
     try {
       const res = await authService.login(email, password);
-      // Ensure backend returns correct structure
       if (res.success || res.token) {
         const profile = await authService.getProfile();
         setUser(profile);
@@ -51,6 +51,19 @@ function App() {
       }
     } catch (err) {
       setError(err.message || 'Login failed');
+    }
+  };
+
+  const handleRegister = async (name, email, password) => {
+    setError(null);
+    try {
+      const res = await authService.register(name, email, password);
+      if (res.success || res.userId) {
+        // Auto login after register
+        await handleLogin(email, password);
+      }
+    } catch (err) {
+      setError(err.message || 'Registration failed');
     }
   };
 
@@ -122,7 +135,19 @@ function App() {
       )}
 
       {view === 'login' && !user && (
-        <LoginView onLogin={handleLogin} error={error} />
+        <LoginView
+          onLogin={handleLogin}
+          onRegisterClick={() => setView('register')}
+          error={error}
+        />
+      )}
+
+      {view === 'register' && !user && (
+        <RegisterView
+          onRegister={handleRegister}
+          onLoginClick={() => setView('login')}
+          error={error}
+        />
       )}
 
       {view === 'pricing' && (
