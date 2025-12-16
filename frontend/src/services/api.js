@@ -61,7 +61,11 @@ export const authService = {
     },
     getProfile: async () => {
         const response = await api.get('/auth/me');
-        return response.data;
+        // Return the user object directly if successful
+        if (response.data.success) {
+            return response.data.user;
+        }
+        return null;
     },
 };
 
