@@ -101,7 +101,167 @@ async function initDatabase() {
     }
 }
 
-// ... (existing code)
+// ============================================
+// 👤 User Management
+// ============================================
+
+async function createUser(email, password, name, role = 'user') {
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+
+    try {
+        const result = await db.execute({
+            sql: "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+            args: [email, hash, name, role]
+        });
+        return { success: true, userId: Number(result.lastInsertRowid) };
+    } catch (e) {
+        if (e.message.includes('UNIQUE constraint failed')) {
+            return { success: false, error: 'Email already exists' };
+        }
+        return { success: false, error: e.message };
+    }
+}
+
+async function verifyPassword(email, password) {
+    const rs = await db.execute({
+        sql: "SELECT * FROM users WHERE email = ?",
+        args: [email]
+    });
+
+    if (rs.rows.length === 0) return null;
+    const user = rs.rows[0];
+
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) return null;
+
+    return user;
+}
+
+async function getUserById(id) {
+    const rs = await db.execute({
+        sql: "SELECT id, email, name, role, plan, plan_expires_at, signals_today, created_at, last_login FROM users WHERE id = ?",
+        args: [id]
+    });
+    return rs.rows[0];
+}
+
+async function getUserByEmail(email) {
+    const rs = await db.execute({
+        sql: "SELECT * FROM users WHERE email = ?",
+        args: [email]
+    });
+    return rs.rows[0];
+}
+
+async function updateLastLogin(id) {
+    await db.execute({
+        sql: "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
+        args: [id]
+    });
+}
+
+// ============================================
+// 👑 Admin Helpers
+// ============================================
+async function getAllUsers() {
+    const rs = await db.execute("SELECT id, email, name, role, plan, plan_expires_at, signals_today, created_at, last_login FROM users ORDER BY created_at DESC");
+    return rs.rows;
+}
+
+async function getUserStats() {
+    const total = await db.execute("SELECT COUNT(*) as count FROM users");
+    const pro = await db.execute("SELECT COUNT(*) as count FROM users WHERE plan = 'pro'");
+    const free = await db.execute("SELECT COUNT(*) as count FROM users WHERE plan = 'free'");
+    const premium = await db.execute("SELECT COUNT(*) as count FROM users WHERE plan = 'premium'");
+
+    return {
+        total: total.rows[0].count,
+        pro_users: pro.rows[0].count,
+        free_users: free.rows[0].count,
+        premium_users: premium.rows[0].count
+    };
+}
+
+async function updateUserPlan(id, plan, expiresAt) {
+    await db.execute({
+        sql: "UPDATE users SET plan = ?, plan_expires_at = ? WHERE id = ?",
+        args: [plan, expiresAt, id]
+    });
+}
+
+async function deleteUser(id) {
+    await db.execute({
+        sql: "DELETE FROM users WHERE id = ?",
+        args: [id]
+    });
+}
+
+async function createAdminUser() {
+    const adminEmail = 'admin@goalsniper.com';
+    const existing = await getUserByEmail(adminEmail);
+
+    if (!existing) {
+        console.log('[DB] Creating default admin user...');
+        await createUser(adminEmail, process.env.ADMIN_PASSWORD || 'admin123', 'Super Admin', 'admin');
+    } else if (existing.role !== 'admin') {
+        // Fix role if needed
+        await db.execute({
+            sql: "UPDATE users SET role = 'admin' WHERE email = ?",
+            args: [adminEmail]
+        });
+        console.log('[DB] Fixed admin role');
+    }
+}
+
+// ============================================
+// 🚦 Signal Access Control
+// ============================================
+
+async function canViewSignal(userId) {
+    const user = await getUserById(userId);
+    if (!user) return false;
+
+    // Admins and Paid users always access
+    if (user.role === 'admin' || user.plan === 'pro' || user.plan === 'premium') return true;
+
+    // Free users: max 3 signals per day
+    // Reset counter if needed (simple logic: if last_login day != today)
+    // For now, we rely on the scheduled job to reset counts or simple check
+    if (user.signals_today < 3) return true;
+
+    return false;
+}
+
+async function incrementSignalCount(userId) {
+    await db.execute({
+        sql: "UPDATE users SET signals_today = signals_today + 1 WHERE id = ?",
+        args: [userId]
+    });
+}
+
+
+// ============================================
+// 📜 System Logging
+// ============================================
+async function addLog(level, message, meta = {}) {
+    try {
+        await db.execute({
+            sql: "INSERT INTO system_logs (level, message, meta) VALUES (?, ?, ?)",
+            args: [level, message, JSON.stringify(meta)]
+        });
+    } catch (e) {
+        console.error('Logging failed:', e);
+    }
+}
+
+async function getRecentLogs(limit = 100) {
+    const rs = await db.execute({
+        sql: "SELECT * FROM system_logs ORDER BY created_at DESC LIMIT ?",
+        args: [limit]
+    });
+    return rs.rows;
+}
 
 // ============================================
 // 🎯 Curated Picks Logic
