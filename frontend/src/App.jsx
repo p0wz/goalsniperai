@@ -628,6 +628,7 @@ Yukarıdaki ${items.length} maç arasından ${config.name} için en yüksek baş
                         <thead className="bg-muted/30">
                           <tr>
                             <th className="p-3 text-left font-medium">Maç</th>
+                            <th className="p-3 text-center font-medium">Saat</th>
                             <th className="p-3 text-left font-medium">Lig</th>
                             <th className="p-3 text-center font-medium">AI Prompt</th>
                           </tr>
@@ -636,6 +637,9 @@ Yukarıdaki ${items.length} maç arasından ${config.name} için en yüksek baş
                           {items.map((m, i) => (
                             <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
                               <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
+                              <td className="p-3 text-center text-sm">
+                                {m.startTime ? new Date(m.startTime * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                              </td>
                               <td className="p-3 text-muted-foreground">{m.league_name}</td>
                               <td className="p-3 text-center">
                                 <button
