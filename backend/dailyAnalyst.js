@@ -156,6 +156,59 @@ async function fetchMatchDetails(matchId) {
     }
 }
 
+// Helper: Fetch Match Odds (Optional - not all matches have odds)
+async function fetchMatchOdds(matchId) {
+    try {
+        const response = await fetchWithRetry(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/odds/${matchId}`, {
+            headers: FLASHSCORE_API.headers
+        });
+        return response.data;
+    } catch (error) {
+        return null; // Odds not available
+    }
+}
+
+// Helper: Format Odds for Prompt
+function formatOddsForPrompt(oddsData) {
+    if (!oddsData || !oddsData.odds) return '';
+
+    const odds = oddsData.odds;
+    let oddsText = '\n5. BETTING ODDS:\n';
+
+    // 1X2 Odds
+    if (odds['1x2'] || odds.fullTime) {
+        const ft = odds['1x2'] || odds.fullTime;
+        oddsText += `   - 1X2: Home ${ft.home || ft['1'] || 'N/A'} | Draw ${ft.draw || ft['x'] || ft['X'] || 'N/A'} | Away ${ft.away || ft['2'] || 'N/A'}\n`;
+    }
+
+    // Over/Under
+    if (odds.overUnder || odds['over/under'] || odds.totals) {
+        const ou = odds.overUnder || odds['over/under'] || odds.totals;
+        if (ou['2.5'] || ou.goals25) {
+            oddsText += `   - O/U 2.5: Over ${ou['2.5']?.over || ou.goals25?.over || 'N/A'} | Under ${ou['2.5']?.under || ou.goals25?.under || 'N/A'}\n`;
+        }
+        if (ou['1.5'] || ou.goals15) {
+            oddsText += `   - O/U 1.5: Over ${ou['1.5']?.over || ou.goals15?.over || 'N/A'} | Under ${ou['1.5']?.under || ou.goals15?.under || 'N/A'}\n`;
+        }
+        if (ou['3.5'] || ou.goals35) {
+            oddsText += `   - O/U 3.5: Over ${ou['3.5']?.over || ou.goals35?.over || 'N/A'} | Under ${ou['3.5']?.under || ou.goals35?.under || 'N/A'}\n`;
+        }
+    }
+
+    // BTTS
+    if (odds.btts || odds.bothTeamsToScore) {
+        const btts = odds.btts || odds.bothTeamsToScore;
+        oddsText += `   - BTTS: Yes ${btts.yes || btts.Yes || 'N/A'} | No ${btts.no || btts.No || 'N/A'}\n`;
+    }
+
+    // Double Chance
+    if (odds.doubleChance) {
+        oddsText += `   - DC: 1X ${odds.doubleChance['1X'] || 'N/A'} | 12 ${odds.doubleChance['12'] || 'N/A'} | X2 ${odds.doubleChance['X2'] || 'N/A'}\n`;
+    }
+
+    return oddsText.length > 30 ? oddsText : ''; // Only return if we have meaningful odds
+}
+
 // Helper: Calculate Stats
 function calculateAdvancedStats(history, teamName) {
     if (!history || !Array.isArray(history) || history.length === 0) return null;
@@ -547,7 +600,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, league
     }
 
     // Helper: Generate AI Prompts
-    function generateAIPrompts(match, stats, market) {
+    function generateAIPrompts(match, stats, market, oddsText = '') {
         const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = stats;
 
         const basePrompt = `Act as a professional football betting analyst (English/Turkish). Analyze this match:
@@ -575,7 +628,7 @@ DETAILED STATISTICS:
 
 4. HEAD-TO-HEAD (Last ${mutual.length})
    ${mutual.map(g => `- ${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name} (${new Date(g.timestamp * 1000).toLocaleDateString()})`).join('\n   ')}
-`;
+${oddsText}`;
         // CUSTOM PROMPT FOR FIRST HALF OVER 0.5
         if (market === 'First Half Over 0.5' && match.fhStats) {
             const fh = match.fhStats;
@@ -624,7 +677,19 @@ What is the "Ice Cold" risk here? Even with high percentage rates, could a recen
         for (const match of candidates[cat]) {
             const generatedId = `${match.event_key || match.match_id}_${cat}`;
             const analysisDetails = generateAnalysisDetails(match, match.filterStats);
-            const aiPrompts = generateAIPrompts(match, match.filterStats, match.market);
+
+            // Fetch odds (optional - may not be available for all matches)
+            let oddsText = '';
+            let oddsData = null;
+            try {
+                oddsData = await fetchMatchOdds(match.event_key || match.match_id);
+                oddsText = formatOddsForPrompt(oddsData);
+                if (oddsText) log.info(`   💰 Odds fetched for ${match.event_home_team} vs ${match.event_away_team}`);
+            } catch (e) {
+                // Odds not available - continue without them
+            }
+
+            const aiPrompts = generateAIPrompts(match, match.filterStats, match.market, oddsText);
 
             results[cat].push({
                 match: `${match.event_home_team} vs ${match.event_away_team}`,
@@ -634,10 +699,14 @@ What is the "Ice Cold" risk here? Even with high percentage rates, could a recen
                 matchId: match.event_key || match.match_id,
                 startTime: match.event_start_time,
                 league: match.league_name,
+                league_name: match.league_name,
                 market: match.market,
                 stats: match.filterStats,
                 detailed_analysis: analysisDetails,
                 ai_prompts: aiPrompts,
+                aiPrompt: aiPrompts[0], // Primary prompt for easy access
+                odds: oddsData, // Raw odds data (if available)
+                oddsText: oddsText, // Formatted odds text
                 status: 'PENDING_APPROVAL' // Admin needs to approve
             });
             log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
