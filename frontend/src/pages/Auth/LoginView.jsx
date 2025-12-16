@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import NeuInput from '../components/ui/NeuInput';
-import NeuButton from '../components/ui/NeuButton';
-import NeuCard from '../components/ui/NeuCard';
+import NeuInput from '../../components/ui/NeuInput';
+import NeuButton from '../../components/ui/NeuButton';
+import NeuCard from '../../components/ui/NeuCard';
 
 export default function LoginView({ onLogin, error }) {
     const [email, setEmail] = useState('');

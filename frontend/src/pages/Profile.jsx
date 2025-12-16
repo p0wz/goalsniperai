@@ -1,5 +1,5 @@
-import NeuCard from '../../components/ui/NeuCard';
-import NeuButton from '../../components/ui/NeuButton';
+import NeuCard from '../components/ui/NeuCard';
+import NeuButton from '../components/ui/NeuButton';
 
 export default function Profile({ user, onLogout }) {
     const isPro = user?.role === 'pro' || user?.role === 'admin';
