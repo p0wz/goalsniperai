@@ -532,7 +532,7 @@ function App() {
 
         {/* Navigation Tabs */}
         <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-          {['live', 'history', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+          {['live', 'analiz', 'history', ...Object.keys(MARKET_CONFIG)].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -544,11 +544,52 @@ function App() {
               )}
             >
               {tab === 'live' && '📡 Live'}
+              {tab === 'analiz' && '🎯 Analiz'}
               {tab === 'history' && '📜 Geçmiş'}
               {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
             </button>
           ))}
         </div>
+
+        {/* Tab Content: ANALYSIS HUB */}
+        {activeTab === 'analiz' && (
+          <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold mb-2">🎯 Analiz Merkezi</h2>
+              <p className="text-muted-foreground">Tüm marketler için hızlı analiz başlatma</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Object.entries(MARKET_CONFIG).map(([key, config]) => (
+                <div
+                  key={key}
+                  className="group relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => setActiveTab(key)}
+                >
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full" />
+                  <div className="text-4xl mb-3">{config.icon}</div>
+                  <h3 className="text-lg font-bold mb-1">{config.name}</h3>
+                  <p className="text-sm text-muted-foreground mb-4">{config.desc}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActiveTab(key); }}
+                      className="flex-1 py-2 text-xs rounded bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors font-medium"
+                    >
+                      Analiz Et →
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 p-4 rounded-lg bg-muted/50 border text-center">
+              <p className="text-sm text-muted-foreground">
+                💡 İpucu: Her markete tıklayarak detaylı analiz sayfasına gidebilir,
+                "Lig Filtreli" veya "Tüm Maçlar" seçeneklerini kullanabilirsiniz.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Tab Content: LIVE */}
         {activeTab === 'live' && (
