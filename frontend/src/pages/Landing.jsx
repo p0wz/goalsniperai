@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     BarChart3,
     Zap,
@@ -6,326 +6,233 @@ import {
     Shield,
     TrendingUp,
     CheckCircle2,
-    Menu,
-    X,
-    ChevronDown,
     ArrowRight,
-    Bot
+    Play,
+    Trophy,
+    Users
 } from 'lucide-react';
 import NeuCard from '../components/ui/NeuCard';
 import NeuButton from '../components/ui/NeuButton';
 
-export default function Landing({ onLoginClick, onNavigate }) {
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [activeFaq, setActiveFaq] = useState(null);
+export default function Landing({ onLoginClick }) {
+    const [scrolled, setScrolled] = useState(false);
 
-    const toggleFaq = (index) => {
-        setActiveFaq(activeFaq === index ? null : index);
-    };
+    useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 50);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Mock Live Ticker Data
+    const liveWins = [
+        { match: 'Man City vs Liverpool', market: 'Over 2.5', status: 'WON', profit: '+ $120' },
+        { match: 'Real Madrid vs Barca', market: 'BTTS', status: 'WON', profit: '+ $85' },
+        { match: 'Arsenal vs Chelsea', market: 'Home Win', status: 'PENDING', profit: '...' },
+        { match: 'Bayern vs Dortmund', market: 'Over 3.5', status: 'WON', profit: '+ $200' },
+        { match: 'PSG vs Lyon', market: 'Away +1.5', status: 'WON', profit: '+ $95' },
+    ];
 
     return (
-        <div className="min-h-screen bg-base text-text-main font-body selection:bg-accent selection:text-white overflow-x-hidden">
-
-            {/* BACKGROUND GRAPHICS */}
-            <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-                <div className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] rounded-full bg-base shadow-neu-extruded opacity-40 blur-3xl animate-float" />
-                <div className="absolute top-[40%] -left-[10%] w-[600px] h-[600px] rounded-full bg-base shadow-neu-inset opacity-30 blur-3xl" />
-            </div>
-
-            {/* NAVBAR */}
-            <nav className="fixed top-0 w-full z-50 bg-base/90 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
-                        <div className="w-10 h-10 rounded-xl bg-accent text-white flex items-center justify-center shadow-neu-extruded">
-                            <Bot size={24} />
-                        </div>
-                        <span className="text-2xl font-extrabold tracking-tight">
-                            SENTIO <span className="text-accent">Pro</span>
-                        </span>
-                    </div>
-
-                    {/* Desktop Menu */}
-                    <div className="hidden md:flex items-center gap-8">
-                        <button onClick={() => onNavigate('about')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">About</button>
-                        <button onClick={() => onNavigate('pricing')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Pricing</button>
-                        <NeuButton onClick={onLoginClick} variant="primary" className="px-6 py-2.5 rounded-xl">
-                            Launch App
-                        </NeuButton>
-                    </div>
-
-                    {/* Mobile Toggle */}
-                    <div className="md:hidden">
-                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-text-main">
-                            {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mobile Menu */}
-                {isMenuOpen && (
-                    <div className="md:hidden absolute top-20 w-full bg-base border-b border-white/20 shadow-xl p-6 flex flex-col gap-4 animate-in slide-in-from-top-4">
-                        <button onClick={() => scrollToSection('features')} className="text-lg font-bold py-2">Features</button>
-                        <button onClick={() => scrollToSection('pricing')} className="text-lg font-bold py-2">Pricing</button>
-                        <NeuButton onClick={onLoginClick} className="w-full py-4 mt-2">Sign In</NeuButton>
-                    </div>
-                )}
-            </nav>
+        <div className="flex flex-col gap-32">
 
             {/* HERO SECTION */}
-            <section className="relative z-10 pt-40 pb-20 md:pt-48 md:pb-32 px-6">
-                <div className="max-w-5xl mx-auto text-center space-y-8">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-base shadow-neu-inset text-accent text-sm font-bold mb-4 animate-in fade-in zoom-in duration-500 delay-100">
-                        <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
-                        </span>
-                        v3.0 Now Live: 85% Win Rate on Premier League
-                    </div>
+            <section className="relative pt-20 px-6">
+                {/* Background Glows */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-accent/20 rounded-full blur-[120px] -z-10 animate-pulse" />
 
-                    <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-text-main tracking-tighter leading-[1.1] mb-6 animate-in slide-in-from-bottom-8 duration-700">
-                        Predict the Future <br className="hidden md:block" />
-                        of <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-purple-600">Football</span>
-                    </h1>
-
-                    <p className="text-xl md:text-2xl text-text-muted font-medium max-w-3xl mx-auto leading-relaxed animate-in slide-in-from-bottom-8 duration-700 delay-200">
-                        Stop gambling. Start investing. Our AI analyzes
-                        <span className="font-bold text-text-main"> 10,000+ data points </span>
-                        per match to find high-value opportunities you missed.
-                    </p>
-
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 pt-8 animate-in slide-in-from-bottom-8 duration-700 delay-300">
-                        <NeuButton onClick={onLoginClick} variant="primary" className="w-full md:w-auto px-10 py-5 text-lg rounded-2xl group">
-                            Start Snipping Free
-                            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </NeuButton>
-                        <NeuButton onClick={() => scrollToSection('how-it-works')} variant="secondary" className="w-full md:w-auto px-10 py-5 text-lg rounded-2xl">
-                            See How It Works
-                        </NeuButton>
-                    </div>
-
-                    <div className="pt-12 flex justify-center gap-12 text-text-muted opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-                        {/* Fake Trust Logos */}
-                        <span className="text-2xl font-black">FlashScore</span>
-                        <span className="text-2xl font-black">Opta</span>
-                        <span className="text-2xl font-black">SofaScore</span>
-                    </div>
-                </div>
-            </section>
-
-            {/* STATS STRIP */}
-            <section className="py-12 bg-base border-y border-white/20 relative z-10">
-                <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                    {[
-                        { label: 'Live Leagues', value: '850+' },
-                        { label: 'Daily Signals', value: '1,240' },
-                        { label: 'Success Rate', value: '78%' },
-                        { label: 'Active Users', value: '5k+' },
-                    ].map((stat, i) => (
-                        <div key={i} className="space-y-2">
-                            <div className="text-4xl md:text-5xl font-black text-text-main">{stat.value}</div>
-                            <div className="text-sm font-bold text-text-muted uppercase tracking-widest">{stat.label}</div>
+                <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+                    <div className="space-y-8 text-center lg:text-left">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/50 backdrop-blur border border-white/20 shadow-neu-flat text-sm font-bold text-accent animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            AI V3.2 Engine Online
                         </div>
-                    ))}
-                </div>
-            </section>
 
-            {/* FEATURES GRID */}
-            <section id="features" className="py-24 md:py-32 px-6 relative z-10">
-                <div className="max-w-7xl mx-auto">
-                    <div className="text-center mb-20 space-y-4">
-                        <h2 className="text-4xl md:text-5xl font-extrabold text-text-main">Unfair Advantage</h2>
-                        <p className="text-xl text-text-muted max-w-2xl mx-auto">
-                            We don't just show stats. We provide actionable intelligence derived from millions of historical matches.
+                        <h1 className="text-5xl md:text-7xl font-black text-text-main tracking-tight leading-[1.1] animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                            Outsmart the <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-purple-500">Bookmakers</span>
+                        </h1>
+
+                        <p className="text-xl text-text-muted font-medium max-w-2xl mx-auto lg:mx-0 leading-relaxed animate-in slide-in-from-bottom-8 duration-700 delay-200">
+                            Stop betting on gut feeling. Our specialized AI processes
+                            <span className="text-text-main font-bold"> 10,000+ data points </span>
+                            per second to find value bets you missed.
                         </p>
-                    </div>
 
-                    <div className="grid md:grid-cols-3 gap-8">
-                        <NeuCard className="group h-full" padding="p-8">
-                            <div className="w-14 h-14 rounded-2xl bg-base shadow-neu-extruded flex items-center justify-center text-accent mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <Target size={32} />
-                            </div>
-                            <h3 className="text-2xl font-bold mb-4">Live Sniper Bot</h3>
-                            <p className="text-text-muted leading-relaxed">
-                                Our bot watches 200+ games simultaneously. When a team creates pressure but hasn't scored, you get an instant signal. Perfect for "Next Goal" bets.
-                            </p>
-                        </NeuCard>
-
-                        <NeuCard className="group h-full" padding="p-8">
-                            <div className="w-14 h-14 rounded-2xl bg-base shadow-neu-extruded flex items-center justify-center text-accent mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <BarChart3 size={32} />
-                            </div>
-                            <h3 className="text-2xl font-bold mb-4">Value Detection</h3>
-                            <p className="text-text-muted leading-relaxed">
-                                Compare bookmaker odds against our true probability models. We highlight when the books have made a mistake, giving you positive EV.
-                            </p>
-                        </NeuCard>
-
-                        <NeuCard className="group h-full" padding="p-8">
-                            <div className="w-14 h-14 rounded-2xl bg-base shadow-neu-extruded flex items-center justify-center text-accent mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <Shield size={32} />
-                            </div>
-                            <h3 className="text-2xl font-bold mb-4">Bankroll Guard</h3>
-                            <p className="text-text-muted leading-relaxed">
-                                Smart staking strategies built-in. Never lose your cool. Our system suggests strict unit sizes based on confidence levels.
-                            </p>
-                        </NeuCard>
-                    </div>
-                </div>
-            </section>
-
-            {/* DETAILED FEATURE (Left/Right) */}
-            <section className="py-24 bg-base relative z-10 overflow-hidden">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="grid md:grid-cols-2 gap-16 items-center">
-                        <div className="space-y-8">
-                            <h2 className="text-4xl font-extrabold leading-tight">
-                                It's like having <br />
-                                <span className="text-accent">Pep Guardiola</span> in your pocket.
-                            </h2>
-                            <p className="text-lg text-text-muted">
-                                Most bettors look at the table. We look at the xG, recent form slope, injury impact, and referee tendencies.
-                                Our "Goal Probability Matrix" calculates the exact % chance of a goal in the next 15 minutes.
-                            </p>
-                            <ul className="space-y-4">
-                                {['Real-time Momentum Tracking', 'Refereed Strictness Analysis', 'Weather Impact Calculations'].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 font-bold text-text-main">
-                                        <CheckCircle2 className="text-green-500" size={24} />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-                            <NeuButton variant="primary" className="px-8 py-3">Explore The Data</NeuButton>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-in slide-in-from-bottom-8 duration-700 delay-300">
+                            <NeuButton onClick={onLoginClick} variant="primary" className="px-8 py-4 text-lg rounded-2xl group">
+                                Start Free Trial
+                                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            </NeuButton>
+                            <NeuButton variant="secondary" className="px-8 py-4 text-lg rounded-2xl flex items-center gap-2">
+                                <Play size={18} fill="currentColor" /> Watch Demo
+                            </NeuButton>
                         </div>
 
-                        <div className="relative">
-                            {/* Decorative mock UI */}
-                            <div className="absolute inset-0 bg-accent/20 blur-[100px] rounded-full" />
-                            <NeuCard className="relative z-10 rotate-3 hover:rotate-0 transition-transform duration-500" padding="p-0">
-                                <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-[32px] text-white h-[400px] flex flex-col justify-between border-4 border-base">
-                                    {/* Mock Dashboard UI */}
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="bg-red-500 text-xs font-bold px-2 py-1 rounded">LIVE 76'</div>
-                                        <div className="text-gray-400 text-sm">Premier League</div>
+                        <div className="pt-8 flex items-center justify-center lg:justify-start gap-8 text-sm font-bold text-text-muted opacity-80">
+                            <div className="flex items-center gap-2">
+                                <Users size={18} /> 5,000+ Active Snipers
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Trophy size={18} /> 78% Win Rate (Hist.)
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* HERO MOCKUP */}
+                    <div className="relative animate-float delay-500 hidden lg:block">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-accent/30 to-purple-500/30 blur-[60px] rounded-full" />
+                        <NeuCard className="relative z-10 rotate-y-12 rotate-x-6 transform-gpu" padding="p-0">
+                            <div className="bg-[#1a1f2e] p-6 rounded-[32px] text-white h-[500px] border-4 border-base overflow-hidden relative">
+                                {/* Mock UI Elements */}
+                                <div className="flex justify-between items-center mb-6">
+                                    <div className="flex gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                                        <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500" />
                                     </div>
-                                    <div className="text-center space-y-2">
-                                        <div className="text-2xl font-bold">Liverpool vs Arsenal</div>
-                                        <div className="text-4xl font-mono text-accent">1 - 1</div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-xs text-gray-400">
-                                            <span>Home Pressure</span>
-                                            <span>88%</span>
-                                        </div>
-                                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                                            <div className="h-full bg-red-500 w-[88%]" />
-                                        </div>
-                                        <div className="bg-accent/20 text-accent p-3 rounded-xl text-center font-bold text-sm border border-accent/30 mt-4">
-                                            ⚡ SIGNAL: OVER 2.5 GOALS
-                                        </div>
-                                    </div>
+                                    <div className="text-xs font-mono text-gray-500">LIVE SCANNER V3</div>
                                 </div>
-                            </NeuCard>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* PRICING */}
-            <section id="pricing" className="py-32 px-6 relative z-10">
-                <div className="max-w-7xl mx-auto">
-                    <div className="text-center mb-20">
-                        <h2 className="text-4xl font-extrabold mb-4">Simple, Transparent Pricing</h2>
-                        <p className="text-text-muted">No hidden fees. Cancel anytime.</p>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-8 items-center">
-                        {/* Free */}
-                        <NeuCard className="h-full opacity-80 hover:opacity-100 transition-opacity">
-                            <div className="text-xl font-bold mb-4">Rookie</div>
-                            <div className="text-4xl font-black mb-2">$0</div>
-                            <p className="text-text-muted text-sm mb-8">Forever free for testing waters.</p>
-                            <ul className="space-y-4 mb-8 text-sm">
-                                <li className="flex items-center gap-2"><CheckCircle2 size={16} /> 3 Daily Signals</li>
-                                <li className="flex items-center gap-2"><CheckCircle2 size={16} /> Major Leagues Only</li>
-                                <li className="flex items-center gap-2 text-text-muted line-through"><X size={16} /> No Live Bot</li>
-                            </ul>
-                            <NeuButton variant="secondary" className="w-full" onClick={onLoginClick}>Join Free</NeuButton>
-                        </NeuCard>
-
-                        {/* Pro */}
-                        <div className="relative transform md:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-accent text-white px-4 py-1 rounded-full text-xs font-bold shadow-neu-extruded z-20">MOST POPULAR</div>
-                            <NeuCard className="h-full border-2 border-accent/20 relative z-10 shadow-neu-extruded-hover">
-                                <div className="text-xl font-bold mb-4 text-accent">Pro Analyst</div>
-                                <div className="text-5xl font-black mb-2">$29<span className="text-lg text-text-muted font-normal">/mo</span></div>
-                                <p className="text-text-muted text-sm mb-8">For serious profit seekers.</p>
-                                <ul className="space-y-4 mb-8 text-sm font-medium">
-                                    <li className="flex items-center gap-2"><CheckCircle2 className="text-accent" size={18} /> Unlimited Signals</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 className="text-accent" size={18} /> Live Sniper Bot Access</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 className="text-accent" size={18} /> 850+ Leagues Included</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 className="text-accent" size={18} /> Priority Support</li>
-                                </ul>
-                                <NeuButton variant="primary" className="w-full py-4 text-lg" onClick={onLoginClick}>Get Pro Access</NeuButton>
-                            </NeuCard>
-                        </div>
-
-                        {/* Elite */}
-                        <NeuCard className="h-full opacity-80 hover:opacity-100 transition-opacity">
-                            <div className="text-xl font-bold mb-4 text-purple-600">Syndicate</div>
-                            <div className="text-4xl font-black mb-2">$99<span className="text-lg text-text-muted font-normal">/mo</span></div>
-                            <p className="text-text-muted text-sm mb-8">For whales and syndicates.</p>
-                            <ul className="space-y-4 mb-8 text-sm">
-                                <li className="flex items-center gap-2"><CheckCircle2 size={16} /> Everything in Pro</li>
-                                <li className="flex items-center gap-2"><CheckCircle2 size={16} /> 1-on-1 Strategy Calls</li>
-                                <li className="flex items-center gap-2"><CheckCircle2 size={16} /> API Access</li>
-                            </ul>
-                            <NeuButton variant="secondary" className="w-full">Contact User</NeuButton>
-                        </NeuCard>
-                    </div>
-                </div>
-            </section>
-
-            {/* FAQ */}
-            <section className="py-20 px-6 max-w-3xl mx-auto relative z-10">
-                <h2 className="text-3xl font-extrabold text-center mb-12">Frequently Asked Questions</h2>
-                <div className="space-y-6">
-                    {[
-                        { q: "Is this guaranteed profit?", a: "No. Sports betting involves risk. We provide statistical edges and tools to improve your decisions, not magic crystal balls. Always bet responsibly." },
-                        { q: "Which leagues are covered?", a: "We cover over 850 leagues globally, from the Premier League to the Japanese J2 League. If there is data, we analyze it." },
-                        { q: "Can I cancel anytime?", a: "Yes. Your subscription can be cancelled instantly from your dashboard. No questions asked." }
-                    ].map((item, i) => (
-                        <NeuCard key={i} className="cursor-pointer" onClick={() => toggleFaq(i)} padding="p-6">
-                            <div className="flex justify-between items-center">
-                                <h3 className="font-bold text-lg">{item.q}</h3>
-                                <ChevronDown className={`transition-transform duration-300 ${activeFaq === i ? 'rotate-180' : ''}`} />
+                                <div className="space-y-4">
+                                    {[1, 2, 3].map((_, i) => (
+                                        <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/10 flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent">⚡</div>
+                                                <div>
+                                                    <div className="font-bold text-sm">Over 2.5 Goals</div>
+                                                    <div className="text-xs text-gray-400">Man City vs Liverpool</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-bold text-green-400">88%</div>
+                                                <div className="text-xs text-gray-400">Confidence</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#1a1f2e] to-transparent" />
+                                </div>
                             </div>
-                            {activeFaq === i && (
-                                <p className="mt-4 text-text-muted leading-relaxed animate-in slide-in-from-top-2">
-                                    {item.a}
-                                </p>
-                            )}
                         </NeuCard>
+                    </div>
+                </div>
+            </section>
+
+            {/* LIVE TICKER */}
+            <div className="bg-base border-y border-white/20 overflow-hidden py-4 relative">
+                <div className="flex gap-8 animate-marquee whitespace-nowrap">
+                    {[...liveWins, ...liveWins, ...liveWins].map((win, i) => (
+                        <div key={i} className="flex items-center gap-3 px-6 py-2 rounded-full bg-base shadow-neu-inset text-sm font-bold opacity-80">
+                            <span className={win.status === 'WON' ? 'text-green-500' : 'text-yellow-500'}>● {win.status}</span>
+                            <span>{win.match}</span>
+                            <span className="text-text-muted">({win.market})</span>
+                            <span className="text-accent">{win.profit}</span>
+                        </div>
                     ))}
                 </div>
+                {/* Gradient Masks */}
+                <div className="absolute top-0 left-0 h-full w-32 bg-gradient-to-r from-base to-transparent z-10" />
+                <div className="absolute top-0 right-0 h-full w-32 bg-gradient-to-l from-base to-transparent z-10" />
+            </div>
+
+            {/* BENTO GRID FEATURES */}
+            <section className="max-w-7xl mx-auto px-6">
+                <div className="text-center mb-16 space-y-4">
+                    <h2 className="text-4xl font-extrabold text-text-main">Why Professionals Choose Us</h2>
+                    <p className="text-text-muted text-lg">The only platform that combines AI precision with bankroll management.</p>
+                </div>
+
+                <div className="grid md:grid-cols-3 md:grid-rows-2 gap-8 h-[800px] md:h-[600px]">
+                    {/* Feature 1: Large Left */}
+                    <NeuCard className="md:row-span-2 group relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent z-0" />
+                        <div className="relative z-10 h-full flex flex-col">
+                            <div className="w-14 h-14 rounded-2xl bg-base shadow-neu-extruded flex items-center justify-center text-accent mb-6">
+                                <Target size={32} strokeWidth={2.5} />
+                            </div>
+                            <h3 className="text-2xl font-bold mb-4">Real-Time Sniper</h3>
+                            <p className="text-text-muted mb-8">
+                                Our bot monitors live match statistics (xG, attacks, pressure metrics) and alerts you explicitly when a goal is imminent.
+                            </p>
+                            <div className="mt-auto rounded-xl bg-base shadow-neu-inset p-4 overflow-hidden">
+                                {/* Abstract Chart */}
+                                <div className="flex items-end gap-2 h-32 opacity-70">
+                                    {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
+                                        <div key={i} className="flex-1 bg-accent rounded-t-sm animate-pulse" style={{ height: `${h}%`, animationDelay: `${i * 100}ms` }} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </NeuCard>
+
+                    {/* Feature 2: Top Middle */}
+                    <NeuCard className="md:col-span-2 bg-gradient-to-r from-base to-white/50">
+                        <div className="flex flex-col md:flex-row items-center gap-8 h-full">
+                            <div className="flex-1">
+                                <div className="w-12 h-12 rounded-xl bg-green-500/10 text-green-600 flex items-center justify-center mb-4">
+                                    <TrendingUp size={24} />
+                                </div>
+                                <h3 className="text-xl font-bold mb-2">Value & Probability</h3>
+                                <p className="text-text-muted text-sm">
+                                    We don't just guess. We calculate the mathematical probability of every outcome and compare it to bookmaker odds to find positive EV.
+                                </p>
+                            </div>
+                            <div className="flex-1 bg-base shadow-neu-flat rounded-xl p-4 w-full">
+                                <div className="flex justify-between items-center text-sm font-bold mb-2">
+                                    <span>Implied Odds</span>
+                                    <span className="text-text-muted">1.80 (55%)</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm font-bold text-accent">
+                                    <span>True Value</span>
+                                    <span>1.60 (62%)</span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-200 rounded-full mt-3 overflow-hidden">
+                                    <div className="h-full bg-accent w-[62%]" />
+                                </div>
+                            </div>
+                        </div>
+                    </NeuCard>
+
+                    {/* Feature 3: Bottom Middle */}
+                    <NeuCard>
+                        <div className="w-12 h-12 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center mb-4">
+                            <Shield size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Bankroll Guard</h3>
+                        <p className="text-text-muted text-sm">
+                            Smart staking plans. We tell you exactly how much to bet (1-5 units) based on confidence.
+                        </p>
+                    </NeuCard>
+
+                    {/* Feature 4: Bottom Right */}
+                    <NeuCard>
+                        <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center mb-4">
+                            <Zap size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Instant Alerts</h3>
+                        <p className="text-text-muted text-sm">
+                            Get notifications via Telegram or Dashboard instantly. Speed is everything.
+                        </p>
+                    </NeuCard>
+                </div>
             </section>
 
-            {/* FOOTER */}
-            <footer className="py-12 border-t border-white/20 bg-base relative z-10">
-                <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-text-main text-base flex items-center justify-center font-bold">G</div>
-                        <span className="font-bold">SENTIO Pro</span>
-                    </div>
-                    <div className="text-sm text-text-muted">
-                        © 2024 SENTIO Pro. All rights reserved.
-                    </div>
-                    <div className="flex gap-6 text-sm font-bold text-text-muted">
-                        <a href="#" className="hover:text-accent">Terms</a>
-                        <a href="#" className="hover:text-accent">Privacy</a>
-                        <a href="#" className="hover:text-accent">Twitter</a>
-                    </div>
+            {/* CTA STRIP */}
+            <section className="bg-[#1a1f2e] text-white py-20 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-accent/10 blur-[100px]" />
+                <div className="max-w-4xl mx-auto px-6 text-center relative z-10 space-y-8">
+                    <h2 className="text-4xl md:text-5xl font-black">Ready to Level Up?</h2>
+                    <p className="text-xl text-gray-300">Join thousands of smart bettors who have stopped guessing and started snipping.</p>
+                    <button
+                        onClick={onLoginClick}
+                        className="px-10 py-5 bg-accent hover:bg-accent-hover text-white rounded-2xl font-bold text-xl shadow-lg hover:shadow-accent/50 transition-all transform hover:-translate-y-1"
+                    >
+                        Get Started Now
+                    </button>
+                    <p className="text-sm text-gray-500">No credit card required for free tier.</p>
                 </div>
-            </footer>
+            </section>
 
         </div>
     );

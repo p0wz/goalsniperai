@@ -2,29 +2,47 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors */
+  /* Colors - Premium Blue-Grey Base */
   --color-base: #E0E5EC;
-  --color-base-dark: #A3B1C6;
+  --color-base-dark: #9BAacf;
   --color-base-light: #FFFFFF;
-  
-  --color-text-main: #3D4852;
-  --color-text-muted: #6B7280;
-  
+
+  --color-text-main: #2D3748;
+  --color-text-muted: #718096;
+
+  /* Vibrant Accents */
   --color-accent: #6C63FF;
-  --color-accent-light: #8B84FF;
-  --color-success: #38B2AC;
-  --color-danger: #EF4444;
+  --color-accent-hover: #5a52d5;
+  --color-success: #00B894;
+  --color-danger: #FF7675;
+  --color-warning: #FDCB6E;
 
   /* Typography */
   --font-display: "Plus Jakarta Sans", sans-serif;
   --font-body: "DM Sans", sans-serif;
-  
-  /* Shadows (The Magic) */
-  --shadow-neu-extruded: 9px 9px 16px rgb(163 177 198 / 0.6), -9px -9px 16px rgb(255 255 255 / 0.5);
-  --shadow-neu-extruded-hover: 12px 12px 20px rgb(163 177 198 / 0.7), -12px -12px 20px rgb(255 255 255 / 0.6);
-  --shadow-neu-inset: inset 6px 6px 10px rgb(163 177 198 / 0.6), inset -6px -6px 10px rgb(255 255 255 / 0.5);
-  --shadow-neu-inset-deep: inset 10px 10px 20px rgb(163 177 198 / 0.7), inset -10px -10px 20px rgb(255 255 255 / 0.6);
-  --shadow-neu-inset-sm: inset 3px 3px 6px rgb(163 177 198 / 0.6), inset -3px -3px 6px rgb(255 255 255 / 0.5);
+
+  /* Shadows (Sharper, cleaner Neumorphism) */
+  --shadow-neu-extruded:
+    9px 9px 16px rgb(163 177 198 / 0.6),
+    -9px -9px 16px rgb(255 255 255 / 0.5);
+
+  --shadow-neu-extruded-hover:
+    12px 12px 20px rgb(163 177 198 / 0.7),
+    -12px -12px 20px rgb(255 255 255 / 0.6),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+  /* Subtle rim light */
+
+  --shadow-neu-inset:
+    inset 6px 6px 10px rgb(163 177 198 / 0.4),
+    inset -6px -6px 10px rgb(255 255 255 / 0.8);
+
+  --shadow-neu-inset-deep:
+    inset 10px 10px 20px rgb(163 177 198 / 0.5),
+    inset -10px -10px 20px rgb(255 255 255 / 0.8);
+
+  --shadow-neu-flat:
+    5px 5px 10px rgb(163 177 198 / 0.5),
+    -5px -5px 10px rgb(255 255 255 / 0.5);
 }
 
 /* Base Styles */
@@ -33,33 +51,51 @@ body {
   color: var(--color-text-main);
   font-family: var(--font-body);
   transition: background-color 0.3s ease;
-  overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow-x: hidden;
+  /* Prevent horizontal scroll */
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   color: var(--color-text-main);
-  letter-spacing: -0.025em; /* tight tracking */
+  letter-spacing: -0.025em;
+  /* tight tracking */
 }
 
 /* Scrollbar Styling for Neumorphism */
 ::-webkit-scrollbar {
   width: 12px;
 }
+
 ::-webkit-scrollbar-track {
-  background: var(--color-base); 
+  background: var(--color-base);
 }
+
 ::-webkit-scrollbar-thumb {
   background-color: var(--color-base-dark);
   border-radius: 20px;
-  border: 3px solid var(--color-base); /* padding around thumb */
+  border: 3px solid var(--color-base);
+  /* padding around thumb */
 }
 
 /* Animations */
 @keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
 }
 
 .animate-float {

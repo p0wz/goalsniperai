@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { signalService, picksService } from '../../services/api';
 import NeuCard from '../../components/ui/NeuCard';
 import NeuButton from '../../components/ui/NeuButton';
-import { Trophy, Flame, Target } from 'lucide-react';
+import { Trophy, Flame, Target, Activity, TrendingUp, Shield, Clock } from 'lucide-react';
 
 export default function ProDashboard({ user }) {
     const [liveSignals, setLiveSignals] = useState([]);
@@ -33,159 +33,188 @@ export default function ProDashboard({ user }) {
 
     useEffect(() => {
         fetchData();
+        const interval = setInterval(fetchData, 30000); // Auto-refresh every 30s
+        return () => clearInterval(interval);
     }, []);
 
     const singlePicks = dailyPicks.filter(p => p.type === 'single');
     const parlays = dailyPicks.filter(p => p.type === 'parlay');
 
     return (
-        <div className="min-h-screen bg-base p-6 md:p-8 font-body">
-            <div className="max-w-7xl mx-auto space-y-12">
+        <div className="max-w-7xl mx-auto px-6 space-y-8 animate-in fade-in duration-500">
 
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-text-main">Welcome Back, {user.name}</h1>
-                        <p className="text-text-muted">Your daily edge is ready.</p>
-                    </div>
-                    <NeuButton onClick={fetchData} variant="secondary" className="px-4 py-2">
-                        {loading ? 'Refreshing...' : 'Refresh Feed'}
-                    </NeuButton>
+            {/* 1. HEADER & QUICK STATS */}
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <h1 className="text-3xl font-black text-text-main flex items-center gap-3">
+                        Command Center
+                        <span className="flex h-3 w-3 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                    </h1>
+                    <p className="text-text-muted font-medium">
+                        Good evening, {user.name.split(' ')[0]}. Converting data to profit.
+                    </p>
                 </div>
 
-                {/* 🌟 USER REQUEST: Daily Picks & Parlays Section */}
-                {(singlePicks.length > 0 || parlays.length > 0) && (
-                    <div className="space-y-6">
-                        <h2 className="text-2xl font-black flex items-center gap-2 text-accent">
-                            <Trophy className="text-yellow-500" /> Günün Seçimleri (Curated)
-                        </h2>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* PARLAYS (Featured) */}
-                            {parlays.map((parlay) => (
-                                <NeuCard key={parlay.id} className="md:col-span-2 relative overflow-hidden border-2 border-accent/20">
-                                    <div className="absolute top-0 right-0 p-2 bg-accent text-white rounded-bl-xl font-bold text-xs shadow-neu-extruded z-10">
-                                        🔥 GÜNÜN KUPONU
-                                    </div>
-                                    <div className="p-4 space-y-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Flame className="text-orange-500" size={24} />
-                                            <span className="font-bold text-lg">Yüksek Güvenli Kombine</span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {/* Render parsed match data for parlay - assumed array or text? 
-                                                Actually DB stores JSON. If it's a parlay, match_data implies multiple matches? 
-                                                Let's assume match_data is an array for parlays or single object for singles.
-                                            */}
-                                            {(Array.isArray(parlay.match_data) ? parlay.match_data : [parlay.match_data]).map((m, i) => (
-                                                <div key={i} className="flex justify-between items-center bg-base shadow-neu-inset p-3 rounded-lg">
-                                                    <span className="font-bold text-sm text-text-main">{m.homeTeam || m.home} vs {m.awayTeam || m.away}</span>
-                                                    <span className="font-bold text-accent">{m.prediction || m.market || 'Pick'}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="text-center pt-2">
-                                            <span className="text-sm text-text-muted">Toplam Oran: </span>
-                                            <span className="text-xl font-black text-green-500">{parlay.confidence || '3.50'}</span>
-                                        </div>
-                                    </div>
-                                </NeuCard>
-                            ))}
-
-                            {/* SINGLE PICKS */}
-                            {singlePicks.map((pick) => (
-                                <NeuCard key={pick.id} className="relative">
-                                    <div className="absolute top-3 right-3">
-                                        <Target className="text-blue-500" size={20} />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="text-xs font-bold text-text-muted uppercase tracking-wider">{pick.market}</div>
-                                        <div className="font-bold text-lg leading-tight">
-                                            {(pick.match_data.homeTeam || pick.match_data.home)} <br />
-                                            <span className="text-sm text-text-muted">vs</span> <br />
-                                            {(pick.match_data.awayTeam || pick.match_data.away)}
-                                        </div>
-                                        <div className="bg-base shadow-neu-inset rounded-lg p-2 text-center">
-                                            <span className="text-accent font-black text-xl">{pick.category || 'Pick'}</span>
-                                        </div>
-                                    </div>
-                                </NeuCard>
-                            ))}
+                <div className="flex gap-4">
+                    <NeuCard className="px-6 py-3 flex items-center gap-4" padding="p-0">
+                        <div className="text-right">
+                            <div className="text-xs font-bold text-text-muted uppercase">Scanner</div>
+                            <div className="text-green-500 font-bold text-sm">ONLINE</div>
                         </div>
+                        <Activity className="text-accent" size={24} />
+                    </NeuCard>
+                    <NeuCard className="px-6 py-3 flex items-center gap-4" padding="p-0">
+                        <div className="text-right">
+                            <div className="text-xs font-bold text-text-muted uppercase">Win Rate</div>
+                            <div className="text-text-main font-bold text-sm">78%</div>
+                        </div>
+                        <TrendingUp className="text-green-500" size={24} />
+                    </NeuCard>
+                </div>
+            </header>
+
+            {/* 2. MAIN GRID */}
+            <div className="grid lg:grid-cols-3 gap-8">
+
+                {/* LEFT COL: LIVE FEED (2/3) */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <Activity size={20} className="text-accent" /> Live Opportunities ({liveSignals.length})
+                        </h2>
+                        <NeuButton onClick={fetchData} variant="secondary" className="px-3 py-1 text-xs">
+                            {loading ? 'Scanning...' : 'Refresh'}
+                        </NeuButton>
                     </div>
-                )}
 
-
-                {/* LIVE SIGNALS */}
-                <div className="space-y-6">
-                    <h2 className="text-2xl font-black flex items-center gap-2 text-text-main">
-                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" /> Live Sniper Feed
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {liveSignals.map((signal) => (
-                            <NeuCard key={signal.id} className="relative group hover:-translate-y-2 transition-transform duration-300">
-                                {/* League Badge */}
-                                <div className="absolute top-4 right-4 text-xs font-bold text-text-muted bg-base shadow-neu-inset px-2 py-1 rounded-lg">
-                                    {signal.league}
-                                </div>
-
-                                {/* Teams */}
-                                <div className="mb-6 mt-2">
-                                    <div className="text-xl font-bold text-text-main mb-1">{signal.homeTeam}</div>
-                                    <div className="text-sm text-text-muted">vs</div>
-                                    <div className="text-xl font-bold text-text-main mt-1">{signal.awayTeam}</div>
-                                </div>
-
-                                {/* Stats Row */}
-                                <div className="flex items-center justify-between bg-base shadow-neu-inset rounded-xl p-4 mb-4">
-                                    <div className="text-center">
-                                        <div className="text-xs text-text-muted font-bold">SCORE</div>
-                                        <div className="text-lg font-bold text-accent">{signal.score}</div>
+                    <div className="space-y-4">
+                        {liveSignals.length > 0 ? liveSignals.map((signal) => (
+                            <NeuCard key={signal.id} className="relative group hover:scale-[1.01] transition-transform duration-300 border-l-4 border-accent">
+                                <div className="flex flex-col md:flex-row gap-6 items-center">
+                                    {/* Time & Score */}
+                                    <div className="text-center min-w-[80px]">
+                                        <div className="text-2xl font-black text-text-main">{signal.time}'</div>
+                                        <div className="text-sm font-bold text-accent bg-accent/10 rounded px-2">{signal.score}</div>
                                     </div>
-                                    <div className="text-center">
-                                        <div className="text-xs text-text-muted font-bold">TIME</div>
-                                        <div className="text-lg font-bold text-text-main">{signal.time}'</div>
+
+                                    {/* Match Info */}
+                                    <div className="flex-grow text-center md:text-left">
+                                        <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                                            <span className="text-xs font-bold text-text-muted uppercase bg-base shadow-neu-inset px-2 py-0.5 rounded">{signal.league}</span>
+                                        </div>
+                                        <div className="text-lg font-bold text-text-main">
+                                            {signal.homeTeam} <span className="text-text-muted text-sm">vs</span> {signal.awayTeam}
+                                        </div>
+                                        <div className="text-sm text-text-muted mt-1 flex items-center justify-center md:justify-start gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                                            {signal.reason}
+                                        </div>
                                     </div>
-                                    <div className="text-center">
-                                        <div className="text-xs text-text-muted font-bold">HT</div>
-                                        <div className="text-lg font-bold text-text-muted">{signal.htScore}</div>
+
+                                    {/* Confidence & Action */}
+                                    <div className="min-w-[140px] text-center space-y-3">
+                                        <div className="relative h-12 w-12 mx-auto flex items-center justify-center">
+                                            <svg className="absolute w-full h-full transform -rotate-90">
+                                                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-base shadow-neu-inset" />
+                                                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-accent" strokeDasharray={125} strokeDashoffset={125 - (125 * signal.confidencePercent) / 100} strokeLinecap="round" />
+                                            </svg>
+                                            <span className="text-xs font-bold">{signal.confidencePercent}%</span>
+                                        </div>
+                                        <NeuButton className="w-full py-2 text-xs">Bet Now</NeuButton>
                                     </div>
                                 </div>
-
-                                {/* Confidence */}
-                                <div className="mb-4">
-                                    <div className="flex justify-between text-xs font-bold text-text-muted mb-1">
-                                        <span>CONFIDENCE</span>
-                                        <span>{signal.confidencePercent}%</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-base shadow-neu-inset rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-accent shadow-neu-extruded"
-                                            style={{ width: `${signal.confidencePercent}%` }}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Reason */}
-                                <p className="text-sm text-text-muted italic bg-base/50 p-2 rounded-lg line-clamp-2 mb-4">
-                                    "{signal.reason}"
-                                </p>
-
-                                <NeuButton className="w-full py-3">Bet Now</NeuButton>
                             </NeuCard>
-                        ))}
-
-                        {liveSignals.length === 0 && !loading && (
-                            <div className="col-span-full py-20 text-center border-2 border-dashed border-text-muted/20 rounded-3xl">
-                                <div className="text-6xl mb-4 grayscale opacity-50">📡</div>
-                                <h3 className="text-2xl font-bold text-text-muted">No live signals yet</h3>
-                                <p className="text-text-muted">The bot is scanning global leagues. Hold tight.</p>
+                        )) : (
+                            <div className="py-20 text-center border-2 border-dashed border-text-muted/20 rounded-3xl animate-pulse">
+                                <Activity className="mx-auto text-text-muted mb-4 opacity-50" size={48} />
+                                <h3 className="text-lg font-bold text-text-muted">Scanning Global Leagues...</h3>
+                                <p className="text-text-muted text-sm">Looking for high-value opportunities.</p>
                             </div>
                         )}
                     </div>
                 </div>
+
+                {/* RIGHT COL: SIDEBAR (1/3) */}
+                <div className="space-y-8">
+
+                    {/* PARLAY OF THE DAY */}
+                    {parlays.length > 0 && (
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 rounded-[32px] blur opacity-20 group-hover:opacity-30 transition-opacity" />
+                            <NeuCard className="relative border-2 border-orange-500/20">
+                                <div className="flex items-center gap-2 mb-4 text-orange-500">
+                                    <Flame size={24} fill="currentColor" />
+                                    <h3 className="font-black text-lg">DAILY PARLAY</h3>
+                                </div>
+                                <div className="space-y-3">
+                                    {(Array.isArray(parlays[0].match_data) ? parlays[0].match_data : [parlays[0].match_data]).map((m, i) => (
+                                        <div key={i} className="flex justify-between items-center text-sm border-b border-text-muted/10 pb-2 last:border-0 last:pb-0">
+                                            <span className="font-bold">{m.homeTeam || m.home}</span>
+                                            <span className="font-bold text-orange-500">{m.prediction || m.market}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-text-muted/10 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-text-muted uppercase">Total Odds</span>
+                                    <span className="text-2xl font-black text-text-main">{parlays[0].confidence || '3.50'}</span>
+                                </div>
+                            </NeuCard>
+                        </div>
+                    )}
+
+                    {/* BANKROLL GUARD */}
+                    <NeuCard>
+                        <div className="flex items-center gap-2 mb-6 text-accent">
+                            <Shield size={24} />
+                            <h3 className="font-black text-lg">BANKROLL GUARD</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-text-muted">Recommended Unit</span>
+                                <span className="font-bold">$25.00</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-text-muted">Daily Stop Loss</span>
+                                <span className="font-bold text-red-500">-$100.00</span>
+                            </div>
+                            <div className="h-2 bg-base shadow-neu-inset rounded-full overflow-hidden mt-2">
+                                <div className="h-full bg-green-500 w-[80%]" />
+                            </div>
+                            <div className="text-center text-xs text-text-muted mt-2">
+                                You are well within safe limits.
+                            </div>
+                        </div>
+                    </NeuCard>
+
+                    {/* SINGLE PICKS */}
+                    <div>
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Target size={18} /> Daily Curated</h3>
+                        <div className="space-y-4">
+                            {singlePicks.map((pick) => (
+                                <NeuCard key={pick.id} className="py-3 px-4 flex justify-between items-center cursor-pointer hover:scale-[1.02] transition-transform">
+                                    <div>
+                                        <div className="text-xs font-bold text-text-muted uppercase">{pick.market}</div>
+                                        <div className="font-bold text-sm">{(pick.match_data.homeTeam || pick.match_data.home)}</div>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-base shadow-neu-extruded flex items-center justify-center">
+                                        <ChevronRight size={16} />
+                                    </div>
+                                </NeuCard>
+                            ))}
+                            {singlePicks.length === 0 && <div className="text-sm text-text-muted italic">No singles pending.</div>}
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
     );
+}
+
+// Helper icon
+function ChevronRight(props) {
+    return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
 }

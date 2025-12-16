@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import Pricing from './pages/Pricing';
 import Checkout from './pages/Checkout';
 import About from './pages/About';
+import MainLayout from './components/layout/MainLayout';
 import NeuButton from './components/ui/NeuButton';
 
 function App() {
@@ -79,40 +80,9 @@ function App() {
     setView('checkout');
   };
 
-  // Nav Bar for Pro Users
-  const ProNav = () => (
-    <nav className="sticky top-0 z-50 bg-base/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between shadow-neu-extruded">
-      <div className="text-2xl font-extrabold text-text-main cursor-pointer" onClick={() => setView('dashboard')}>
-        SENTIO <span className="text-accent">Pro</span>
-      </div>
-      <div className="flex items-center gap-4">
-        {user?.role === 'admin' && (
-          <button
-            onClick={() => setView('admin')}
-            className="font-bold px-4 py-2 rounded-xl text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all border border-red-500/20"
-          >
-            👽 Admin Panel
-          </button>
-        )}
-        <button
-          onClick={() => setView('dashboard')}
-          className={`font-bold px-4 py-2 rounded-xl transition-all ${view === 'dashboard' ? 'text-accent bg-base shadow-neu-inset' : 'text-text-muted hover:text-text-main'}`}
-        >
-          Signals
-        </button>
-        <button
-          onClick={() => setView('profile')}
-          className={`font-bold px-4 py-2 rounded-xl transition-all ${view === 'profile' ? 'text-accent bg-base shadow-neu-inset' : 'text-text-muted hover:text-text-main'}`}
-        >
-          My Profile
-        </button>
-      </div>
-    </nav>
-  );
-
   if (loading) return <div className="flex h-screen items-center justify-center bg-base text-text-muted font-bold text-xl animate-pulse">Loading System...</div>;
 
-  // 1. Admin View (Legacy/Functional Isolation) - NOW CONTROLLED BY STATE
+  // 1. Admin View (Legacy/Functional Isolation)
   if (user && view === 'admin') {
     return (
       <AdminPanel
@@ -123,11 +93,9 @@ function App() {
     );
   }
 
-  // 2. Public/Pro Views (Neumorphic)
+  // 2. Public/Pro Views (Neumorphic Main Layout)
   return (
-    <div className="min-h-screen bg-base text-text-main font-body selection:bg-accent selection:text-white pb-12">
-      {user && view !== 'landing' && <ProNav />}
-
+    <MainLayout user={user} onViewChange={setView} currentView={view}>
       {view === 'landing' && !user && (
         <Landing
           onLoginClick={() => setView('login')}
@@ -177,7 +145,7 @@ function App() {
       {view === 'profile' && user && (
         <Profile user={user} onLogout={handleLogout} />
       )}
-    </div>
+    </MainLayout>
   );
 }
 
