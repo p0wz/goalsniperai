@@ -24,7 +24,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 // Routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
-const { runDailyAnalysis, runFirstHalfScan } = require('./dailyAnalyst');
+const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
@@ -1904,16 +1904,71 @@ app.delete('/api/bet-history/:id', requireAuth, async (req, res) => {
 });
 
 // ============================================
-// 📈 Daily Pre-Match Analyst Endpoint
+// 📈 Single Market Analysis Endpoint (New Modular API)
 // ----------------------------------------------------------------------
-app.get('/api/analysis/first-half', optionalAuth, async (req, res) => {
-    log.info('🚀 API Request: Independent First Half Analysis');
+// Supports: over25, btts, doubleChance, homeOver15, under35, under25, firstHalfOver05
+// Query params: leagueFilter=true|false (default: true)
+app.get('/api/analysis/:market', optionalAuth, async (req, res) => {
+    const { market } = req.params;
+    const leagueFilter = req.query.leagueFilter !== 'false'; // Default true
+
+    log.info(`🚀 API Request: Single Market Analysis - ${market} (LeagueFilter: ${leagueFilter})`);
+
+    // Validate market
+    if (!MARKET_MAP[market]) {
+        return res.status(400).json({
+            success: false,
+            error: `Invalid market: ${market}. Valid options: ${Object.keys(MARKET_MAP).join(', ')}`
+        });
+    }
+
     try {
-        const results = await runFirstHalfScan(log);
+        const results = await runSingleMarketAnalysis(market, leagueFilter, log);
         res.json({ success: true, data: results });
     } catch (error) {
-        log.error('First Half Analysis Failed:', error);
+        log.error(`Single Market Analysis Failed (${market}):`, error);
         res.status(500).json({ success: false, error: 'Analysis failed' });
+    }
+});
+
+// Reset Market History (Admin Only)
+app.delete('/api/bet-history/market/:market', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { market } = req.params;
+    log.info(`🗑️ API Request: Reset History for Market - ${market}`);
+
+    try {
+        const result = await betTracker.clearMarketHistory(market);
+        res.json(result);
+    } catch (error) {
+        log.error(`Clear Market History Failed (${market}):`, error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get History for Specific Market
+app.get('/api/bet-history/market/:market', optionalAuth, async (req, res) => {
+    const { market } = req.params;
+    try {
+        const allBets = await betTracker.getAllBets();
+        const filtered = allBets.filter(b => b.market === market || b.strategyCode === market);
+        res.json({ success: true, data: filtered });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Record Single Bet (for saving analysis result to history)
+app.post('/api/bet-history/record', requireAuth, async (req, res) => {
+    try {
+        const { match, market, source = 'daily' } = req.body;
+        const result = await betTracker.recordBet(match, market, market, 80, source);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

@@ -769,4 +769,196 @@ Analyze this "First Half Over 0.5 Goal" pick based on the pure form score. Is it
     return results;
 }
 
-module.exports = { runDailyAnalysis, runFirstHalfScan };
+// ============================================
+// ⚡ SINGLE MARKET ANALYSIS (New Modular Approach)
+// ============================================
+const MARKET_MAP = {
+    'over25': { name: 'Over 2.5 Goals', key: 'over25' },
+    'btts': { name: 'BTTS (Both Teams To Score)', key: 'btts' },
+    'doubleChance': { name: '1X Double Chance', key: 'doubleChance' },
+    'homeOver15': { name: 'Home Team Over 1.5', key: 'homeOver15' },
+    'under35': { name: 'Under 3.5 Goals', key: 'under35' },
+    'under25': { name: 'Under 2.5 Goals', key: 'under25' },
+    'firstHalfOver05': { name: 'First Half Over 0.5', key: 'firstHalfOver05' }
+};
+
+async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = console, customLimit = MATCH_LIMIT) {
+    const startTime = Date.now();
+    const marketInfo = MARKET_MAP[marketKey];
+
+    if (!marketInfo) {
+        throw new Error(`Unknown market: ${marketKey}`);
+    }
+
+    log.info(`\n╔═══════════════════════════════════════════════════════╗`);
+    log.info(`║  📊 SINGLE MARKET ANALYSIS: ${marketInfo.name.padEnd(22)} ║`);
+    log.info(`║  League Filter: ${leagueFilter ? 'ON' : 'OFF'}                              ║`);
+    log.info(`╚═══════════════════════════════════════════════════════╝`);
+
+    // 1. Fetch Matches
+    log.info('[SingleMarket] Fetching matches...');
+    const ignoreLeagues = !leagueFilter;
+    let matches = await fetchDay(1, log, ignoreLeagues);
+
+    if (matches.length === 0) {
+        log.warn('[SingleMarket] No matches found.');
+        return { candidates: [], market: marketKey };
+    }
+
+    log.info(`✅ Found ${matches.length} matches. Processing top ${customLimit}...`);
+
+    // 2. Process & Filter (Only for requested market)
+    const candidates = [];
+    let processed = 0;
+    let consecutiveErrors = 0;
+
+    for (const m of matches) {
+        if (processed >= customLimit) break;
+        if (consecutiveErrors >= 3) break;
+
+        const mid = m.event_key || m.match_id;
+        if (!mid) continue;
+
+        await sleep(800);
+
+        const h2hData = await fetchMatchH2H(mid);
+        if (!h2hData) {
+            consecutiveErrors++;
+            continue;
+        }
+
+        const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+
+        // Filter History
+        const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
+        const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
+        const homeAllHistory = homeRawHistory.slice(0, 5);
+        const awayAllHistory = awayRawHistory.slice(0, 5);
+        const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
+        const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
+        const mutualH2H = sections.filter(x =>
+            (x.home_team?.name === m.event_home_team && x.away_team?.name === m.event_away_team) ||
+            (x.home_team?.name === m.event_away_team && x.away_team?.name === m.event_home_team)
+        ).slice(0, 3);
+
+        const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
+        const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
+        const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
+        const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
+
+        if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
+            consecutiveErrors = 0;
+            continue;
+        }
+
+        consecutiveErrors = 0;
+        processed++;
+        const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
+        const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
+
+        // Check ONLY the requested market
+        let passes = false;
+        let matchData = { ...m, filterStats: stats };
+
+        switch (marketKey) {
+            case 'over25':
+                passes = proxyLeagueAvg >= 3.0 && homeForm.over25Rate >= 70 && awayForm.over25Rate >= 70 && homeHomeStats.avgScored >= 1.5;
+                matchData.market = 'Over 2.5 Goals';
+                break;
+            case 'btts':
+                passes = homeHomeStats.scoringRate >= 75 && awayAwayStats.scoringRate >= 70 && homeForm.bttsRate >= 60 && awayForm.bttsRate >= 60;
+                matchData.market = 'BTTS (Both Teams To Score)';
+                break;
+            case 'doubleChance':
+                passes = homeHomeStats.lossCount <= 1 && awayAwayStats.winRate < 30 && homeHomeStats.winRate >= 50 && homeHomeStats.scoringRate >= 75;
+                matchData.market = '1X Double Chance';
+                break;
+            case 'homeOver15':
+                passes = homeHomeStats.avgScored >= 1.6 && awayAwayStats.avgConceded >= 1.4 && homeHomeStats.scoringRate >= 80 && homeForm.over15Rate >= 60;
+                matchData.market = 'Home Team Over 1.5';
+                break;
+            case 'under35':
+                const h2hSafe35 = mutualH2H.every(g => (parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0)) <= 4);
+                passes = proxyLeagueAvg < 2.4 && homeForm.under35Rate >= 80 && awayForm.under35Rate >= 80 && h2hSafe35;
+                matchData.market = 'Under 3.5 Goals';
+                break;
+            case 'under25':
+                const mutualOver35 = mutualH2H.some(g => (parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0)) > 3);
+                passes = proxyLeagueAvg < 2.5 && homeForm.under25Rate >= 75 && awayForm.under25Rate >= 75 && !mutualOver35;
+                matchData.market = 'Under 2.5 Goals';
+                break;
+            case 'firstHalfOver05':
+                const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
+                passes = fhAnalysis.signal;
+                matchData.fhStats = fhAnalysis;
+                matchData.market = 'First Half Over 0.5';
+                break;
+        }
+
+        if (passes) {
+            // Generate AI Prompt
+            matchData.aiPrompt = generateDetailedPrompt(m, stats, matchData.market, matchData.fhStats);
+            candidates.push(matchData);
+            log.info(`   ✅ ${m.event_home_team} vs ${m.event_away_team} → PASS`);
+        }
+    }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    log.info(`\n✅ Analysis Complete: ${candidates.length} candidates found in ${duration}s`);
+
+    return { candidates, market: marketKey, marketName: marketInfo.name };
+}
+
+// Helper: Generate Detailed AI Prompt for a single match
+function generateDetailedPrompt(match, stats, market, fhStats = null) {
+    const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = stats;
+
+    if (market === 'First Half Over 0.5' && fhStats) {
+        return `Act as a professional football betting analyst.
+Match: ${match.event_home_team} vs ${match.event_away_team}
+League: ${match.league_name}
+Market: First Half Over 0.5 Goals
+
+PURE FORM SCORE: ${fhStats.score}/100
+Confidence: ${fhStats.confidence}
+Reason: ${fhStats.reason}
+
+KEY METRICS:
+- Home Team FH Goal Potential: ${fhStats.metrics.home_pot}%
+- Away Team FH Goal Potential: ${fhStats.metrics.away_pot}%
+- H2H FH Goal Potential: ${fhStats.metrics.h2h_pot}%
+
+Analyze and provide your verdict.`;
+    }
+
+    return `Act as a professional football betting analyst.
+Match: ${match.event_home_team} vs ${match.event_away_team}
+League: ${match.league_name}
+Market: ${market}
+
+DETAILED STATISTICS:
+1. LEAGUE CONTEXT
+   - League Average Goals: ${((homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2).toFixed(2)}
+
+2. HOME TEAM (${match.event_home_team})
+   - General Form (Last 5): Scored ${homeForm.avgScored.toFixed(2)}/game, Conceded ${homeForm.avgConceded.toFixed(2)}/game.
+   - Over 2.5 Rate: ${homeForm.over25Rate.toFixed(0)}%
+   - Under 2.5 Rate: ${homeForm.under25Rate.toFixed(0)}%
+   - BTTS Rate: ${homeForm.bttsRate.toFixed(0)}%
+   - AT HOME (Last 8): Scored in ${homeHomeStats.scoringRate.toFixed(0)}% of games, Win Rate ${homeHomeStats.winRate.toFixed(0)}%. Avg Scored ${homeHomeStats.avgScored.toFixed(2)}.
+
+3. AWAY TEAM (${match.event_away_team})
+   - General Form (Last 5): Scored ${awayForm.avgScored.toFixed(2)}/game, Conceded ${awayForm.avgConceded.toFixed(2)}/game.
+   - Over 2.5 Rate: ${awayForm.over25Rate.toFixed(0)}%
+   - Under 2.5 Rate: ${awayForm.under25Rate.toFixed(0)}%
+   - BTTS Rate: ${awayForm.bttsRate.toFixed(0)}%
+   - AWAY FROM HOME (Last 8): Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0)).toFixed(0)}% of games. Avg Conceded ${awayAwayStats.avgConceded.toFixed(2)}.
+
+4. HEAD-TO-HEAD (Last ${mutual.length})
+   ${mutual.map(g => `- ${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name}`).join('\n   ')}
+
+TASK: Analyze this match for '${market}' bet. Is it a solid value? Provide your verdict (PLAY/SKIP) with confidence %.`;
+}
+
+module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP };
+

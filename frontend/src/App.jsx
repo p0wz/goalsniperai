@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { authService, signalService, betService, adminService } from './services/api';
+import { MarketTab, MARKET_CONFIG } from './MarketTab';
 import clsx from 'clsx';
 
 function App() {
@@ -530,22 +531,21 @@ function App() {
       <main className="container mx-auto p-4 md:p-6">
 
         {/* Navigation Tabs */}
-        <div className="mb-6 flex gap-2 border-b">
-          {['live', 'history', 'daily', 'iy05'].map((tab) => (
+        <div className="mb-6 flex gap-2 border-b overflow-x-auto">
+          {['live', 'history', ...Object.keys(MARKET_CONFIG)].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={clsx(
-                "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
+                "px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap",
                 activeTab === tab
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              {tab === 'live' && '📡 Live Signals'}
-              {tab === 'history' && '📜 Signal History'}
-              {tab === 'daily' && '📅 Daily Analysis'}
-              {tab === 'iy05' && '⏱️ 1.Y 0.5 Üst'}
+              {tab === 'live' && '📡 Live'}
+              {tab === 'history' && '📜 Geçmiş'}
+              {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
             </button>
           ))}
         </div>
@@ -915,6 +915,15 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Market Tabs - Dynamic Rendering */}
+        {Object.keys(MARKET_CONFIG).map((marketKey) => (
+          activeTab === marketKey && (
+            <div key={marketKey} className="p-4 md:p-6 animate-in fade-in duration-300">
+              <MarketTab marketKey={marketKey} />
+            </div>
+          )
+        ))}
       </main>
 
       {/* Modal */}

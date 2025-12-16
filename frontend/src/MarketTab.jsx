@@ -1,0 +1,241 @@
+import { useState, useEffect } from 'react';
+import { signalService, betService } from './services/api';
+import clsx from 'clsx';
+
+// Market Configuration
+const MARKET_CONFIG = {
+    over25: { name: 'Over 2.5', icon: '🔥', desc: 'Maç sonu 3+ gol' },
+    btts: { name: 'BTTS', icon: '⚽', desc: 'İki takım da gol atar' },
+    doubleChance: { name: '1X DC', icon: '🛡️', desc: 'Ev sahibi kaybetmez' },
+    homeOver15: { name: 'Ev 1.5+', icon: '🏠', desc: 'Ev sahibi 2+ gol' },
+    under35: { name: 'Alt 3.5', icon: '🔒', desc: 'Maç sonu maks 3 gol' },
+    under25: { name: 'Alt 2.5', icon: '🧊', desc: 'Maç sonu maks 2 gol' },
+    firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' }
+};
+
+function MarketTab({ marketKey }) {
+    const config = MARKET_CONFIG[marketKey];
+
+    const [candidates, setCandidates] = useState([]);
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [copiedId, setCopiedId] = useState(null);
+
+    // Fetch history on mount
+    useEffect(() => {
+        fetchHistory();
+    }, [marketKey]);
+
+    const fetchHistory = async () => {
+        try {
+            const res = await signalService.getMarketHistory(marketKey);
+            if (res.success) setHistory(res.data || []);
+        } catch (e) { console.error(e); }
+    };
+
+    const runAnalysis = async (leagueFilter) => {
+        setLoading(true);
+        setCandidates([]);
+        try {
+            const res = await signalService.analyzeMarket(marketKey, leagueFilter);
+            if (res.success) {
+                setCandidates(res.data.candidates || []);
+            }
+        } catch (err) {
+            alert(`Analiz başarısız: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSettle = async (id, status) => {
+        if (!confirm(`Bu maçı ${status} olarak işaretle?`)) return;
+        try {
+            await betService.settleBet(id, status, '');
+            fetchHistory();
+        } catch (e) {
+            alert('Hata: ' + e.message);
+        }
+    };
+
+    const handleReset = async () => {
+        if (!confirm(`${config.name} geçmişini sıfırla?`)) return;
+        try {
+            await signalService.resetMarketHistory(marketKey);
+            setHistory([]);
+            alert('Geçmiş sıfırlandı');
+        } catch (e) {
+            alert('Hata: ' + e.message);
+        }
+    };
+
+    const copyPrompt = (match) => {
+        if (match.aiPrompt) {
+            navigator.clipboard.writeText(match.aiPrompt);
+            setCopiedId(match.event_key || match.matchId);
+            setTimeout(() => setCopiedId(null), 2000);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                        {config.icon} {config.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{config.desc}</p>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setShowHistory(false)}
+                        className={clsx("px-3 py-1 text-sm rounded-md", !showHistory ? "bg-primary text-primary-foreground" : "bg-muted")}
+                    >
+                        Analiz
+                    </button>
+                    <button
+                        onClick={() => setShowHistory(true)}
+                        className={clsx("px-3 py-1 text-sm rounded-md", showHistory ? "bg-primary text-primary-foreground" : "bg-muted")}
+                    >
+                        Geçmiş ({history.filter(h => h.status === 'PENDING').length})
+                    </button>
+                </div>
+            </div>
+
+            {!showHistory ? (
+                /* Analysis View */
+                <div className="space-y-4">
+                    {/* Analysis Buttons */}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => runAnalysis(true)}
+                            disabled={loading}
+                            className="flex-1 py-3 rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white font-medium hover:shadow-lg disabled:opacity-50"
+                        >
+                            {loading ? '⏳ Taranıyor...' : '🏆 Lig Filtreli Analiz'}
+                        </button>
+                        <button
+                            onClick={() => runAnalysis(false)}
+                            disabled={loading}
+                            className="flex-1 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium hover:shadow-lg disabled:opacity-50"
+                        >
+                            {loading ? '⏳ Taranıyor...' : '🌍 Tüm Maçlar'}
+                        </button>
+                    </div>
+
+                    {/* Results Table */}
+                    {candidates.length > 0 ? (
+                        <div className="rounded-lg border bg-card overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted">
+                                    <tr>
+                                        <th className="p-3 text-left">Maç</th>
+                                        <th className="p-3 text-left">Lig</th>
+                                        <th className="p-3 text-center">AI Prompt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {candidates.map((m, i) => (
+                                        <tr key={i} className="border-t hover:bg-muted/50">
+                                            <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
+                                            <td className="p-3 text-muted-foreground">{m.league_name}</td>
+                                            <td className="p-3 text-center">
+                                                <button
+                                                    onClick={() => copyPrompt(m)}
+                                                    className={clsx(
+                                                        "px-3 py-1 rounded text-xs font-medium transition-all",
+                                                        copiedId === (m.event_key || m.matchId)
+                                                            ? "bg-green-500 text-white"
+                                                            : "bg-muted hover:bg-primary hover:text-primary-foreground"
+                                                    )}
+                                                >
+                                                    {copiedId === (m.event_key || m.matchId) ? '✓ Kopyalandı' : '📋 Kopyala'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : !loading && (
+                        <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground">
+                            <p>Henüz analiz yapılmadı.</p>
+                            <p className="text-sm mt-2">Yukarıdaki butonlardan birini seçin.</p>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                /* History View */
+                <div className="space-y-4">
+                    <div className="flex justify-end">
+                        <button
+                            onClick={handleReset}
+                            className="px-3 py-1 text-xs rounded bg-red-600/10 text-red-500 hover:bg-red-600/20"
+                        >
+                            🗑️ Geçmişi Sıfırla
+                        </button>
+                    </div>
+
+                    {history.length > 0 ? (
+                        <div className="rounded-lg border bg-card overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted">
+                                    <tr>
+                                        <th className="p-3 text-left">Maç</th>
+                                        <th className="p-3 text-center">Durum</th>
+                                        <th className="p-3 text-right">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {history.map((h, i) => (
+                                        <tr key={i} className="border-t hover:bg-muted/50">
+                                            <td className="p-3">
+                                                <span className="font-medium">{h.homeTeam || h.home_team} vs {h.awayTeam || h.away_team}</span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className={clsx(
+                                                    "px-2 py-1 rounded text-xs font-bold",
+                                                    h.status === 'WON' && "bg-green-600/20 text-green-500",
+                                                    h.status === 'LOST' && "bg-red-600/20 text-red-500",
+                                                    h.status === 'PENDING' && "bg-yellow-600/20 text-yellow-500"
+                                                )}>
+                                                    {h.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                {h.status === 'PENDING' && (
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button
+                                                            onClick={() => handleSettle(h.id, 'WON')}
+                                                            className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                        >
+                                                            WON
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleSettle(h.id, 'LOST')}
+                                                            className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                                        >
+                                                            LOST
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground">
+                            <p>Henüz geçmiş yok.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export { MarketTab, MARKET_CONFIG };

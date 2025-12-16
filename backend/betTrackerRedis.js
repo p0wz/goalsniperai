@@ -232,6 +232,15 @@ async function deleteBet(id) {
     return { success: true, message: 'Bet deleted' };
 }
 
+// Clear history for a specific market (by market name or strategyCode)
+async function clearMarketHistory(market) {
+    const db = await loadDb();
+    const filtered = db.filter(b => b.market !== market && b.strategyCode !== market);
+    const deleted = db.length - filtered.length;
+    await saveDb(filtered);
+    return { success: true, message: `Cleared ${deleted} bets for market: ${market}` };
+}
+
 // ============================================
 // 🤖 Auto-Settlement Helpers
 // ============================================
@@ -320,6 +329,7 @@ module.exports = {
     manualSettle,
     startTracking,
     clearAllBets,
+    clearMarketHistory,
     getPendingBets,
     updateBetStatus,
     // Coupon Exports
