@@ -116,10 +116,10 @@ function App() {
     } catch (err) { console.error(err); }
   };
 
-  const handleRunDaily = async (force = false) => {
+  const handleRunDaily = async (leagueFilter = true) => {
     try {
       setIsAnalysing(true);
-      const res = await signalService.getDailyAnalysis(force);
+      const res = await signalService.getDailyAnalysis(true, leagueFilter);
       if (res.success) setDailyAnalysis(res.data);
     } catch (err) {
       alert('Analysis failed: ' + err.message);

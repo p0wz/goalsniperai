@@ -70,8 +70,8 @@ export const signalService = {
         const response = await api.get('/signals');
         return response.data;
     },
-    getDailyAnalysis: async (force = false) => {
-        const response = await api.get(`/daily-analysis?force=${force}`);
+    getDailyAnalysis: async (force = false, leagueFilter = true) => {
+        const response = await api.get(`/daily-analysis?force=${force}&leagueFilter=${leagueFilter}`);
         return response.data;
     },
     // New: Single-Market Analysis

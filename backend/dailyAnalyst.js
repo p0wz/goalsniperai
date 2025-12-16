@@ -487,7 +487,7 @@ RESPOND WITH ONLY JSON: {"verdict": "PLAY", "confidence": 85, "reason": "Brief r
 }
 
 // Main Runner
-async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
+async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, leagueFilter = true) {
     const startTime = Date.now();
 
     log.info(`\n`);
@@ -500,8 +500,8 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`\n📅 STEP 1: Fetching Match List`);
 
     // Fetch Day 1 (Today) only
-    log.info('[DailyAnalyst] Fetching Day 1 (Today)...');
-    let matches = await fetchDay(1, log);
+    log.info(`[DailyAnalyst] Fetching Day 1 (Today), League Filter: ${leagueFilter}...`);
+    let matches = await fetchDay(1, log, !leagueFilter); // Pass !leagueFilter as ignoreLeagues
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');

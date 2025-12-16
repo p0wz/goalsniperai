@@ -1986,9 +1986,10 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
         return res.status(403).json({ success: false, error: 'Upgrade to PRO to access Daily Analyst.' });
     }
 
-    const { force, limit } = req.query;
+    const { force, limit, leagueFilter } = req.query;
     const forceUpdate = force === 'true';
     const customLimit = limit ? parseInt(limit) : 100;
+    const useLeagueFilter = leagueFilter !== 'false'; // Default true
 
     // Helper to filter results based on role & approval
     const filterResults = (results) => {
@@ -2031,8 +2032,8 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
     }
 
     try {
-        log.info('Running Daily Pre-Match Analysis...');
-        const results = await runDailyAnalysis(log, customLimit);
+        log.info(`Running Daily Pre-Match Analysis (League Filter: ${useLeagueFilter})...`);
+        const results = await runDailyAnalysis(log, customLimit, useLeagueFilter);
 
         // Post-processing: Assign IDs immediately for consistency
         const processedResults = { ...results };
