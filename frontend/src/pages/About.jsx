@@ -32,7 +32,7 @@ export default function About({ onBack }) {
                         </p>
                     </NeuCard>
                     <NeuCard>
-                        <h3 className="font-bold text-xl mb-2 text-text-main">Machine > Man</h3>
+                        <h3 className="font-bold text-xl mb-2 text-text-main">Machine &gt; Man</h3>
                         <p className="text-text-muted text-sm">
                             Humans get emotional. Humans chase losses. Our AI executes cold, calculated logic based purely on math and expected value (EV).
                         </p>
