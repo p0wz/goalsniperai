@@ -577,51 +577,65 @@ function App() {
               </button>
             </div>
 
-            {/* MARKET CARDS - Always Visible */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-bold text-center">📊 Market Sonuçları</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Object.entries(MARKET_CONFIG).map(([key, config]) => {
-                  const items = dailyAnalysis?.[key] || [];
-                  return (
-                    <div key={key} className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-bold flex items-center gap-2">
-                          {config.icon} {config.name}
-                        </h4>
-                        <span className={clsx(
-                          "px-2 py-1 rounded text-xs font-bold",
-                          items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
-                        )}>
-                          {items.length} Maç
-                        </span>
-                      </div>
-                      {items.length > 0 ? (
-                        <ul className="space-y-1 text-sm">
-                          {items.slice(0, 3).map((m, i) => (
-                            <li key={i} className="truncate text-muted-foreground">
-                              • {m.event_home_team} vs {m.event_away_team}
-                            </li>
-                          ))}
-                          {items.length > 3 && (
-                            <li className="text-primary cursor-pointer hover:underline" onClick={() => setActiveTab(key)}>
-                              +{items.length - 3} daha...
-                            </li>
-                          )}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">Analiz bekleniyor...</p>
-                      )}
-                      <button
-                        onClick={() => setActiveTab(key)}
-                        className="w-full mt-3 py-2 text-xs rounded bg-muted hover:bg-primary hover:text-primary-foreground transition-colors"
-                      >
-                        Detaylar →
-                      </button>
+            {/* MARKET RESULTS - Full Tables */}
+            <div className="space-y-6">
+              {Object.entries(MARKET_CONFIG).map(([key, config]) => {
+                const items = dailyAnalysis?.[key] || [];
+                return (
+                  <div key={key} className="rounded-xl border bg-card shadow-sm overflow-hidden">
+                    {/* Market Header */}
+                    <div className="flex items-center justify-between p-4 bg-muted/50 border-b">
+                      <h4 className="font-bold text-lg flex items-center gap-2">
+                        {config.icon} {config.name}
+                      </h4>
+                      <span className={clsx(
+                        "px-3 py-1 rounded-full text-sm font-bold",
+                        items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
+                      )}>
+                        {items.length} Maç
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Results Table */}
+                    {items.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            <th className="p-3 text-left font-medium">Maç</th>
+                            <th className="p-3 text-left font-medium">Lig</th>
+                            <th className="p-3 text-center font-medium">AI Prompt</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((m, i) => (
+                            <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+                              <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
+                              <td className="p-3 text-muted-foreground">{m.league_name}</td>
+                              <td className="p-3 text-center">
+                                <button
+                                  onClick={() => {
+                                    if (m.aiPrompt || m.ai_prompts?.[0]) {
+                                      navigator.clipboard.writeText(m.aiPrompt || m.ai_prompts?.[0]);
+                                      alert('AI Prompt kopyalandı!');
+                                    }
+                                  }}
+                                  className="px-3 py-1 rounded text-xs font-medium bg-muted hover:bg-primary hover:text-primary-foreground transition-all"
+                                >
+                                  📋 Kopyala
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="p-6 text-center text-muted-foreground italic">
+                        Analiz bekleniyor...
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-6 p-4 rounded-lg bg-muted/50 border text-center">
