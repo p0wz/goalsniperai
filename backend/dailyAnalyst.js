@@ -240,8 +240,8 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         doubleChance: [],
         homeOver15: [],
         under35: [],
-        under35: [],
         under25: [],
+        btts: [],
         firstHalfOver05: []
     };
 
@@ -338,11 +338,14 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             passedFilters.push('Over 2.5');
         }
 
-        // Logic C: BTTS - REMOVED
-        // if (homeHomeStats.scoringRate >= 70 && awayAwayStats.scoringRate >= 65) {
-        //     candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS' });
-        //     passedFilters.push('BTTS');
-        // }
+
+        // Logic C: BTTS (Both Teams To Score)
+        // Ev evinde gol atma ≥75%, Dep deplasmanda gol atma ≥70%, Her iki takım BTTS ≥60%
+        if (homeHomeStats.scoringRate >= 75 && awayAwayStats.scoringRate >= 70 &&
+            homeForm.bttsRate >= 60 && awayForm.bttsRate >= 60) {
+            candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS (Both Teams To Score)' });
+            passedFilters.push('BTTS');
+        }
 
         // Logic D: 1X Double Chance (IMPROVED)
         // Ev mağlubiyet ≤1, Dep kazanma <30%, Ev winRate ≥50%, Ev scoringRate ≥75%
@@ -401,9 +404,9 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`   • Skipped (No H2H): ${skippedNoH2H}`);
     log.info(`   • Skipped (No Stats): ${skippedNoStats}`);
     log.info(`   • Over 2.5 candidates: ${candidates.over25.length}`);
+    log.info(`   • BTTS candidates: ${candidates.btts.length}`);
     log.info(`   • 1X DC candidates: ${candidates.doubleChance.length}`);
     log.info(`   • Home O1.5 candidates: ${candidates.homeOver15.length}`);
-    log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
     log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
     log.info(`   • Under 2.5 candidates: ${candidates.under25.length}`);
     log.info(`   • 1H Over 0.5 candidates: ${candidates.firstHalfOver05.length}`);
@@ -502,7 +505,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [] };
+        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [] };
     }
 
     log.info(`✅ Found ${matches.length} upcoming fixtures. Processing top ${customLimit}...`);
@@ -519,7 +522,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT) {
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], firstHalfOver05: []
+        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: []
     };
 
     // Helper: Generate Detailed Analysis Text
@@ -652,7 +655,7 @@ What is the "Ice Cold" risk here? Even with high percentage rates, could a recen
     log.info(`║  Matches Scanned: ${customLimit}                               ║`);
     log.info(`║  Candidates Found: ${totalCandidates}                             ║`);
     log.info(`╠═══════════════════════════════════════════════════════╣`);
-    log.info(`║  Over 2.5: ${results.over25.length} | 1X: ${results.doubleChance.length} | Home O1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} | 1H O0.5: ${results.firstHalfOver05.length} ║`);
+    log.info(`║  O2.5: ${results.over25.length} | BTTS: ${results.btts.length} | 1X: ${results.doubleChance.length} | HO1.5: ${results.homeOver15.length} | U3.5: ${results.under35.length} | U2.5: ${results.under25.length} | 1H: ${results.firstHalfOver05.length} ║`);
     log.info(`╚═══════════════════════════════════════════════════════╝`);
     log.info(`\n⏳ Waiting for Admin Approval in Admin Panel...`);
 
