@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     BarChart3,
     Zap,
@@ -14,7 +15,8 @@ import {
 import NeuCard from '../components/ui/NeuCard';
 import NeuButton from '../components/ui/NeuButton';
 
-export default function Landing({ onLoginClick }) {
+export default function Landing() {
+    const navigate = useNavigate();
     const [scrolled, setScrolled] = useState(false);
 
     useEffect(() => {
@@ -62,7 +64,7 @@ export default function Landing({ onLoginClick }) {
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-in slide-in-from-bottom-8 duration-700 delay-300">
-                            <NeuButton onClick={onLoginClick} variant="primary" className="px-8 py-4 text-lg rounded-2xl group">
+                            <NeuButton onClick={() => navigate('/login')} variant="primary" className="px-8 py-4 text-lg rounded-2xl group">
                                 Start Free Trial
                                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </NeuButton>
@@ -225,7 +227,7 @@ export default function Landing({ onLoginClick }) {
                     <h2 className="text-4xl md:text-5xl font-black">Ready to Level Up?</h2>
                     <p className="text-xl text-gray-300">Join thousands of smart bettors who have stopped guessing and started snipping.</p>
                     <button
-                        onClick={onLoginClick}
+                        onClick={() => navigate('/login')}
                         className="px-10 py-5 bg-accent hover:bg-accent-hover text-white rounded-2xl font-bold text-xl shadow-lg hover:shadow-accent/50 transition-all transform hover:-translate-y-1"
                     >
                         Get Started Now

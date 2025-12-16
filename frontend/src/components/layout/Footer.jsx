@@ -1,6 +1,7 @@
+import { Link } from 'react-router-dom';
 import { Bot, Twitter, Github, Globe } from 'lucide-react';
 
-export default function Footer({ onNavigate }) {
+export default function Footer() {
     return (
         <footer className="bg-base pt-20 pb-10 border-t border-white/20 relative z-10">
             <div className="max-w-7xl mx-auto px-6">
@@ -36,9 +37,9 @@ export default function Footer({ onNavigate }) {
                     <div>
                         <h4 className="font-bold text-lg mb-6">Product</h4>
                         <ul className="space-y-4 text-text-muted">
-                            <li><button onClick={() => onNavigate('dashboard')} className="hover:text-accent transition-colors">Live Scanner</button></li>
-                            <li><button onClick={() => onNavigate('pricing')} className="hover:text-accent transition-colors">Pricing</button></li>
-                            <li><button onClick={() => onNavigate('dashboard')} className="hover:text-accent transition-colors">Daily Picks</button></li>
+                            <li><Link to="/dashboard" className="hover:text-accent transition-colors">Live Scanner</Link></li>
+                            <li><Link to="/pricing" className="hover:text-accent transition-colors">Pricing</Link></li>
+                            <li><Link to="/dashboard" className="hover:text-accent transition-colors">Daily Picks</Link></li>
                             <li><span className="text-accent bg-accent/10 px-2 py-0.5 rounded text-xs font-bold">New</span> API Access</li>
                         </ul>
                     </div>
@@ -46,7 +47,7 @@ export default function Footer({ onNavigate }) {
                     <div>
                         <h4 className="font-bold text-lg mb-6">Company</h4>
                         <ul className="space-y-4 text-text-muted">
-                            <li><button onClick={() => onNavigate('about')} className="hover:text-accent transition-colors">About Us</button></li>
+                            <li><Link to="/about" className="hover:text-accent transition-colors">About Us</Link></li>
                             <li><a href="#" className="hover:text-accent transition-colors">Terms of Service</a></li>
                             <li><a href="#" className="hover:text-accent transition-colors">Privacy Policy</a></li>
                             <li><a href="#" className="hover:text-accent transition-colors">Contact Support</a></li>

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { signalService, betService, adminService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import clsx from 'clsx';
-import NeuButton from '../../components/ui/NeuButton'; // Import for consistency if needed, or keep legacy buttons
+import NeuButton from '../../components/ui/NeuButton';
 
-export default function AdminPanel({ user, handleLogout, onSwitchToUser }) {
-    // Logic from App.jsx specific to the dashboard functionality
+export default function AdminPanel({ user, handleLogout }) {
     const [activeTab, setActiveTab] = useState('live');
     const [liveSignals, setLiveSignals] = useState([]);
     const [betHistory, setBetHistory] = useState([]);
@@ -358,12 +358,12 @@ export default function AdminPanel({ user, handleLogout, onSwitchToUser }) {
                         <h1 className="text-xl font-bold">SENTIO Pro - ADMIN</h1>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
-                        <button
-                            onClick={onSwitchToUser}
+                        <Link
+                            to="/dashboard"
                             className="px-3 py-1.5 rounded bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-bold transition-colors"
                         >
                             👁️ View as User
-                        </button>
+                        </Link>
                         <span className="text-muted-foreground">{user.name} <span className="text-xs opacity-50">({user.role})</span></span>
                         <button onClick={handleLogout} className="text-red-400 hover:text-red-300">Logout</button>
                     </div>

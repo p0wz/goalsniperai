@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Bot, Menu, X, ChevronRight, User } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Bot, Menu, X, User } from 'lucide-react';
 import NeuButton from '../ui/NeuButton';
 
-export default function Navbar({ user, onViewChange, currentView }) {
+export default function Navbar({ user }) {
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const location = useLocation();
+    const navigate = useNavigate();
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -13,16 +16,13 @@ export default function Navbar({ user, onViewChange, currentView }) {
     }, []);
 
     const navLinks = [
-        { label: 'Analysis Hub', id: 'dashboard', allowGuest: false },
-        { label: 'Live Scanner', id: 'dashboard', allowGuest: false }, // Could be anchor links
-        { label: 'Pricing', id: 'pricing', allowGuest: true },
-        { label: 'About', id: 'about', allowGuest: true },
+        { label: 'Analysis Hub', path: '/dashboard', allowGuest: false },
+        { label: 'Live Scanner', path: '/dashboard', allowGuest: false },
+        { label: 'Pricing', path: '/pricing', allowGuest: true },
+        { label: 'About', path: '/about', allowGuest: true },
     ];
 
-    const handleNav = (id) => {
-        onViewChange(id);
-        setMobileMenuOpen(false);
-    };
+    const isActive = (path) => location.pathname === path;
 
     return (
         <nav
@@ -32,8 +32,8 @@ export default function Navbar({ user, onViewChange, currentView }) {
             <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
 
                 {/* LOGO */}
-                <div
-                    onClick={() => handleNav(user ? 'dashboard' : 'landing')}
+                <Link
+                    to={user ? '/dashboard' : '/'}
                     className="flex items-center gap-3 cursor-pointer group"
                 >
                     <div className="w-10 h-10 rounded-xl bg-base shadow-neu-extruded flex items-center justify-center text-accent group-hover:scale-105 transition-transform">
@@ -42,50 +42,50 @@ export default function Navbar({ user, onViewChange, currentView }) {
                     <span className="text-2xl font-black tracking-tight text-text-main">
                         GOAL<span className="text-accent">SNIPER</span>
                     </span>
-                </div>
+                </Link>
 
                 {/* DESKTOP NAV */}
                 <div className="hidden md:flex items-center gap-8">
                     {navLinks.map((link) => (
                         (!user && !link.allowGuest) ? null :
-                            <button
+                            <Link
                                 key={link.label}
-                                onClick={() => handleNav(link.id)}
-                                className={`text-sm font-bold transition-colors ${currentView === link.id ? 'text-accent' : 'text-text-muted hover:text-text-main'
+                                to={link.path}
+                                className={`text-sm font-bold transition-colors ${isActive(link.path) ? 'text-accent' : 'text-text-muted hover:text-text-main'
                                     }`}
                             >
                                 {link.label}
-                            </button>
+                            </Link>
                     ))}
 
                     {user ? (
                         <div className="flex items-center gap-4 pl-4 border-l border-white/20">
                             {user.role === 'admin' && (
-                                <button
-                                    onClick={() => handleNav('admin')}
+                                <Link
+                                    to="/admin"
                                     className="px-4 py-2 text-xs font-bold text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-all"
                                 >
                                     ADMIN
-                                </button>
+                                </Link>
                             )}
-                            <button
-                                onClick={() => handleNav('profile')}
+                            <Link
+                                to="/profile"
                                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-base shadow-neu-extruded hover:shadow-neu-extruded-hover transition-all text-sm font-bold text-text-main"
                             >
                                 <User size={16} />
                                 {user.name?.split(' ')[0]}
-                            </button>
+                            </Link>
                         </div>
                     ) : (
                         <div className="flex items-center gap-4 pl-4">
-                            <button
-                                onClick={() => handleNav('login')}
+                            <Link
+                                to="/login"
                                 className="text-sm font-bold text-text-main hover:text-accent transition-colors"
                             >
                                 Login
-                            </button>
+                            </Link>
                             <NeuButton
-                                onClick={() => handleNav('register')}
+                                onClick={() => navigate('/register')}
                                 variant="primary"
                                 className="px-6 py-2 text-sm"
                             >
@@ -119,26 +119,27 @@ export default function Navbar({ user, onViewChange, currentView }) {
                     <div className="flex flex-col gap-6 text-center">
                         {navLinks.map((link) => (
                             (!user && !link.allowGuest) ? null :
-                                <button
+                                <Link
                                     key={link.label}
-                                    onClick={() => handleNav(link.id)}
+                                    to={link.path}
+                                    onClick={() => setMobileMenuOpen(false)}
                                     className="text-xl font-bold text-text-main py-4 border-b border-white/10"
                                 >
                                     {link.label}
-                                </button>
+                                </Link>
                         ))}
 
                         {!user && (
                             <>
-                                <button onClick={() => handleNav('login')} className="text-xl font-bold py-4">Login</button>
-                                <NeuButton onClick={() => handleNav('register')} className="w-full py-4 mt-4" variant="primary">
+                                <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="text-xl font-bold py-4">Login</Link>
+                                <NeuButton onClick={() => { navigate('/register'); setMobileMenuOpen(false); }} className="w-full py-4 mt-4" variant="primary">
                                     Get Started
                                 </NeuButton>
                             </>
                         )}
 
                         {user && (
-                            <NeuButton onClick={() => handleNav('profile')} className="w-full py-4 mt-4" variant="secondary">
+                            <NeuButton onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }} className="w-full py-4 mt-4" variant="secondary">
                                 My Profile
                             </NeuButton>
                         )}

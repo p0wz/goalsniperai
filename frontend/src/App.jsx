@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { authService, signalService, betService, adminService } from './services/api';
 import AdminPanel from './pages/Admin/AdminPanel';
@@ -12,12 +13,27 @@ import About from './pages/About';
 import MainLayout from './components/layout/MainLayout';
 import NeuButton from './components/ui/NeuButton';
 
+// Auth Guard Wrapper
+const ProtectedRoute = ({ children, user, redirect = '/login' }) => {
+  if (!user) return <Navigate to={redirect} replace />;
+  return children;
+};
+
+// Admin Guard Wrapper
+const AdminRoute = ({ children, user }) => {
+  if (!user || user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+// Public Route Wrapper (redirect to dashboard if logged in)
+const PublicRoute = ({ children, user }) => {
+  if (user) return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('landing'); // landing, login, register, dashboard, profile, pricing, checkout, about
-  const [error, setError] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(null); // For checkout
 
   useEffect(() => {
     checkAuth();
@@ -27,126 +43,107 @@ function App() {
     try {
       setLoading(true);
       const profile = await authService.getProfile();
-      if (profile) {
-        setUser(profile);
-        setView(profile.role === 'admin' ? 'admin' : 'dashboard');
-      } else {
-        setView('landing');
-      }
+      if (profile) setUser(profile);
     } catch (err) {
       console.log('User not logged in');
-      setView('landing');
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogin = async (email, password) => {
-    setError(null);
     try {
       const res = await authService.login(email, password);
-      // Ensure backend returns correct structure
       if (res.success || res.token) {
         const profile = await authService.getProfile();
         setUser(profile);
-        setView(profile.role === 'admin' ? 'admin' : 'dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Login failed');
+      throw err;
     }
   };
 
   const handleRegister = async (name, email, password) => {
-    setError(null);
     try {
       const res = await authService.register(name, email, password);
-      if (res.success || res.userId) {
-        // Auto login after register
-        await handleLogin(email, password);
-      }
+      if (res.success || res.userId) await handleLogin(email, password);
     } catch (err) {
-      setError(err.message || 'Registration failed');
+      throw err;
     }
   };
 
   const handleLogout = async () => {
     await authService.logout();
     setUser(null);
-    setView('landing');
-  };
-
-  const handleChoosePlan = (plan) => {
-    setSelectedPlan(plan);
-    setView('checkout');
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-base text-text-muted font-bold text-xl animate-pulse">Loading System...</div>;
 
-  // 1. Admin View (Legacy/Functional Isolation)
-  if (user && view === 'admin') {
-    return (
-      <AdminPanel
-        user={user}
-        handleLogout={handleLogout}
-        onSwitchToUser={() => setView('dashboard')}
-      />
-    );
-  }
-
-  // 2. Public/Pro Views (Neumorphic Main Layout)
   return (
-    <MainLayout user={user} onViewChange={setView} currentView={view}>
-      {view === 'landing' && !user && (
-        <Landing
-          onLoginClick={() => setView('login')}
-          onNavigate={(page) => setView(page)}
-        />
-      )}
+    <BrowserRouter>
+      <Routes>
+        {/* Admin Route - Isolated Layout */}
+        <Route path="/admin" element={
+          <AdminRoute user={user}>
+            <AdminPanel user={user} handleLogout={handleLogout} />
+          </AdminRoute>
+        } />
 
-      {view === 'login' && !user && (
-        <LoginView
-          onLogin={handleLogin}
-          onRegisterClick={() => setView('register')}
-          error={error}
-        />
-      )}
+        {/* Main App Routes - Wrapped in MainLayout */}
+        <Route element={<MainLayoutWrapper user={user} handleLogout={handleLogout} />}>
 
-      {view === 'register' && !user && (
-        <RegisterView
-          onRegister={handleRegister}
-          onLoginClick={() => setView('login')}
-          error={error}
-        />
-      )}
+          <Route path="/" element={
+            <PublicRoute user={user}>
+              <Landing />
+            </PublicRoute>
+          } />
 
-      {view === 'pricing' && (
-        <Pricing onChoosePlan={handleChoosePlan} />
-      )}
+          <Route path="/login" element={
+            <PublicRoute user={user}>
+              <LoginView onLogin={handleLogin} />
+            </PublicRoute>
+          } />
 
-      {view === 'checkout' && (
-        <Checkout
-          plan={selectedPlan}
-          onBack={() => setView('pricing')}
-          onComplete={() => {
-            alert('Success! Welcome to Pro.');
-            setView('login');
-          }}
-        />
-      )}
+          <Route path="/register" element={
+            <PublicRoute user={user}>
+              <RegisterView onRegister={handleRegister} />
+            </PublicRoute>
+          } />
 
-      {view === 'about' && (
-        <About onBack={() => setView('landing')} />
-      )}
+          <Route path="/dashboard" element={
+            <ProtectedRoute user={user}>
+              <ProDashboard user={user} />
+            </ProtectedRoute>
+          } />
 
-      {view === 'dashboard' && user && (
-        <ProDashboard user={user} />
-      )}
+          <Route path="/profile" element={
+            <ProtectedRoute user={user}>
+              <Profile user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          } />
 
-      {view === 'profile' && user && (
-        <Profile user={user} onLogout={handleLogout} />
-      )}
-    </MainLayout>
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/checkout" element={<Checkout />} />
+
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
+
+// Layout Wrapper to inject Router props
+const MainLayoutWrapper = ({ user, handleLogout }) => {
+  const location = useLocation();
+
+  return (
+    <MainLayout user={user} currentPath={location.pathname}>
+      <Outlet />
+    </MainLayout>
+  );
+};
 
 export default App;

@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import NeuInput from '../../components/ui/NeuInput';
 import NeuButton from '../../components/ui/NeuButton';
 import NeuCard from '../../components/ui/NeuCard';
 
-export default function LoginView({ onLogin, error, onRegisterClick }) {
+export default function LoginView({ onLogin, error }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
@@ -59,7 +60,7 @@ export default function LoginView({ onLogin, error, onRegisterClick }) {
             </NeuCard>
 
             <div className="mt-8 text-text-muted text-sm font-medium">
-                Don't have an account? <span onClick={onRegisterClick} className="text-accent font-bold cursor-pointer hover:underline">Request Access</span>
+                Don't have an account? <Link to="/register" className="text-accent font-bold cursor-pointer hover:underline">Request Access</Link>
             </div>
         </div>
     );

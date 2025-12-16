@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import NeuInput from '../../components/ui/NeuInput';
 import NeuButton from '../../components/ui/NeuButton';
 import NeuCard from '../../components/ui/NeuCard';
 
-export default function RegisterView({ onRegister, onLoginClick, error }) {
+export default function RegisterView({ onRegister, error }) {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -64,7 +65,7 @@ export default function RegisterView({ onRegister, onLoginClick, error }) {
                 </form>
 
                 <div className="mt-8 text-center text-text-muted text-sm font-medium">
-                    Already an agent? <span onClick={onLoginClick} className="text-accent font-bold cursor-pointer hover:underline">Sign In</span>
+                    Already an agent? <Link to="/login" className="text-accent font-bold cursor-pointer hover:underline">Sign In</Link>
                 </div>
             </NeuCard>
         </div>
