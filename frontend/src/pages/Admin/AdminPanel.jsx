@@ -146,6 +146,28 @@ export default function AdminPanel({ user, handleLogout, onSwitchToUser }) {
         }
     };
 
+    const handleAddToPicks = async (match, marketName, type = 'single') => {
+        if (!confirm(`Add ${match.event_home_team} vs ${match.event_away_team} to ${type === 'parlay' ? 'Daily Parlay' : 'Daily Picks'}?`)) return;
+        try {
+            await adminService.createPick({
+                type: type,
+                match_data: {
+                    matchId: match.matchId,
+                    homeTeam: match.event_home_team,
+                    awayTeam: match.event_away_team,
+                    market: marketName,
+                    prediction: marketName
+                },
+                market: marketName,
+                category: type === 'parlay' ? 'Daily Parlay' : 'Daily Pick',
+                confidence: 85
+            });
+            alert(`Added to ${type === 'parlay' ? 'Parlay' : 'Daily Picks'}!`);
+        } catch (err) {
+            alert('Failed to add pick: ' + err.message);
+        }
+    };
+
     const handleDeleteHistory = async (id) => {
         if (!confirm('Delete this record permanently?')) return;
         try {
@@ -616,6 +638,7 @@ ${prompt}
                         handleDailyAction={handleDailyAction}
                         copyMarketPrompt={copyMarketPrompt}
                         setSelectedDailyMatch={setSelectedDailyMatch}
+                        handleAddToPicks={handleAddToPicks}
                     />
                 )}
             </main>

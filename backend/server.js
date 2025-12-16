@@ -24,6 +24,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 // Routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const picksRoutes = require('./routes/picks');
 const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
@@ -2191,6 +2192,7 @@ app.post('/api/admin/approve/:id', requireAuth, (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/picks', picksRoutes);
 
 // ============================================
 // 📄 Page Routes

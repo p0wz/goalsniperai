@@ -17,7 +17,7 @@ export default function Pricing({ onChoosePlan }) {
                 'Basic Stats',
                 'Community Access'
             ],
-            missing: ['Live Sniper Bot', 'AI Probabilities', '1-on-1 Support'],
+            missing: ['Live Sniper Bot', 'AI Probabilities', 'Daily Curated Picks', 'Daily Parlay'],
             cta: 'Start Free',
             variant: 'secondary'
         },
@@ -30,30 +30,14 @@ export default function Pricing({ onChoosePlan }) {
                 'Unlimited Live Signals',
                 'All 850+ Leagues',
                 'Live Sniper Bot Access',
-                'AI Value Detection',
-                'Bankroll Management',
-                'Priority Support'
+                '🎯 Daily Curated Picks',
+                '🚀 Daily High-Odds Parlay',
+                'AI Analysis & Value Detection'
             ],
             missing: [],
             cta: 'Upgrade to Pro',
             variant: 'primary',
             popular: true
-        },
-        {
-            name: 'Syndicate',
-            price: billingCycle === 'monthly' ? 99 : 990,
-            originalPrice: billingCycle === 'monthly' ? null : 1188,
-            description: 'For professional groups and whales.',
-            features: [
-                'Everything in Pro',
-                'Private API Access',
-                '1-on-1 Strategy Calls',
-                'Custom Bot Configuration',
-                'Whale Alerts'
-            ],
-            missing: [],
-            cta: 'Contact Sales',
-            variant: 'secondary'
         }
     ];
 

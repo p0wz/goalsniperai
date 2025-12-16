@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { getAllUsers, getUserStats, updateUserPlan, deleteUser, getUserById, getRecentLogs } = require('../database');
+const { getAllUsers, getUserStats, updateUserPlan, deleteUser, getUserById, getRecentLogs, createPick, deletePick } = require('../database');
 const { requireAdmin } = require('../auth');
 
 // All admin routes require admin role
@@ -245,6 +245,37 @@ router.delete('/history', async (req, res) => {
     } catch (error) {
         console.error('[ADMIN] Clear history error:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// 🎯 Curated Picks Management
+// ============================================
+router.post('/picks', async (req, res) => {
+    try {
+        const { type, match_data, market, category, confidence } = req.body;
+
+        // Basic Validation
+        if (!['single', 'parlay'].includes(type) || !match_data) {
+            return res.status(400).json({ success: false, error: 'Invalid pick data' });
+        }
+
+        const result = await createPick(type, match_data, market || 'General', category || 'Daily', confidence || 80);
+        res.json(result);
+    } catch (error) {
+        console.error('[ADMIN] Create pick error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+router.delete('/picks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await deletePick(id);
+        res.json(result);
+    } catch (error) {
+        console.error('[ADMIN] Delete pick error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
     }
 });
 

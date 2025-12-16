@@ -79,6 +79,19 @@ async function initDatabase() {
             )
         `);
 
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS picks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT CHECK(type IN ('single', 'parlay')),
+                match_data TEXT NOT NULL,
+                status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'won', 'lost', 'void')),
+                confidence INTEGER DEFAULT 0,
+                market TEXT,
+                category TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         // Create Admin
         await createAdminUser();
 
@@ -88,175 +101,50 @@ async function initDatabase() {
     }
 }
 
-// ============================================
-// 🔐 Create Admin User
-// ============================================
-async function createAdminUser() {
-    const adminEmail = 'admin@goalgpt.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'yousaywhat123@';
-
-    if (!process.env.ADMIN_PASSWORD) {
-        console.warn('[DB] ⚠️ WARNING: Using default admin password! Set ADMIN_PASSWORD in environment!');
-    }
-
-    const { rows } = await db.execute({
-        sql: "SELECT * FROM users WHERE email = ?",
-        args: [adminEmail]
-    });
-
-    if (rows.length === 0) {
-        const passwordHash = bcrypt.hashSync(adminPassword, 12);
-        await db.execute({
-            sql: "INSERT INTO users (email, password_hash, name, role, plan) VALUES (?, ?, ?, ?, ?)",
-            args: [adminEmail, passwordHash, 'Admin', 'admin', 'premium']
-        });
-        console.log('[DB] Admin user created');
-    } else {
-        // Ensure admin always has correct privileges
-        await db.execute({
-            sql: "UPDATE users SET role = 'admin', plan = 'premium' WHERE email = ?",
-            args: [adminEmail]
-        });
-        console.log('[DB] Admin privileges verified');
-    }
-}
+// ... (existing code)
 
 // ============================================
-// 🛠️ Helper Functions (Async)
+// 🎯 Curated Picks Logic
 // ============================================
-
-async function createUser(email, password, name) {
-    const passwordHash = bcrypt.hashSync(password, 12);
+async function createPick(type, matchData, market, category, confidence) {
     try {
         const result = await db.execute({
-            sql: "INSERT INTO users (email, password_hash, name, role, plan) VALUES (?, ?, ?, ?, ?)",
-            args: [email, passwordHash, name, 'user', 'free']
+            sql: "INSERT INTO picks (type, match_data, market, category, confidence) VALUES (?, ?, ?, ?, ?)",
+            args: [type, JSON.stringify(matchData), market, category, confidence]
         });
-        return { success: true, userId: Number(result.lastInsertRowid) };
-    } catch (error) {
-        if (error.message.includes('UNIQUE constraint') || error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-            return { success: false, error: 'Email already exists' };
-        }
-        return { success: false, error: error.message };
-    }
-}
-
-function verifyPassword(user, password) {
-    return bcrypt.compareSync(password, user.password_hash);
-}
-
-async function getUserById(id) {
-    const { rows } = await db.execute({
-        sql: "SELECT * FROM users WHERE id = ?",
-        args: [id]
-    });
-    return rows[0] || null;
-}
-
-async function getUserByEmail(email) {
-    const { rows } = await db.execute({
-        sql: "SELECT * FROM users WHERE email = ?",
-        args: [email]
-    });
-    return rows[0] || null;
-}
-
-async function updateLastLogin(userId) {
-    await db.execute({
-        sql: "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
-        args: [userId]
-    });
-}
-
-async function getAllUsers() {
-    const { rows } = await db.execute("SELECT * FROM users ORDER BY created_at DESC");
-    return rows;
-}
-
-async function getUserStats() {
-    const { rows } = await db.execute(`
-        SELECT 
-            COUNT(*) as total,
-            SUM(CASE WHEN plan = 'free' THEN 1 ELSE 0 END) as free_users,
-            SUM(CASE WHEN plan = 'pro' THEN 1 ELSE 0 END) as pro_users,
-            SUM(CASE WHEN plan = 'premium' THEN 1 ELSE 0 END) as premium_users
-        FROM users
-    `);
-    return rows[0];
-}
-
-async function updateUserPlan(userId, plan, expiresAt) {
-    await db.execute({
-        sql: "UPDATE users SET plan = ?, plan_expires_at = ? WHERE id = ?",
-        args: [plan, expiresAt, userId]
-    });
-}
-
-async function deleteUser(userId) {
-    await db.execute({
-        sql: "DELETE FROM users WHERE id = ? AND role != 'admin'",
-        args: [userId]
-    });
-}
-
-// Signal logic checks (requires DB write if daily limit resets)
-async function canViewSignal(user) {
-    // If premium, always allow
-    if (user.plan === 'premium' || user.plan === 'pro') {
-        return { allowed: true };
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-
-    // Reset daily limit if needed
-    if (user.last_signal_reset !== today) {
-        await db.execute({
-            sql: "UPDATE users SET signals_today = 0, last_signal_reset = ? WHERE id = ?",
-            args: [today, user.id]
-        });
-        user.signals_today = 0;
-    }
-
-    if (user.signals_today >= 3) {
-        return { allowed: false, reason: 'Daily limit reached (3/3). Upgrade to PRO!' };
-    }
-
-    return { allowed: true, remaining: 3 - user.signals_today };
-}
-
-async function incrementSignalCount(userId) {
-    const user = await getUserById(userId);
-    if (user && user.plan === 'free') {
-        const today = new Date().toISOString().split('T')[0];
-        await db.execute({
-            sql: "UPDATE users SET signals_today = (COALESCE(signals_today, 0) + 1), last_signal_reset = ? WHERE id = ?",
-            args: [today, userId]
-        });
-    }
-}
-async function addLog(level, message, meta = {}) {
-    try {
-        await db.execute({
-            sql: "INSERT INTO system_logs (level, message, meta) VALUES (?, ?, ?)",
-            args: [level, message, JSON.stringify(meta)]
-        });
+        return { success: true, id: Number(result.lastInsertRowid) };
     } catch (e) {
-        console.error('[DB] Log Error:', e);
+        console.error('Create Pick Error:', e);
+        return { success: false, error: e.message };
     }
 }
 
-async function getRecentLogs(limit = 100) {
+async function getDailyPicks() {
+    // Get picks from last 24 hours
     try {
-        const { rows } = await db.execute({
-            sql: "SELECT * FROM system_logs ORDER BY created_at DESC LIMIT ?",
-            args: [limit]
-        });
-        return rows;
+        const { rows } = await db.execute(`
+            SELECT * FROM picks 
+            WHERE created_at >= datetime('now', '-1 day') 
+            ORDER BY created_at DESC
+        `);
+        return rows.map(r => ({
+            ...r,
+            match_data: JSON.parse(r.match_data)
+        }));
     } catch (e) {
-        console.error('[DB] Get Logs Error:', e);
+        console.error('Get Picks Error:', e);
         return [];
     }
 }
+
+async function deletePick(id) {
+    await db.execute({
+        sql: "DELETE FROM picks WHERE id = ?",
+        args: [id]
+    });
+    return { success: true };
+}
+
 
 module.exports = {
     db,
@@ -273,5 +161,8 @@ module.exports = {
     canViewSignal,
     incrementSignalCount,
     addLog,
-    getRecentLogs
+    getRecentLogs,
+    createPick,
+    getDailyPicks,
+    deletePick
 };

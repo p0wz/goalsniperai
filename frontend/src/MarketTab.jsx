@@ -13,7 +13,7 @@ const MARKET_CONFIG = {
     firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' }
 };
 
-function MarketTab({ marketKey }) {
+function MarketTab({ marketKey, handleAddToPicks }) {
     const config = MARKET_CONFIG[marketKey];
 
     const [candidates, setCandidates] = useState([]);
@@ -141,7 +141,7 @@ function MarketTab({ marketKey }) {
                                         <tr key={i} className="border-t hover:bg-muted/50">
                                             <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
                                             <td className="p-3 text-muted-foreground">{m.league_name}</td>
-                                            <td className="p-3 text-center">
+                                            <td className="p-3 text-center flex gap-2 justify-center">
                                                 <button
                                                     onClick={() => copyPrompt(m)}
                                                     className={clsx(
@@ -151,7 +151,21 @@ function MarketTab({ marketKey }) {
                                                             : "bg-muted hover:bg-primary hover:text-primary-foreground"
                                                     )}
                                                 >
-                                                    {copiedId === (m.event_key || m.matchId) ? '✓ Kopyalandı' : '📋 Kopyala'}
+                                                    {copiedId === (m.event_key || m.matchId) ? '✓' : '📋'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAddToPicks(m, config.name, 'single')}
+                                                    className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
+                                                    title="Add to Daily Picks"
+                                                >
+                                                    ⭐ Pick
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAddToPicks(m, config.name, 'parlay')}
+                                                    className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
+                                                    title="Add to Daily Parlay"
+                                                >
+                                                    🔥 Parlay
                                                 </button>
                                             </td>
                                         </tr>
