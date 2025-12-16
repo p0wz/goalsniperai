@@ -168,45 +168,77 @@ async function fetchMatchOdds(matchId) {
     }
 }
 
-// Helper: Format Odds for Prompt
+// Helper: Format Odds for Prompt (based on actual Flashscore API structure)
 function formatOddsForPrompt(oddsData) {
-    if (!oddsData || !oddsData.odds) return '';
+    if (!oddsData || !Array.isArray(oddsData) || oddsData.length === 0) return '';
 
-    const odds = oddsData.odds;
-    let oddsText = '\n5. BETTING ODDS:\n';
+    // Use first bookmaker (usually bet365 or best available)
+    const bookmaker = oddsData[0];
+    if (!bookmaker || !bookmaker.odds) return '';
 
-    // 1X2 Odds
-    if (odds['1x2'] || odds.fullTime) {
-        const ft = odds['1x2'] || odds.fullTime;
-        oddsText += `   - 1X2: Home ${ft.home || ft['1'] || 'N/A'} | Draw ${ft.draw || ft['x'] || ft['X'] || 'N/A'} | Away ${ft.away || ft['2'] || 'N/A'}\n`;
+    const oddsArray = bookmaker.odds;
+    let oddsText = `\n5. BETTING ODDS (${bookmaker.name}):\n`;
+    let hasOdds = false;
+
+    // Helper: Find odds by type and scope
+    const findOdds = (type, scope = 'FULL_TIME') =>
+        oddsArray.find(o => o.bettingType === type && o.bettingScope === scope);
+
+    // 1X2 Full Time
+    const hda = findOdds('HOME_DRAW_AWAY');
+    if (hda && hda.odds && hda.odds.length >= 3) {
+        const home = hda.odds.find(o => o.eventParticipantId && o.eventParticipantId !== null)?.value || hda.odds[0]?.value;
+        const away = hda.odds.find((o, i) => i === 1)?.value;
+        const draw = hda.odds.find(o => o.eventParticipantId === null)?.value || hda.odds[2]?.value;
+        oddsText += `   - 1X2: Home ${home || 'N/A'} | Draw ${draw || 'N/A'} | Away ${away || 'N/A'}\n`;
+        hasOdds = true;
     }
 
-    // Over/Under
-    if (odds.overUnder || odds['over/under'] || odds.totals) {
-        const ou = odds.overUnder || odds['over/under'] || odds.totals;
-        if (ou['2.5'] || ou.goals25) {
-            oddsText += `   - O/U 2.5: Over ${ou['2.5']?.over || ou.goals25?.over || 'N/A'} | Under ${ou['2.5']?.under || ou.goals25?.under || 'N/A'}\n`;
+    // Over/Under Full Time
+    const ou = findOdds('OVER_UNDER');
+    if (ou && ou.odds) {
+        // Group by handicap value
+        const overUnder = {};
+        ou.odds.forEach(o => {
+            if (o.handicap && o.handicap.value && o.selection) {
+                const line = o.handicap.value;
+                if (!overUnder[line]) overUnder[line] = {};
+                overUnder[line][o.selection] = o.value;
+            }
+        });
+
+        // Display key lines: 1.5, 2.5, 3.5
+        ['1.5', '2.5', '3.5'].forEach(line => {
+            if (overUnder[line] && (overUnder[line].OVER || overUnder[line].UNDER)) {
+                oddsText += `   - O/U ${line}: Over ${overUnder[line].OVER || 'N/A'} | Under ${overUnder[line].UNDER || 'N/A'}\n`;
+                hasOdds = true;
+            }
+        });
+    }
+
+    // BTTS Full Time
+    const btts = findOdds('BOTH_TEAMS_TO_SCORE');
+    if (btts && btts.odds && btts.odds.length >= 2) {
+        const yesOdd = btts.odds.find(o => o.bothTeamsToScore === true)?.value;
+        const noOdd = btts.odds.find(o => o.bothTeamsToScore === false)?.value;
+        if (yesOdd || noOdd) {
+            oddsText += `   - BTTS: Yes ${yesOdd || 'N/A'} | No ${noOdd || 'N/A'}\n`;
+            hasOdds = true;
         }
-        if (ou['1.5'] || ou.goals15) {
-            oddsText += `   - O/U 1.5: Over ${ou['1.5']?.over || ou.goals15?.over || 'N/A'} | Under ${ou['1.5']?.under || ou.goals15?.under || 'N/A'}\n`;
+    }
+
+    // Double Chance Full Time
+    const dc = findOdds('DOUBLE_CHANCE');
+    if (dc && dc.odds && dc.odds.length >= 3) {
+        // DC order: 1X, 12, X2 (positions vary by bookmaker)
+        const dcOdds = dc.odds.map(o => o.value);
+        if (dcOdds.length >= 3) {
+            oddsText += `   - DC: 1X ${dcOdds[1] || 'N/A'} | 12 ${dcOdds[0] || 'N/A'} | X2 ${dcOdds[2] || 'N/A'}\n`;
+            hasOdds = true;
         }
-        if (ou['3.5'] || ou.goals35) {
-            oddsText += `   - O/U 3.5: Over ${ou['3.5']?.over || ou.goals35?.over || 'N/A'} | Under ${ou['3.5']?.under || ou.goals35?.under || 'N/A'}\n`;
-        }
     }
 
-    // BTTS
-    if (odds.btts || odds.bothTeamsToScore) {
-        const btts = odds.btts || odds.bothTeamsToScore;
-        oddsText += `   - BTTS: Yes ${btts.yes || btts.Yes || 'N/A'} | No ${btts.no || btts.No || 'N/A'}\n`;
-    }
-
-    // Double Chance
-    if (odds.doubleChance) {
-        oddsText += `   - DC: 1X ${odds.doubleChance['1X'] || 'N/A'} | 12 ${odds.doubleChance['12'] || 'N/A'} | X2 ${odds.doubleChance['X2'] || 'N/A'}\n`;
-    }
-
-    return oddsText.length > 30 ? oddsText : ''; // Only return if we have meaningful odds
+    return hasOdds ? oddsText : '';
 }
 
 // Helper: Calculate Stats
