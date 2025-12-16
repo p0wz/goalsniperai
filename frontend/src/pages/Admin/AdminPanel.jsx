@@ -333,7 +333,7 @@ export default function AdminPanel({ user, handleLogout, onSwitchToUser }) {
                 <div className="container mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">G</div>
-                        <h1 className="text-xl font-bold">GoalGPT Pro - ADMIN</h1>
+                        <h1 className="text-xl font-bold">SENTIO Pro - ADMIN</h1>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                         <button

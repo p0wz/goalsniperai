@@ -7,13 +7,13 @@ export default function About({ onBack }) {
             <div className="max-w-4xl mx-auto space-y-12">
 
                 <div className="text-center space-y-4">
-                    <h1 className="text-4xl font-extrabold">About GoalGPT</h1>
+                    <h1 className="text-4xl font-extrabold">About SENTIO</h1>
                     <p className="text-xl text-text-muted">Democratizing sports intelligence through AI.</p>
                 </div>
 
                 <NeuCard className="space-y-6 text-lg leading-relaxed text-text-muted">
                     <p>
-                        <strong className="text-text-main">GoalGPT Pro</strong> was born from a simple frustration: Bookmakers have all the data, and bettors have... gut feelings.
+                        <strong className="text-text-main">SENTIO Pro</strong> was born from a simple frustration: Bookmakers have all the data, and bettors have... gut feelings.
                     </p>
                     <p>
                         We set out to level the playing field. By ingesting real-time data from thousands of matches and training deep learning models on historical outcomes, we created a system that identifies

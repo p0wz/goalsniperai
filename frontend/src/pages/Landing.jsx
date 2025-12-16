@@ -40,7 +40,7 @@ export default function Landing({ onLoginClick, onNavigate }) {
                             <Bot size={24} />
                         </div>
                         <span className="text-2xl font-extrabold tracking-tight">
-                            GoalGPT <span className="text-accent">Pro</span>
+                            SENTIO <span className="text-accent">Pro</span>
                         </span>
                     </div>
 
@@ -314,10 +314,10 @@ export default function Landing({ onLoginClick, onNavigate }) {
                 <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-text-main text-base flex items-center justify-center font-bold">G</div>
-                        <span className="font-bold">GoalGPT Pro</span>
+                        <span className="font-bold">SENTIO Pro</span>
                     </div>
                     <div className="text-sm text-text-muted">
-                        © 2024 GoalGPT Pro. All rights reserved.
+                        © 2024 SENTIO Pro. All rights reserved.
                     </div>
                     <div className="flex gap-6 text-sm font-bold text-text-muted">
                         <a href="#" className="hover:text-accent">Terms</a>

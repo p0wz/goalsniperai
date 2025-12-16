@@ -69,7 +69,7 @@ function App() {
   const ProNav = () => (
     <nav className="sticky top-0 z-50 bg-base/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between shadow-neu-extruded">
       <div className="text-2xl font-extrabold text-text-main cursor-pointer" onClick={() => setView('dashboard')}>
-        GoalGPT <span className="text-accent">Pro</span>
+        SENTIO <span className="text-accent">Pro</span>
       </div>
       <div className="flex items-center gap-4">
         {user?.role === 'admin' && (
