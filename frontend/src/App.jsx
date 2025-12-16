@@ -5,13 +5,17 @@ import Landing from './pages/Landing';
 import LoginView from './pages/Auth/LoginView';
 import ProDashboard from './pages/Dashboard/ProDashboard';
 import Profile from './pages/Profile';
+import Pricing from './pages/Pricing';
+import Checkout from './pages/Checkout';
+import About from './pages/About';
 import NeuButton from './components/ui/NeuButton';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('landing'); // landing, login, dashboard, profile
+  const [view, setView] = useState('landing'); // landing, login, dashboard, profile, pricing, checkout, about
   const [error, setError] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null); // For checkout
 
   useEffect(() => {
     checkAuth();
@@ -54,6 +58,11 @@ function App() {
     await authService.logout();
     setUser(null);
     setView('landing');
+  };
+
+  const handleChoosePlan = (plan) => {
+    setSelectedPlan(plan);
+    setView('checkout');
   };
 
   // Nav Bar for Pro Users
@@ -103,14 +112,36 @@ function App() {
   // 2. Public/Pro Views (Neumorphic)
   return (
     <div className="min-h-screen bg-base text-text-main font-body selection:bg-accent selection:text-white">
-      {user && <ProNav />}
+      {user && view !== 'landing' && <ProNav />}
 
       {view === 'landing' && !user && (
-        <Landing onLoginClick={() => setView('login')} />
+        <Landing
+          onLoginClick={() => setView('login')}
+          onNavigate={(page) => setView(page)}
+        />
       )}
 
       {view === 'login' && !user && (
         <LoginView onLogin={handleLogin} error={error} />
+      )}
+
+      {view === 'pricing' && (
+        <Pricing onChoosePlan={handleChoosePlan} />
+      )}
+
+      {view === 'checkout' && (
+        <Checkout
+          plan={selectedPlan}
+          onBack={() => setView('pricing')}
+          onComplete={() => {
+            alert('Success! Welcome to Pro.');
+            setView('login');
+          }}
+        />
+      )}
+
+      {view === 'about' && (
+        <About onBack={() => setView('landing')} />
       )}
 
       {view === 'dashboard' && user && (

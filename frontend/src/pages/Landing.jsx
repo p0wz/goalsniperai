@@ -15,18 +15,12 @@ import {
 import NeuCard from '../components/ui/NeuCard';
 import NeuButton from '../components/ui/NeuButton';
 
-export default function Landing({ onLoginClick }) {
+export default function Landing({ onLoginClick, onNavigate }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [activeFaq, setActiveFaq] = useState(null);
 
     const toggleFaq = (index) => {
         setActiveFaq(activeFaq === index ? null : index);
-    };
-
-    const scrollToSection = (id) => {
-        const el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-        setIsMenuOpen(false);
     };
 
     return (
@@ -41,7 +35,7 @@ export default function Landing({ onLoginClick }) {
             {/* NAVBAR */}
             <nav className="fixed top-0 w-full z-50 bg-base/90 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
                         <div className="w-10 h-10 rounded-xl bg-accent text-white flex items-center justify-center shadow-neu-extruded">
                             <Bot size={24} />
                         </div>
@@ -52,9 +46,8 @@ export default function Landing({ onLoginClick }) {
 
                     {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-8">
-                        <button onClick={() => scrollToSection('features')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Features</button>
-                        <button onClick={() => scrollToSection('how-it-works')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">How it Works</button>
-                        <button onClick={() => scrollToSection('pricing')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Pricing</button>
+                        <button onClick={() => onNavigate('about')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">About</button>
+                        <button onClick={() => onNavigate('pricing')} className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Pricing</button>
                         <NeuButton onClick={onLoginClick} variant="primary" className="px-6 py-2.5 rounded-xl">
                             Launch App
                         </NeuButton>
