@@ -111,6 +111,13 @@ async function createAdminUser() {
             args: [adminEmail, passwordHash, 'Admin', 'admin', 'premium']
         });
         console.log('[DB] Admin user created');
+    } else {
+        // Ensure admin always has correct privileges
+        await db.execute({
+            sql: "UPDATE users SET role = 'admin', plan = 'premium' WHERE email = ?",
+            args: [adminEmail]
+        });
+        console.log('[DB] Admin privileges verified');
     }
 }
 
