@@ -556,90 +556,78 @@ function App() {
           <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
             <div className="text-center mb-6">
               <h2 className="text-3xl font-bold mb-2">🎯 Analiz Merkezi</h2>
-              <p className="text-muted-foreground">Tüm marketler için toplu veya tekli analiz</p>
+              <p className="text-muted-foreground">Tüm marketler için toplu analiz</p>
             </div>
 
-            {/* BULK ANALYSIS BUTTON */}
-            <div className="flex justify-center gap-4 mb-8">
+            {/* BULK ANALYSIS BUTTONS */}
+            <div className="flex justify-center gap-4 mb-8 flex-wrap">
               <button
                 onClick={() => handleRunDaily(true)}
                 disabled={isAnalysing}
-                className="px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+                className="px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
               >
-                {isAnalysing ? '⏳ Tüm Marketler Taranıyor...' : '🚀 TÜM MARKETLERİ ANALİZ ET'}
+                {isAnalysing ? '⏳ Taranıyor...' : '🏆 LİG FİLTRELİ ANALİZ'}
+              </button>
+              <button
+                onClick={() => handleRunDaily(false)}
+                disabled={isAnalysing}
+                className="px-6 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+              >
+                {isAnalysing ? '⏳ Taranıyor...' : '🌍 TÜM MAÇLAR (Filtresiz)'}
               </button>
             </div>
 
-            {/* BULK RESULTS */}
-            {dailyAnalysis && !isAnalysing && (
-              <div className="space-y-6 mb-8">
-                <h3 className="text-xl font-bold text-center">📊 Toplu Analiz Sonuçları</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.entries(MARKET_CONFIG).map(([key, config]) => {
-                    const items = dailyAnalysis[key] || [];
-                    return (
-                      <div key={key} className="rounded-xl border bg-card p-4 shadow-sm">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-bold flex items-center gap-2">
-                            {config.icon} {config.name}
-                          </h4>
-                          <span className={clsx(
-                            "px-2 py-1 rounded text-xs font-bold",
-                            items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
-                          )}>
-                            {items.length} Maç
-                          </span>
-                        </div>
-                        {items.length > 0 ? (
-                          <ul className="space-y-1 text-sm">
-                            {items.slice(0, 3).map((m, i) => (
-                              <li key={i} className="truncate text-muted-foreground">
-                                • {m.event_home_team} vs {m.event_away_team}
-                              </li>
-                            ))}
-                            {items.length > 3 && (
-                              <li className="text-primary cursor-pointer hover:underline" onClick={() => setActiveTab(key)}>
-                                +{items.length - 3} daha...
-                              </li>
-                            )}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Uygun maç bulunamadı</p>
-                        )}
-                        <button
-                          onClick={() => setActiveTab(key)}
-                          className="w-full mt-3 py-2 text-xs rounded bg-muted hover:bg-primary hover:text-primary-foreground transition-colors"
-                        >
-                          Detaylar →
-                        </button>
+            {/* MARKET CARDS - Always Visible */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-center">📊 Market Sonuçları</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {Object.entries(MARKET_CONFIG).map(([key, config]) => {
+                  const items = dailyAnalysis?.[key] || [];
+                  return (
+                    <div key={key} className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-bold flex items-center gap-2">
+                          {config.icon} {config.name}
+                        </h4>
+                        <span className={clsx(
+                          "px-2 py-1 rounded text-xs font-bold",
+                          items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
+                        )}>
+                          {items.length} Maç
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* INDIVIDUAL MARKET CARDS */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-semibold mb-4 text-center">📁 Tekli Market Analizi</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                {Object.entries(MARKET_CONFIG).map(([key, config]) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveTab(key)}
-                    className="p-4 rounded-lg border bg-card hover:bg-muted hover:shadow-md transition-all text-center"
-                  >
-                    <div className="text-2xl mb-1">{config.icon}</div>
-                    <div className="text-xs font-medium">{config.name}</div>
-                  </button>
-                ))}
+                      {items.length > 0 ? (
+                        <ul className="space-y-1 text-sm">
+                          {items.slice(0, 3).map((m, i) => (
+                            <li key={i} className="truncate text-muted-foreground">
+                              • {m.event_home_team} vs {m.event_away_team}
+                            </li>
+                          ))}
+                          {items.length > 3 && (
+                            <li className="text-primary cursor-pointer hover:underline" onClick={() => setActiveTab(key)}>
+                              +{items.length - 3} daha...
+                            </li>
+                          )}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">Analiz bekleniyor...</p>
+                      )}
+                      <button
+                        onClick={() => setActiveTab(key)}
+                        className="w-full mt-3 py-2 text-xs rounded bg-muted hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        Detaylar →
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             <div className="mt-6 p-4 rounded-lg bg-muted/50 border text-center">
               <p className="text-sm text-muted-foreground">
-                💡 <strong>Toplu Analiz:</strong> Tek tıkla tüm marketler için maçları tarar (1 H2H çağrısı/maç).
-                <strong>Tekli Analiz:</strong> Belirli bir markete odaklanmak için kart seçin.
+                💡 <strong>Lig Filtreli:</strong> Sadece seçili liglerdeki maçları tarar.
+                <strong>Tüm Maçlar:</strong> Lig filtresi olmadan tüm maçları tarar.
               </p>
             </div>
           </div>
