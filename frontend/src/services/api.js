@@ -139,6 +139,22 @@ export const adminService = {
     stopBot: async () => {
         const response = await api.post('/admin/bot/stop');
         return response.data;
+    },
+    // Picks
+    createPick: async (data) => {
+        const response = await api.post('/admin/picks', data);
+        return response.data;
+    },
+    deletePick: async (id) => {
+        const response = await api.delete(`/admin/picks/${id}`);
+        return response.data;
+    }
+};
+
+export const picksService = {
+    getDailyPicks: async () => {
+        const response = await api.get('/picks/daily');
+        return response.data;
     }
 };
 
