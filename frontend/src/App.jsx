@@ -554,38 +554,92 @@ function App() {
         {/* Tab Content: ANALYSIS HUB */}
         {activeTab === 'analiz' && (
           <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <h2 className="text-3xl font-bold mb-2">🎯 Analiz Merkezi</h2>
-              <p className="text-muted-foreground">Tüm marketler için hızlı analiz başlatma</p>
+              <p className="text-muted-foreground">Tüm marketler için toplu veya tekli analiz</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {Object.entries(MARKET_CONFIG).map(([key, config]) => (
-                <div
-                  key={key}
-                  className="group relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => setActiveTab(key)}
-                >
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full" />
-                  <div className="text-4xl mb-3">{config.icon}</div>
-                  <h3 className="text-lg font-bold mb-1">{config.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{config.desc}</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setActiveTab(key); }}
-                      className="flex-1 py-2 text-xs rounded bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors font-medium"
-                    >
-                      Analiz Et →
-                    </button>
-                  </div>
+            {/* BULK ANALYSIS BUTTON */}
+            <div className="flex justify-center gap-4 mb-8">
+              <button
+                onClick={() => handleRunDaily(true)}
+                disabled={isAnalysing}
+                className="px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+              >
+                {isAnalysing ? '⏳ Tüm Marketler Taranıyor...' : '🚀 TÜM MARKETLERİ ANALİZ ET'}
+              </button>
+            </div>
+
+            {/* BULK RESULTS */}
+            {dailyAnalysis && !isAnalysing && (
+              <div className="space-y-6 mb-8">
+                <h3 className="text-xl font-bold text-center">📊 Toplu Analiz Sonuçları</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(MARKET_CONFIG).map(([key, config]) => {
+                    const items = dailyAnalysis[key] || [];
+                    return (
+                      <div key={key} className="rounded-xl border bg-card p-4 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-bold flex items-center gap-2">
+                            {config.icon} {config.name}
+                          </h4>
+                          <span className={clsx(
+                            "px-2 py-1 rounded text-xs font-bold",
+                            items.length > 0 ? "bg-green-600/20 text-green-500" : "bg-muted text-muted-foreground"
+                          )}>
+                            {items.length} Maç
+                          </span>
+                        </div>
+                        {items.length > 0 ? (
+                          <ul className="space-y-1 text-sm">
+                            {items.slice(0, 3).map((m, i) => (
+                              <li key={i} className="truncate text-muted-foreground">
+                                • {m.event_home_team} vs {m.event_away_team}
+                              </li>
+                            ))}
+                            {items.length > 3 && (
+                              <li className="text-primary cursor-pointer hover:underline" onClick={() => setActiveTab(key)}>
+                                +{items.length - 3} daha...
+                              </li>
+                            )}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Uygun maç bulunamadı</p>
+                        )}
+                        <button
+                          onClick={() => setActiveTab(key)}
+                          className="w-full mt-3 py-2 text-xs rounded bg-muted hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                          Detaylar →
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* INDIVIDUAL MARKET CARDS */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4 text-center">📁 Tekli Market Analizi</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {Object.entries(MARKET_CONFIG).map(([key, config]) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className="p-4 rounded-lg border bg-card hover:bg-muted hover:shadow-md transition-all text-center"
+                  >
+                    <div className="text-2xl mb-1">{config.icon}</div>
+                    <div className="text-xs font-medium">{config.name}</div>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-8 p-4 rounded-lg bg-muted/50 border text-center">
+            <div className="mt-6 p-4 rounded-lg bg-muted/50 border text-center">
               <p className="text-sm text-muted-foreground">
-                💡 İpucu: Her markete tıklayarak detaylı analiz sayfasına gidebilir,
-                "Lig Filtreli" veya "Tüm Maçlar" seçeneklerini kullanabilirsiniz.
+                💡 <strong>Toplu Analiz:</strong> Tek tıkla tüm marketler için maçları tarar (1 H2H çağrısı/maç).
+                <strong>Tekli Analiz:</strong> Belirli bir markete odaklanmak için kart seçin.
               </p>
             </div>
           </div>
