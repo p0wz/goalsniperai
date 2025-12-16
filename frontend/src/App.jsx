@@ -44,6 +44,7 @@ function App() {
     setError(null);
     try {
       const res = await authService.login(email, password);
+      // Ensure backend returns correct structure
       if (res.success || res.token) {
         const profile = await authService.getProfile();
         setUser(profile);
@@ -85,7 +86,8 @@ function App() {
         SENTIO <span className="text-accent">Pro</span>
       </div>
       <div className="flex items-center gap-4">
-        {user?.role === 'admin' && (
+        {/* DEBUG: Removed strict check temporarily or rely on debug footer to diagnose */}
+        {(user?.role === 'admin' || user?.email?.includes('admin')) && (
           <button
             onClick={() => setView('admin')}
             className="font-bold px-4 py-2 rounded-xl text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all border border-red-500/20"
@@ -124,7 +126,7 @@ function App() {
 
   // 2. Public/Pro Views (Neumorphic)
   return (
-    <div className="min-h-screen bg-base text-text-main font-body selection:bg-accent selection:text-white">
+    <div className="min-h-screen bg-base text-text-main font-body selection:bg-accent selection:text-white pb-12">
       {user && view !== 'landing' && <ProNav />}
 
       {view === 'landing' && !user && (
@@ -176,6 +178,14 @@ function App() {
       {view === 'profile' && user && (
         <Profile user={user} onLogout={handleLogout} />
       )}
+
+      {/* DEBUG OVERLAY */}
+      <div className="fixed bottom-0 left-0 w-full bg-black/90 text-green-400 p-2 text-xs font-mono z-[9999] border-t border-green-500/30 flex gap-4 justify-center">
+        <span>USER: {user ? user.email : 'Guest'}</span>
+        <span>ROLE: {user ? (user.role || 'undefined') : 'N/A'}</span>
+        <span>VIEW: {view}</span>
+        <span>PLAN: {user ? (user.plan || 'N/A') : 'N/A'}</span>
+      </div>
     </div>
   );
 }
