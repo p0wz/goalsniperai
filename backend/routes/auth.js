@@ -8,6 +8,9 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const { createUser, verifyPassword, getUserByEmail, updateLastLogin, getUserById } = require('../database');
 const { generateToken, requireAuth } = require('../auth');
+const passport = require('passport');
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Rate limiting for auth endpoints (prevent brute force)
 const authLimiter = rateLimit({
@@ -203,5 +206,53 @@ router.post('/refresh', requireAuth, (req, res) => {
 
     res.json({ success: true, token });
 });
+
+// ============================================
+// 🌐 Google Auth Routes
+// ============================================
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get('/google/callback',
+    passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/login?error=google_failed` }),
+    (req, res) => {
+        // Successful authentication
+        const token = generateToken(req.user);
+
+        // Set cookie
+        const isProduction = process.env.NODE_ENV === 'production';
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
+        res.redirect(`${FRONTEND_URL}/dashboard`);
+    }
+);
+
+// ============================================
+// 🐦 Twitter Auth Routes
+// ============================================
+router.get('/twitter', passport.authenticate('twitter'));
+
+router.get('/twitter/callback',
+    passport.authenticate('twitter', { failureRedirect: `${FRONTEND_URL}/login?error=twitter_failed` }),
+    (req, res) => {
+        // Successful authentication
+        const token = generateToken(req.user);
+
+        // Set cookie
+        const isProduction = process.env.NODE_ENV === 'production';
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
+        res.redirect(`${FRONTEND_URL}/dashboard`);
+    }
+);
 
 module.exports = router;

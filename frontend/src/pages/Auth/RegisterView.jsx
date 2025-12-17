@@ -32,6 +32,29 @@ export default function RegisterView({ onRegister, error }) {
                     </div>
                 )}
 
+                <div className="flex gap-4 mb-6">
+                    <button
+                        onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/google`}
+                        className="flex-1 py-3 px-4 rounded-xl bg-base shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center justify-center gap-2 font-bold text-text-main"
+                        type="button"
+                    >
+                        <span className="text-red-500">G</span> Google
+                    </button>
+                    <button
+                        onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/twitter`}
+                        className="flex-1 py-3 px-4 rounded-xl bg-base shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center justify-center gap-2 font-bold text-text-main"
+                        type="button"
+                    >
+                        <span className="text-black dark:text-white">𝕏</span> Twitter
+                    </button>
+                </div>
+
+                <div className="relative flex items-center mb-6">
+                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                    <span className="flex-shrink-0 mx-4 text-sm text-text-muted">Or join with email</span>
+                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <NeuInput
                         label="Full Name"

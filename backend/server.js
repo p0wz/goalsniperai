@@ -12,6 +12,8 @@ const helmet = require('helmet');
 const xss = require('xss-clean');
 const hpp = require('hpp');
 const morgan = require('morgan');
+const session = require('express-session');
+const passport = require('./config/passport'); // Import passport config
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
@@ -83,6 +85,21 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '10kb' })); // Limit body size
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
+
+// Session for Passport (Required for OAuth state)
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'dev_session_secret_change_me',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 1000 * 60 * 60 // 1 hour
+    }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Security: XSS protection
 app.use(xss());
