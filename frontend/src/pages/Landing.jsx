@@ -75,7 +75,7 @@ export default function Landing() {
 
                         <div className="pt-8 flex items-center justify-center lg:justify-start gap-8 text-sm font-bold text-text-muted opacity-80">
                             <div className="flex items-center gap-2">
-                                <Users size={18} /> 5,000+ Active Snipers
+                                <Users size={18} /> 5,000+ Active Members
                             </div>
                             <div className="flex items-center gap-2">
                                 <Trophy size={18} /> 78% Win Rate (Hist.)
@@ -142,7 +142,7 @@ export default function Landing() {
             <section className="max-w-7xl mx-auto px-6">
                 <div className="text-center mb-16 space-y-4">
                     <h2 className="text-4xl font-extrabold text-text-main">Why Professionals Choose Us</h2>
-                    <p className="text-text-muted text-lg">The only platform that combines AI precision with bankroll management.</p>
+                    <p className="text-text-muted text-lg">The only platform that combines AI precision with real-time market analysis.</p>
                 </div>
 
                 <div className="grid md:grid-cols-3 md:grid-rows-2 gap-8 h-[800px] md:h-[600px]">
@@ -201,9 +201,9 @@ export default function Landing() {
                         <div className="w-12 h-12 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center mb-4">
                             <Shield size={24} />
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Bankroll Guard</h3>
+                        <h3 className="text-xl font-bold mb-2">Deep Learning</h3>
                         <p className="text-text-muted text-sm">
-                            Smart staking plans. We tell you exactly how much to bet (1-5 units) based on confidence.
+                            Our models learn from every match outcome, constantly refining their accuracy for future predictions.
                         </p>
                     </NeuCard>
 
@@ -225,7 +225,7 @@ export default function Landing() {
                 <div className="absolute top-0 right-0 w-1/2 h-full bg-accent/10 blur-[100px]" />
                 <div className="max-w-4xl mx-auto px-6 text-center relative z-10 space-y-8">
                     <h2 className="text-4xl md:text-5xl font-black">Ready to Level Up?</h2>
-                    <p className="text-xl text-gray-300">Join thousands of smart bettors who have stopped guessing and started snipping.</p>
+                    <p className="text-xl text-gray-300">Join thousands of smart bettors who have stopped guessing and started winning.</p>
                     <button
                         onClick={() => navigate('/login')}
                         className="px-10 py-5 bg-accent hover:bg-accent-hover text-white rounded-2xl font-bold text-xl shadow-lg hover:shadow-accent/50 transition-all transform hover:-translate-y-1"

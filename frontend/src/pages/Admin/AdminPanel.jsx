@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { signalService, betService, adminService } from '../../services/api';
+import { signalService, betService, adminService, picksService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import clsx from 'clsx';
 import NeuButton from '../../components/ui/NeuButton';
@@ -373,7 +373,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'analiz', 'history', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -387,6 +387,7 @@ export default function AdminPanel({ user, handleLogout }) {
                             {tab === 'live' && '📡 Live'}
                             {tab === 'analiz' && '🎯 Analiz'}
                             {tab === 'history' && '📜 Geçmiş'}
+                            {tab === 'picks' && '⭐ Yönetin'}
                             {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
                         </button>
                     ))}

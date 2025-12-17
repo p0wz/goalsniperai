@@ -36,11 +36,11 @@ export default function Navbar({ user }) {
                     to={user ? '/dashboard' : '/'}
                     className="flex items-center gap-3 cursor-pointer group"
                 >
-                    <div className="w-10 h-10 rounded-xl bg-base shadow-neu-extruded flex items-center justify-center text-accent group-hover:scale-105 transition-transform">
-                        <Bot size={24} strokeWidth={2.5} />
+                    <div className="w-10 h-10 rounded-xl bg-base shadow-neu-extruded flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
+                        <img src="/sentio-logo.jpg" alt="SENTIO" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-2xl font-black tracking-tight text-text-main">
-                        GOAL<span className="text-accent">SNIPER</span>
+                        SENTIO
                     </span>
                 </Link>
 
@@ -109,7 +109,7 @@ export default function Navbar({ user }) {
                 <div className="fixed inset-0 z-50 bg-base flex flex-col p-6 animate-in slide-in-from-right-full duration-300">
                     <div className="flex justify-between items-center mb-12">
                         <span className="text-2xl font-black tracking-tight">
-                            GOAL<span className="text-accent">SNIPER</span>
+                            SENTIO
                         </span>
                         <button onClick={() => setMobileMenuOpen(false)} className="p-2 bg-base shadow-neu-extruded rounded-full text-danger">
                             <X size={24} />

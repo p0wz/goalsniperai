@@ -9,11 +9,11 @@ export default function Footer() {
                     {/* Brand */}
                     <div className="col-span-1 md:col-span-2 space-y-6">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-accent text-white flex items-center justify-center shadow-neu-extruded">
-                                <Bot size={24} />
+                            <div className="w-10 h-10 rounded-xl bg-base shadow-neu-extruded flex items-center justify-center overflow-hidden">
+                                <img src="/sentio-logo.jpg" alt="SENTIO" className="w-full h-full object-cover" />
                             </div>
                             <span className="text-2xl font-black tracking-tight text-text-main">
-                                GOAL<span className="text-accent">SNIPER</span>
+                                SENTIO
                             </span>
                         </div>
                         <p className="text-text-muted leading-relaxed max-w-sm">
@@ -56,7 +56,7 @@ export default function Footer() {
                 </div>
 
                 <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-text-muted font-medium">
-                    <div>© 2024 GoalSniper AI. All rights reserved.</div>
+                    <div>© 2024 SENTIO. All rights reserved.</div>
                     <div className="flex gap-8">
                         <span>Made with 🧠 + 💻</span>
                         <span>v3.2.0</span>

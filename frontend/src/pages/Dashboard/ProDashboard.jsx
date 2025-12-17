@@ -44,35 +44,15 @@ export default function ProDashboard({ user }) {
         <div className="max-w-7xl mx-auto px-6 space-y-8 animate-in fade-in duration-500">
 
             {/* 1. HEADER & QUICK STATS */}
+            {/* 1. HEADER */}
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-text-main flex items-center gap-3">
                         Command Center
-                        <span className="flex h-3 w-3 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                        </span>
                     </h1>
                     <p className="text-text-muted font-medium">
-                        Good evening, {user.name.split(' ')[0]}. Converting data to profit.
+                        Welcome back, {user.name.split(' ')[0]}.
                     </p>
-                </div>
-
-                <div className="flex gap-4">
-                    <NeuCard className="px-6 py-3 flex items-center gap-4" padding="p-0">
-                        <div className="text-right">
-                            <div className="text-xs font-bold text-text-muted uppercase">Scanner</div>
-                            <div className="text-green-500 font-bold text-sm">ONLINE</div>
-                        </div>
-                        <Activity className="text-accent" size={24} />
-                    </NeuCard>
-                    <NeuCard className="px-6 py-3 flex items-center gap-4" padding="p-0">
-                        <div className="text-right">
-                            <div className="text-xs font-bold text-text-muted uppercase">Win Rate</div>
-                            <div className="text-text-main font-bold text-sm">78%</div>
-                        </div>
-                        <TrendingUp className="text-green-500" size={24} />
-                    </NeuCard>
                 </div>
             </header>
 
@@ -165,29 +145,7 @@ export default function ProDashboard({ user }) {
                         </div>
                     )}
 
-                    {/* BANKROLL GUARD */}
-                    <NeuCard>
-                        <div className="flex items-center gap-2 mb-6 text-accent">
-                            <Shield size={24} />
-                            <h3 className="font-black text-lg">BANKROLL GUARD</h3>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-text-muted">Recommended Unit</span>
-                                <span className="font-bold">$25.00</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-text-muted">Daily Stop Loss</span>
-                                <span className="font-bold text-red-500">-$100.00</span>
-                            </div>
-                            <div className="h-2 bg-base shadow-neu-inset rounded-full overflow-hidden mt-2">
-                                <div className="h-full bg-green-500 w-[80%]" />
-                            </div>
-                            <div className="text-center text-xs text-text-muted mt-2">
-                                You are well within safe limits.
-                            </div>
-                        </div>
-                    </NeuCard>
+
 
                     {/* SINGLE PICKS */}
                     <div>
