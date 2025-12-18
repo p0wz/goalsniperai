@@ -327,7 +327,10 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         under35: [],
         under25: [],
         btts: [],
-        firstHalfOver05: []
+        firstHalfOver05: [],
+        ms1AndOver15: [],
+        awayOver05: [],
+        handicap: []
     };
 
     let processed = 0;
@@ -475,6 +478,30 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             passedFilters.push('1H Over 0.5');
         }
 
+        // Logic H: MS1 & 1.5 Üst (NEW)
+        // Home Win >= 50% AND Home Over 1.5 >= 70%
+        if (homeHomeStats.winRate >= 50 && homeHomeStats.avgScored >= 1.5 && homeForm.over15Rate >= 70) {
+            candidates.ms1AndOver15.push({ ...m, filterStats: stats, market: 'MS1 & 1.5 Üst' });
+            passedFilters.push('MS1 & 1.5+');
+        }
+
+        // Logic I: Dep 0.5 Üst (NEW)
+        // Away Scoring Rate >= 70% AND Home Clean Sheet Rate <= 30%
+        const homeConcedeRate = 100 - (homeHomeStats.cleanSheetRate || (100 - (homeHomeStats.lossCount + homeHomeStats.draws) * 10)); // Approximate check if simple stats
+        // Actually cleaner: homeHomeStats.scoringRate is offense. Defense check:
+        // Let's use avgConceded.
+        if (awayAwayStats.scoringRate >= 70 && awayAwayStats.avgScored >= 0.8 && homeHomeStats.avgConceded >= 0.8) {
+            candidates.awayOver05.push({ ...m, filterStats: stats, market: 'Dep 0.5 Üst' });
+            passedFilters.push('Away 0.5+');
+        }
+
+        // Logic J: Handikaplı Maç Sonucu (-1) (NEW)
+        // Strong Home: WinRate >= 60%, Avg Scored > Conceded + 1.2
+        if (homeHomeStats.winRate >= 60 && (homeHomeStats.avgScored - homeHomeStats.avgConceded) >= 1.2) {
+            candidates.handicap.push({ ...m, filterStats: stats, market: 'Handikaplı MS1' });
+            passedFilters.push('Handicap MS1');
+        }
+
         if (passedFilters.length > 0) {
             log.info(`   ✅ PASSED: ${passedFilters.join(', ')}`);
         } else {
@@ -495,6 +522,9 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
     log.info(`   • Under 2.5 candidates: ${candidates.under25.length}`);
     log.info(`   • 1H Over 0.5 candidates: ${candidates.firstHalfOver05.length}`);
+    log.info(`   • MS1 & 1.5+ candidates: ${candidates.ms1AndOver15.length}`);
+    log.info(`   • Away 0.5+ candidates: ${candidates.awayOver05.length}`);
+    log.info(`   • Handicap candidates: ${candidates.handicap.length}`);
     log.info(`═══════════════════════════════════════════════════════`);
 
     return candidates;
@@ -590,7 +620,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, league
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [] };
+        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: [] };
     }
 
     log.info(`✅ Found ${matches.length} upcoming fixtures. Processing top ${customLimit}...`);
@@ -607,7 +637,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, league
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: []
+        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: []
     };
 
     // Helper: Generate Detailed Analysis Text
@@ -880,7 +910,10 @@ const MARKET_MAP = {
     'homeOver15': { name: 'Home Team Over 1.5', key: 'homeOver15' },
     'under35': { name: 'Under 3.5 Goals', key: 'under35' },
     'under25': { name: 'Under 2.5 Goals', key: 'under25' },
-    'firstHalfOver05': { name: 'First Half Over 0.5', key: 'firstHalfOver05' }
+    'firstHalfOver05': { name: 'First Half Over 0.5', key: 'firstHalfOver05' },
+    'ms1AndOver15': { name: 'MS1 & 1.5 Üst', key: 'ms1AndOver15' },
+    'awayOver05': { name: 'Dep 0.5 Üst', key: 'awayOver05' },
+    'handicap': { name: 'Hnd. MS1', key: 'handicap' }
 };
 
 async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = console, customLimit = MATCH_LIMIT) {
@@ -993,6 +1026,18 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
                 passes = fhAnalysis.signal;
                 matchData.fhStats = fhAnalysis;
                 matchData.market = 'First Half Over 0.5';
+                break;
+            case 'ms1AndOver15':
+                passes = homeHomeStats.winRate >= 50 && homeHomeStats.avgScored >= 1.5 && homeForm.over15Rate >= 70;
+                matchData.market = 'MS1 & 1.5 Üst';
+                break;
+            case 'awayOver05':
+                passes = awayAwayStats.scoringRate >= 70 && awayAwayStats.avgScored >= 0.8 && homeHomeStats.avgConceded >= 0.8;
+                matchData.market = 'Dep 0.5 Üst';
+                break;
+            case 'handicap':
+                passes = homeHomeStats.winRate >= 60 && (homeHomeStats.avgScored - homeHomeStats.avgConceded) >= 1.2;
+                matchData.market = 'Handikaplı MS1';
                 break;
         }
 

@@ -2147,7 +2147,7 @@ app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.flushHeaders();
 
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 150;
 
     // Custom logger that streams to client
     const streamLog = {

@@ -10,7 +10,10 @@ const MARKET_CONFIG = {
     homeOver15: { name: 'Ev 1.5+', icon: '🏠', desc: 'Ev sahibi 2+ gol' },
     under35: { name: 'Alt 3.5', icon: '🔒', desc: 'Maç sonu maks 3 gol' },
     under25: { name: 'Alt 2.5', icon: '🧊', desc: 'Maç sonu maks 2 gol' },
-    firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' }
+    firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' },
+    ms1AndOver15: { name: 'MS1 & 1.5 Üst', icon: '1️⃣', desc: 'Ev Kazanır ve 1.5 Üst' },
+    awayOver05: { name: 'Dep 0.5 Üst', icon: '🚀', desc: 'Deplasman gol atar' },
+    handicap: { name: 'Hnd. MS1', icon: '💪', desc: 'Ev sahibi farklı kazanır' }
 };
 
 function MarketTab({ marketKey, handleAddToPicks }) {
