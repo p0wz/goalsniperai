@@ -2006,7 +2006,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
     const { force, limit, leagueFilter } = req.query;
     const forceUpdate = force === 'true';
-    const customLimit = limit ? parseInt(limit) : 250;
+    const customLimit = limit ? parseInt(limit) : 500;
     const useLeagueFilter = leagueFilter !== 'false'; // Default true
 
     // Helper to filter results based on role & approval
@@ -2147,7 +2147,7 @@ app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.flushHeaders();
 
-    const limit = parseInt(req.query.limit) || 250;
+    const limit = parseInt(req.query.limit) || 500;
 
     // Custom logger that streams to client
     const streamLog = {
