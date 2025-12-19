@@ -314,6 +314,7 @@ function calculateAdvancedStats(history, teamName) {
         scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
         winRate: (wins / totalMatches) * 100,
         lossCount: losses,
+        cleanSheetRate: (cleanSheetCount / totalMatches) * 100,
         htGoalRate: (htGoalCount / totalMatches) * 100  // First Half goal rate
     };
 }
@@ -445,8 +446,10 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
 
         // Logic E: Home Over 1.5 (IMPROVED)
         // Ev avgScored ≥1.6, Dep avgConceded ≥1.4, Ev scoringRate ≥80%, Ev over15Rate ≥60%
-        if (homeHomeStats.avgScored >= 1.6 && awayAwayStats.avgConceded >= 1.4 &&
-            homeHomeStats.scoringRate >= 80 && homeForm.over15Rate >= 60) {
+        // Logic E: Home Over 1.5 (IMPROVED - STRICTER)
+        // Ev avgScored >= 2.0, Dep avgConceded >= 1.5, Ev scoringRate >= 85%, Ev over15Rate >= 80%
+        if (homeHomeStats.avgScored >= 2.0 && awayAwayStats.avgConceded >= 1.5 &&
+            homeHomeStats.scoringRate >= 85 && homeForm.over15Rate >= 80) {
             candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
             passedFilters.push('Home O1.5');
         }
@@ -478,9 +481,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             passedFilters.push('1H Over 0.5');
         }
 
-        // Logic H: MS1 & 1.5 Üst (NEW)
-        // Home Win >= 50% AND Home Over 1.5 >= 70%
-        if (homeHomeStats.winRate >= 50 && homeHomeStats.avgScored >= 1.5 && homeForm.over15Rate >= 70) {
+        // Logic H: MS1 & 1.5 Üst (IMPROVED - STRICTER)
+        // Home Win >= 60%, Home Avg Scored > 1.9, Away Avg Conceded > 1.2
+        if (homeHomeStats.winRate >= 60 && homeHomeStats.avgScored >= 1.9 &&
+            awayAwayStats.avgConceded >= 1.2 &&
+            homeForm.over15Rate >= 75) {
             candidates.ms1AndOver15.push({ ...m, filterStats: stats, market: 'MS1 & 1.5 Üst' });
             passedFilters.push('MS1 & 1.5+');
         }
@@ -490,16 +495,27 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         const homeConcedeRate = 100 - (homeHomeStats.cleanSheetRate || (100 - (homeHomeStats.lossCount + homeHomeStats.draws) * 10)); // Approximate check if simple stats
         // Actually cleaner: homeHomeStats.scoringRate is offense. Defense check:
         // Let's use avgConceded.
-        if (awayAwayStats.scoringRate >= 70 && awayAwayStats.avgScored >= 0.8 && homeHomeStats.avgConceded >= 0.8) {
+        // Logic I: Dep 0.5 Üst (IMPROVED - STRICTER)
+        // Away Scoring Rate >= 80%, Away Avg Scored >= 1.2, Home Concede Rate >= 80% (CleanSheet <= 20%)
+        if (awayAwayStats.scoringRate >= 80 && awayAwayStats.avgScored >= 1.2 &&
+            (100 - (homeHomeStats.cleanSheetRate || 0)) >= 80) {
             candidates.awayOver05.push({ ...m, filterStats: stats, market: 'Dep 0.5 Üst' });
             passedFilters.push('Away 0.5+');
         }
 
         // Logic J: Handikaplı Maç Sonucu (-1) (NEW)
         // Strong Home: WinRate >= 60%, Avg Scored > Conceded + 1.2
-        if (homeHomeStats.winRate >= 60 && (homeHomeStats.avgScored - homeHomeStats.avgConceded) >= 1.2) {
-            candidates.handicap.push({ ...m, filterStats: stats, market: 'Handikaplı MS1' });
-            passedFilters.push('Handicap MS1');
+        // Logic J: Handicap Match Result (-1.5) (DUAL SIDE)
+        // Home Fav: Win >= 70%, GoalDiff >= 1.8 | Away Fav: Win >= 70%, GoalDiff >= 1.8
+        const homeGoalDiff = homeHomeStats.avgScored - homeHomeStats.avgConceded;
+        const awayGoalDiff = awayAwayStats.avgScored - awayAwayStats.avgConceded;
+
+        if (homeHomeStats.winRate >= 70 && homeGoalDiff >= 1.8) {
+            candidates.handicap.push({ ...m, filterStats: stats, market: 'Hnd. MS1 (-1.5)' });
+            passedFilters.push('Hnd. MS1 -1.5');
+        } else if (awayAwayStats.winRate >= 70 && awayGoalDiff >= 1.8) {
+            candidates.handicap.push({ ...m, filterStats: stats, market: 'Hnd. MS2 (-1.5)' });
+            passedFilters.push('Hnd. MS2 -1.5');
         }
 
         if (passedFilters.length > 0) {
@@ -1008,7 +1024,8 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
                 matchData.market = '1X Double Chance';
                 break;
             case 'homeOver15':
-                passes = homeHomeStats.avgScored >= 1.6 && awayAwayStats.avgConceded >= 1.4 && homeHomeStats.scoringRate >= 80 && homeForm.over15Rate >= 60;
+                passes = homeHomeStats.avgScored >= 2.0 && awayAwayStats.avgConceded >= 1.5 &&
+                    homeHomeStats.scoringRate >= 85 && homeForm.over15Rate >= 80;
                 matchData.market = 'Home Team Over 1.5';
                 break;
             case 'under35':
@@ -1028,16 +1045,26 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
                 matchData.market = 'First Half Over 0.5';
                 break;
             case 'ms1AndOver15':
-                passes = homeHomeStats.winRate >= 50 && homeHomeStats.avgScored >= 1.5 && homeForm.over15Rate >= 70;
+                passes = homeHomeStats.winRate >= 60 && homeHomeStats.avgScored >= 1.9 &&
+                    awayAwayStats.avgConceded >= 1.2 && homeForm.over15Rate >= 75;
                 matchData.market = 'MS1 & 1.5 Üst';
                 break;
             case 'awayOver05':
-                passes = awayAwayStats.scoringRate >= 70 && awayAwayStats.avgScored >= 0.8 && homeHomeStats.avgConceded >= 0.8;
+                passes = awayAwayStats.scoringRate >= 80 && awayAwayStats.avgScored >= 1.2 &&
+                    (100 - (homeHomeStats.cleanSheetRate || 0)) >= 80;
                 matchData.market = 'Dep 0.5 Üst';
                 break;
             case 'handicap':
-                passes = homeHomeStats.winRate >= 60 && (homeHomeStats.avgScored - homeHomeStats.avgConceded) >= 1.2;
-                matchData.market = 'Handikaplı MS1';
+                const hDiff = homeHomeStats.avgScored - homeHomeStats.avgConceded;
+                const aDiff = awayAwayStats.avgScored - awayAwayStats.avgConceded;
+
+                if (homeHomeStats.winRate >= 70 && hDiff >= 1.8) {
+                    passes = true;
+                    matchData.market = 'Hnd. MS1 (-1.5)';
+                } else if (awayAwayStats.winRate >= 70 && aDiff >= 1.8) {
+                    passes = true;
+                    matchData.market = 'Hnd. MS2 (-1.5)';
+                }
                 break;
         }
 
