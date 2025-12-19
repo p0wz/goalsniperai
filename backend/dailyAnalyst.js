@@ -16,7 +16,7 @@ const FLASHSCORE_API = {
     }
 };
 
-const MATCH_LIMIT = 150; // Increased limit
+const MATCH_LIMIT = 250; // Increased limit
 
 // Allowed Leagues Filter (Only analyze these leagues)
 // Format: "COUNTRY: League" - matches API format exactly
