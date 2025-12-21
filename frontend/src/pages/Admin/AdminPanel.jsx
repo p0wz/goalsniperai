@@ -432,7 +432,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'ai-analiz', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -444,6 +444,7 @@ export default function AdminPanel({ user, handleLogout }) {
                             )}
                         >
                             {tab === 'live' && '📡 Live'}
+                            {tab === 'ai-analiz' && '🤖 AI Analiz'}
                             {tab === 'analiz' && '🎯 Analiz'}
                             {tab === 'history' && '📜 Geçmiş'}
                             {tab === 'picks' && '⭐ Yönetin'}
@@ -508,6 +509,76 @@ export default function AdminPanel({ user, handleLogout }) {
                         </div>
                     </div>
                 )}
+
+                {/* Tab Content: AI ANALIZ NEW */}
+                {activeTab === 'ai-analiz' && (
+                    <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
+                        <div className="bg-card border border-indigo-500/20 rounded-xl shadow-sm p-6 text-center">
+                            <h2 className="text-3xl font-bold mb-4 flex items-center justify-center gap-2">
+                                🤖 AI Oto-Analiz (Gemini 3 Flash)
+                            </h2>
+                            <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+                                Yapay zeka tüm maçları tarar, istatistikleri inceler ve sadece <strong>1.50 oranın altındaki BANKO</strong> fırsatları bulur.
+                            </p>
+
+                            <div className="flex gap-4 justify-center mb-8">
+                                <button
+                                    onClick={() => handleAutoAI(true)}
+                                    disabled={isAutoAnalysing}
+                                    className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {isAutoAnalysing ? 'Taranıyor...' : '🔍 Lig Filtreli Tara'}
+                                </button>
+                                <button
+                                    onClick={() => handleAutoAI(false)}
+                                    disabled={isAutoAnalysing}
+                                    className="px-8 py-4 bg-slate-700 hover:bg-slate-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50"
+                                >
+                                    {isAutoAnalysing ? 'Taranıyor...' : '🌍 Tümünü Tara'}
+                                </button>
+                            </div>
+
+                            {/* Results Grid - NEW LAYOUT */}
+                            {aiCandidates.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+                                    {aiCandidates.map(c => (
+                                        <div key={c.id} className="p-5 rounded-xl bg-background border border-indigo-500/30 hover:border-indigo-500 transition-all shadow-md group hover:shadow-lg">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <h4 className="font-bold text-lg">{c.match}</h4>
+                                                    <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">{c.league}</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-bold text-xl text-indigo-400">{c.ai.estimated_odds}</span>
+                                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Oran</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mb-4 p-3 bg-muted/40 rounded-lg text-sm">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="font-bold text-foreground">{c.ai.market}</span>
+                                                    <span className="text-green-500 font-bold bg-green-500/10 px-2 py-0.5 rounded">%{c.ai.confidence}</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground leading-relaxed">{c.ai.reason}</p>
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleApproveAICandidate(c)}
+                                                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 shadow hover:shadow-lg transition-all"
+                                            >
+                                                ✅ Onayla & Takibe Al
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {aiCandidates.length === 0 && !isAutoAnalysing && (
+                                <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                                    Sonuçlar burada görünecek.
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
                 {/* Tab Content: ANALYSIS HUB */}
                 {activeTab === 'analiz' && (
@@ -587,68 +658,7 @@ Yukarıdaki maç havuzunu detaylı incele. Amacımız "BANKO" (Güvenilir) kupon
                                 </button>
                             )}
 
-                            {/* AI AUTO ANALYSIS SECTION */}
-                            <div className="my-8 p-6 bg-card border border-indigo-500/20 rounded-xl shadow-sm">
-                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                    🤖 AI Oto-Analiz (Llama 4 Scout)
-                                    <span className="text-xs bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded">NEW</span>
-                                </h3>
-                                <p className="text-sm text-muted-foreground mb-4">
-                                    Yapay zeka tüm maçları tarar, istatistikleri inceler ve sadece <strong>1.50 oranın altındaki BANKO</strong> fırsatları bulur.
-                                </p>
-
-                                <div className="flex gap-4 justify-center">
-                                    <button
-                                        onClick={() => handleAutoAI(true)}
-                                        disabled={isAutoAnalysing}
-                                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow disabled:opacity-50 flex items-center gap-2"
-                                    >
-                                        {isAutoAnalysing ? 'Taranıyor...' : '🔍 Lig Filtreli Tara'}
-                                    </button>
-                                    <button
-                                        onClick={() => handleAutoAI(false)}
-                                        disabled={isAutoAnalysing}
-                                        className="px-6 py-3 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-semibold shadow disabled:opacity-50"
-                                    >
-                                        {isAutoAnalysing ? 'Taranıyor...' : '🌍 Tümünü Tara'}
-                                    </button>
-                                </div>
-
-                                {/* Results Grid */}
-                                {aiCandidates.length > 0 && (
-                                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                                        {aiCandidates.map(c => (
-                                            <div key={c.id} className="p-4 rounded-lg bg-background border border-indigo-500/30 hover:border-indigo-500 transition-colors shadow-sm group">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <h4 className="font-bold text-base">{c.match}</h4>
-                                                        <span className="text-xs text-muted-foreground">{c.league}</span>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="block font-bold text-lg text-indigo-400">{c.ai.estimated_odds}</span>
-                                                        <span className="text-xs text-muted-foreground">Est. Odds</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mb-3 p-2 bg-muted/40 rounded text-sm">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="font-bold text-foreground">{c.ai.market}</span>
-                                                        <span className="text-green-500 font-bold">%{c.ai.confidence} Güven</span>
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground leading-relaxed">{c.ai.reason}</p>
-                                                </div>
-
-                                                <button
-                                                    onClick={() => handleApproveAICandidate(c)}
-                                                    className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm flex items-center justify-center gap-2 opacity-90 hover:opacity-100"
-                                                >
-                                                    ✅ Onayla & Takibe Al
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            {/* AI AUTO ANALYSIS SECTION REMOVED (Moved to dedicated tab) */}
                         </div>
 
                         {/* Analysis Content Grid */}
