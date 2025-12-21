@@ -27,7 +27,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const picksRoutes = require('./routes/picks');
-const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP } = require('./dailyAnalyst');
+const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, MARKET_MAP } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
@@ -2150,7 +2150,7 @@ app.post('/api/daily-analysis/ai-auto', requireAuth, async (req, res) => {
         // We will await it (assuming < 60s timeout). 
         // If it takes longer, we should use streaming, but for 20 matches limit it should be fast (~30s).
 
-        const results = await dailyAnalyst.runAIAutomatedAnalysis(leagueFilter, log);
+        const results = await runAIAutomatedAnalysis(leagueFilter, log);
 
         res.json({ success: true, count: results.length, candidates: results });
     } catch (error) {
