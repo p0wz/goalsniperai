@@ -1374,6 +1374,6 @@ module.exports = {
     parseGeminiResponse, // New Export
     analyzeMatchOracle,
     fetchMatchOdds,
-    generateAnalysisDetails
+    generateDetailedPrompt // Fixed export name
 };
 
