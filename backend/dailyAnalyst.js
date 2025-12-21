@@ -418,55 +418,32 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         log.info(`      • Home Scoring@Home: ${homeHomeStats.scoringRate.toFixed(0)}% | Away Scoring@Away: ${awayAwayStats.scoringRate.toFixed(0)}%`);
         log.info(`      • Home AvgScored@Home: ${homeHomeStats.avgScored.toFixed(2)} | Away AvgConceded@Away: ${awayAwayStats.avgConceded.toFixed(2)}`);
 
-        // Uses separate pure form analysis
-        const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
-        if (fhAnalysis.signal) {
-            // Attach the specific analysis to the match object for later use
-            candidates.firstHalfOver05.push({ ...m, filterStats: stats, fhStats: fhAnalysis, market: 'First Half Over 0.5' });
-            passedFilters.push('1H Over 0.5');
-        }
+        // ----------------------------------------------------------------
+        // 🧠 PHASE 15: AI-FIRST ORACLE ANALYSIS
+        // ----------------------------------------------------------------
+        // We skip hardcoded filters and ask the Oracle directly.
 
-        // Logic H: MS1 & 1.5 Üst (IMPROVED - STRICTER)
-        // Home Win >= 60%, Home Avg Scored > 1.9, Away Avg Conceded > 1.2
-        if (homeHomeStats.winRate >= 60 && homeHomeStats.avgScored >= 1.9 &&
-            awayAwayStats.avgConceded >= 1.2 &&
-            homeForm.over15Rate >= 75) {
-            candidates.ms1AndOver15.push({ ...m, filterStats: stats, market: 'MS1 & 1.5 Üst' });
-            passedFilters.push('MS1 & 1.5+');
-        }
+        log.info(`   🤖 Asking Oracle (Groq/Llama-17b)...`);
 
-        // Logic I: Dep 0.5 Üst (NEW)
-        // Away Scoring Rate >= 70% AND Home Clean Sheet Rate <= 30%
-        const homeConcedeRate = 100 - (homeHomeStats.cleanSheetRate || (100 - (homeHomeStats.lossCount + homeHomeStats.draws) * 10)); // Approximate check if simple stats
-        // Actually cleaner: homeHomeStats.scoringRate is offense. Defense check:
-        // Let's use avgConceded.
-        // Logic I: Dep 0.5 Üst (IMPROVED - STRICTER)
-        // Away Scoring Rate >= 80%, Away Avg Scored >= 1.2, Home Concede Rate >= 80% (CleanSheet <= 20%)
-        if (awayAwayStats.scoringRate >= 80 && awayAwayStats.avgScored >= 1.2 &&
-            (100 - (homeHomeStats.cleanSheetRate || 0)) >= 80) {
-            candidates.awayOver05.push({ ...m, filterStats: stats, market: 'Dep 0.5 Üst' });
-            passedFilters.push('Away 0.5+');
-        }
+        const oracleResult = await analyzeMatchOracle({ ...m, filterStats: stats });
 
-        // Logic J: Handikaplı Maç Sonucu (-1) (NEW)
-        // Strong Home: WinRate >= 60%, Avg Scored > Conceded + 1.2
-        // Logic J: Handicap Match Result (-1.5) (DUAL SIDE)
-        // Home Fav: Win >= 70%, GoalDiff >= 1.8 | Away Fav: Win >= 70%, GoalDiff >= 1.8
-        const homeGoalDiff = homeHomeStats.avgScored - homeHomeStats.avgConceded;
-        const awayGoalDiff = awayAwayStats.avgScored - awayAwayStats.avgConceded;
+        if (oracleResult.recommendations && oracleResult.recommendations.length > 0) {
+            log.info(`   💡 Oracle found ${oracleResult.recommendations.length} picks!`);
 
-        if (homeHomeStats.winRate >= 70 && homeGoalDiff >= 1.8) {
-            candidates.handicap.push({ ...m, filterStats: stats, market: 'Hnd. MS1 (-1.5)' });
-            passedFilters.push('Hnd. MS1 -1.5');
-        } else if (awayAwayStats.winRate >= 70 && awayGoalDiff >= 1.8) {
-            candidates.handicap.push({ ...m, filterStats: stats, market: 'Hnd. MS2 (-1.5)' });
-            passedFilters.push('Hnd. MS2 -1.5');
-        }
+            candidates.oracle.push({
+                ...m,
+                filterStats: stats,
+                recommendations: oracleResult.recommendations,
+                ai_analysis_raw: oracleResult
+            });
 
-        if (passedFilters.length > 0) {
-            log.info(`   ✅ PASSED: ${passedFilters.join(', ')}`);
+            // Rate Limit Safety (30 RPM = 2s delay)
+            log.info(`   ⏳ Cooling down (2100ms)...`);
+            await sleep(2100);
+
         } else {
-            log.info(`   ⏭️ No filters passed`);
+            log.info(`   skipping (Oracle found no value)`);
+            await sleep(2100);
         }
     }
 
