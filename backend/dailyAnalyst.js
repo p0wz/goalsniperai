@@ -623,42 +623,37 @@ async function analyzeMatchOracle(match, retries = 3) {
     const leagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
 
     const prompt = `ROLE: You are "The Oracle", a senior betting syndicate analyst.
-TASK: Analyze this match and find the single BEST value market. 
-You are NOT restricted to basic markets if you see a specific high-value trend, but prioritize liquid markets.
+TASK: Analyze this match and find the single BEST value market.
+You are NOT restricted to any list. You can choose ANY standard betting market (e.g., 1X2, Goals, Handicaps, First Half, etc.) that offers the best Value or Safety.
 
 MATCH: ${match.event_home_team} vs ${match.event_away_team}
 LEAGUE: ${match.league_name} (Avg Goals: ~${leagueAvg.toFixed(2)})
 
 DETAILED STATS:
 [HOME TEAM: ${match.event_home_team}]
-- Recent Form (Last 5): Scored ${homeForm.avgScored.toFixed(1)}, Conceded ${homeForm.avgConceded.toFixed(1)} per game.
-- Trends: Over 2.5 in ${homeForm.over25Rate}% | BTTS in ${homeForm.bttsRate}% | Clean Sheets: ${homeForm.cleanSheetRate || 0}%
-- At Home (Last 8): Wins ${homeHomeStats.winRate}% | Scored in ${homeHomeStats.scoringRate}% | Avg Scored ${homeHomeStats.avgScored.toFixed(1)}
+- Recent Form (Last 5): Scored ${homeForm.avgScored.toFixed(1)}, Conceded ${homeForm.avgConceded.toFixed(1)}/game.
+- Trends: Over 2.5 in ${homeForm.over25Rate}% | BTTS in ${homeForm.bttsRate}% | Clean Sheets: ${homeForm.cleanSheetRate || 0}% | 1H Goals: ${homeForm.htGoalRate || 0}%
+- At Home (Last 8): Wins ${homeHomeStats.winRate}% | Scored in ${homeHomeStats.scoringRate}% | 1H Goal Potential: ${homeHomeStats.htGoalRate || 0}%
 
 [AWAY TEAM: ${match.event_away_team}]
-- Recent Form (Last 5): Scored ${awayForm.avgScored.toFixed(1)}, Conceded ${awayForm.avgConceded.toFixed(1)} per game.
-- Trends: Over 2.5 in ${awayForm.over25Rate}% | BTTS in ${awayForm.bttsRate}% | Clean Sheets: ${awayForm.cleanSheetRate || 0}%
-- Away (Last 8): Wins ${awayAwayStats.winRate}% | Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0))}% | Avg Conceded ${awayAwayStats.avgConceded.toFixed(1)}
+- Recent Form (Last 5): Scored ${awayForm.avgScored.toFixed(1)}, Conceded ${awayForm.avgConceded.toFixed(1)}/game.
+- Trends: Over 2.5 in ${awayForm.over25Rate}% | BTTS in ${awayForm.bttsRate}% | Clean Sheets: ${awayForm.cleanSheetRate || 0}% | 1H Goals: ${awayForm.htGoalRate || 0}%
+- Away (Last 8): Wins ${awayAwayStats.winRate}% | Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0))}% | 1H Goal Potential: ${awayAwayStats.htGoalRate || 0}%
 
 [HEAD-TO-HEAD]
 - Mutual Matches: ${mutual.map(g => `${g.home_team_score}-${g.away_team_score}`).join(', ')}
 
 ${memoryContext}
 
-SUGGESTED MARKETS (But not limited to):
-- Goals: Over/Under 2.5, Over 1.5, BTTS (Yes/No), First Half Over 0.5
-- Sides: Home Win, Away Win, Double Chance (1X/X2), Draw No Bet
-- Specifics: Home Over 1.5 Goals, Away Over 0.5 Goals
-
-CLASSIFICATION RULES:
-- BANKO (Banker): Confidence 85%+, High Safety. Ideal for accumulators.
-- VALUE: Confidence 65-84%, High EV (Expected Value). Good for singles.
+CLASSIFICATION RULES (Strict adherence required):
+- BANKO (Banker): Confidence 85%+, Low Risk. (Target Odds: 1.15 - 1.60).
+- VALUE: Confidence 65-84%, Moderate Risk. (Target Odds: 1.60 - 2.20).
 
 OUTPUT JSON (Must be valid JSON, no markdown text outside the block):
 {
   "recommendations": [
     {
-      "market": "String",
+      "market": "String (e.g. 'Over 2.5 Goals', 'Home Win', '1H Over 0.5')",
       "classification": "BANKO" | "VALUE",
       "confidence": Number (0-100),
       "reasoning": "Specific statistical reason citing the data above."
