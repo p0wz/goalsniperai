@@ -645,23 +645,35 @@ export default function AdminPanel({ user, handleLogout }) {
                                                 {items.length > 0 && (
                                                     <button
                                                         onClick={() => {
-                                                            const bulkPrompt = `📊 ${config.name.toUpperCase()} ANALİZİ (${items.length} Maç)
-════════════════════════════════════════
+                                                            // Generate Bulk Prompt on Client Side
+                                                            let bulkPrompt = `ROLE: Expert Football Analyst (Stats Only Mode)\n`;
+                                                            bulkPrompt += `TASK: Analyze these matches. Find the BEST VALUE.\n`;
+                                                            bulkPrompt += `IMPORTANT: Output JSON ONLY with "classification": "BANKO" | "VALUE".\n\n`;
 
-${items.map((m, idx) => {
-                                                                const prompt = m.aiPrompt || m.ai_prompts?.[0] || '';
-                                                                return `\n[${idx + 1}/${items.length}] ${m.event_home_team} vs ${m.event_away_team}
-----------------------------------------
-${prompt}
-`;
-                                                            }).join('\n')}
-════════════════════════════════════════`;
+                                                            items.forEach((m, idx) => {
+                                                                const stats = m.filterStats || {};
+                                                                const hHome = stats.homeHomeStats || {};
+                                                                const aAway = stats.awayAwayStats || {};
+                                                                const hForm = stats.homeForm || {};
+                                                                const aForm = stats.awayForm || {};
+
+                                                                bulkPrompt += `[MATCH ${idx + 1}] ${m.event_home_team} vs ${m.event_away_team}\n`;
+                                                                bulkPrompt += `LEAGUE: ${m.league_name}\n`;
+                                                                if (hForm.avgScored) {
+                                                                    bulkPrompt += `HOME: Form Scored ${hForm.avgScored.toFixed(1)}, Conceded ${hForm.avgConceded.toFixed(1)}. @Home Win ${hHome.winRate}%\n`;
+                                                                    bulkPrompt += `AWAY: Form Scored ${aForm.avgScored.toFixed(1)}, Conceded ${aForm.avgConceded.toFixed(1)}. @Away Win ${aAway.winRate}%\n`;
+                                                                }
+                                                                bulkPrompt += `----------------------------------------\n`;
+                                                            });
+
+                                                            bulkPrompt += `\nOutput Format:\n{ "picks": [ { "home_team": "...", "classification": "BANKO", "confidence": 90, "reason": "..." } ] }`;
+
                                                             navigator.clipboard.writeText(bulkPrompt);
-                                                            alert('TOPLU AI PROMPT KOPYALANDI! 📋');
+                                                            alert(`✅ ${items.length} maç için Gemini Prompt kopyalandı!`);
                                                         }}
-                                                        className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 flex items-center gap-1 shadow-sm"
+                                                        className="px-3 py-1.5 text-xs font-bold bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-1 shadow-sm"
                                                     >
-                                                        🤖 TOPLU COPY
+                                                        🤖 GEMINI PROMPT KOPYALA (TÜMÜ)
                                                     </button>
                                                 )}
                                                 <span className="text-xs px-2 py-1 bg-background rounded border font-mono">
