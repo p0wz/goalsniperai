@@ -477,7 +477,102 @@ export default function AdminPanel({ user, handleLogout }) {
                             >
                                 {isAnalysing ? '⏳ Taranıyor...' : '🌍 TÜM MAÇLAR (Filtresiz)'}
                             </button>
+                            <button
+                                onClick={() => setShowImportModal(true)}
+                                disabled={isAnalysing}
+                                className="px-6 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
+                            >
+                                📥 MANUEL GEMINI SONUCU YÜKLE
+                            </button>
                         </div>
+
+                        {/* MANUAL AI DASHBOARD (IMPORTED) */}
+                        {dailyAnalysis?.gemini && dailyAnalysis.gemini.length > 0 && (
+                            <div className="mb-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="p-1 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500">
+                                    <div className="bg-background rounded-lg p-6">
+                                        <h3 className="text-2xl font-bold flex items-center gap-2 mb-6 text-orange-600">
+                                            🧠 MANUAL GEMINI PICKS
+                                            <span className="text-sm font-normal text-muted-foreground ml-2">
+                                                (Imported from your manual analysis)
+                                            </span>
+                                        </h3>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            {/* ALL GEMINI PICKS RENDERED HERE */}
+                                            {['BANKO', 'VALUE'].map(type => {
+                                                const picks = dailyAnalysis.gemini.filter(p => p.classification === type);
+                                                if (picks.length === 0) return null;
+
+                                                return (
+                                                    <div key={type} className="space-y-4">
+                                                        <h4 className={`text-xl font-bold flex items-center gap-2 ${type === 'BANKO' ? 'text-green-600' : 'text-blue-600'}`}>
+                                                            {type === 'BANKO' ? '🏆 BANKO' : '💎 VALUE'}
+                                                        </h4>
+                                                        <button
+                                                            onClick={() => {
+                                                                const items = picks.map(r => ({
+                                                                    id: r.id,
+                                                                    matchData: {
+                                                                        matchId: r.event_key || `gemini_${Date.now()}`, // Fallback ID
+                                                                        home_team: r.home_team,
+                                                                        away_team: r.away_team
+                                                                    },
+                                                                    market: r.market,
+                                                                    category: 'gemini', // TRACK HISTORY SEPARATELY
+                                                                    confidence: r.confidence,
+                                                                    reason: r.reason
+                                                                }));
+                                                                if (confirm(`Approve all ${items.length} MANUAL ${type} bets?`)) {
+                                                                    signalService.bulkApprove(items, 'gemini');
+                                                                    alert(`${type} Bets Approved!`);
+                                                                }
+                                                            }}
+                                                            className={`text-xs ml-auto px-3 py-1 rounded font-bold text-white ${type === 'BANKO' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                                        >
+                                                            ✅ Approve All {type}
+                                                        </button>
+
+                                                        <div className="space-y-3">
+                                                            {picks.map((item, idx) => (
+                                                                <div key={idx} className="p-4 rounded-lg border hover:shadow-md transition-all bg-card">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <div>
+                                                                            <div className="font-bold">{item.home_team} vs {item.away_team}</div>
+                                                                            <div className="text-xs text-muted-foreground">{item.market}</div>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <div className="text-xs font-mono">{item.odds} Odds</div>
+                                                                            <div className="font-bold text-orange-600">{item.confidence}%</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <p className="text-sm text-foreground/80 italic mb-3">"{item.reason}"</p>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            // Construct a mock 'match' object for handleDailyAction
+                                                                            const mockMatch = {
+                                                                                id: item.id,
+                                                                                event_home_team: item.home_team,
+                                                                                event_away_team: item.away_team,
+                                                                                matchId: item.event_key || `gemini_${Date.now()}`
+                                                                            };
+                                                                            handleDailyAction({ ...mockMatch, market: item.market }, 'approve', 'gemini');
+                                                                        }}
+                                                                        className="w-full py-1.5 rounded bg-orange-600 text-white text-xs font-bold hover:bg-orange-700"
+                                                                    >
+                                                                        APPROVE
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ORACLE DASHBOARD (AI-FIRST) */}
                         {dailyAnalysis?.oracle && dailyAnalysis.oracle.length > 0 && (
