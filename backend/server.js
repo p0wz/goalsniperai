@@ -2106,6 +2106,60 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// ✅ Bulk Approve Daily Candidates
+// ============================================
+app.post('/api/daily-analysis/approve-all', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { candidates, market, category } = req.body; // candidates is array of { id, matchData, ... }
+
+    if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
+        return res.status(400).json({ success: false, error: 'No candidates provided' });
+    }
+
+    let approvedCount = 0;
+
+    try {
+        candidates.forEach(c => {
+            const mid = c.id;
+            if (!APPROVED_IDS.has(mid) && !REJECTED_IDS.has(mid)) {
+                APPROVED_IDS.add(mid);
+
+                // Record Bet
+                if (c.matchData) {
+                    betTracker.recordBet({
+                        match_id: c.matchData.matchId,
+                        home_team: c.matchData.home_team,
+                        away_team: c.matchData.away_team
+                    }, market, category, 85, 'daily');
+                } else if (c.event_key) {
+                    // Fallback if matchData not explicitly structured
+                    betTracker.recordBet({
+                        match_id: c.event_key,
+                        home_team: c.event_home_team,
+                        away_team: c.event_away_team
+                    }, market, c.market || category, 85, 'daily');
+                }
+
+                approvedCount++;
+            }
+        });
+
+        if (approvedCount > 0) {
+            saveApprovals();
+            log.success(`Bulk approved ${approvedCount} candidates for ${market}`);
+        }
+
+        res.json({ success: true, count: approvedCount });
+    } catch (error) {
+        log.error(`Bulk Approval Error: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
 // 🗑️ Reject Daily Candidate (Admin)
 // ============================================
 app.post('/api/daily-analysis/reject/:id', requireAuth, async (req, res) => {
