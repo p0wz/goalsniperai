@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { signalService, betService } from './services/api';
+import { signalService, betService, trainingService } from './services/api';
 import clsx from 'clsx';
 
 // Market Configuration
@@ -185,9 +185,20 @@ function MarketTab({ marketKey, handleAddToPicks }) {
                                                                 confidence: 85
                                                             });
                                                             if (res.success) {
-                                                                alert("✅ Maç geçmişe eklendi!");
-                                                                // Optionally remove from list or highlight? 
-                                                                // Let's just notify for now as removing might be confusing if user wants to analyze again.
+                                                                // Also record to AI Training Dataset
+                                                                await trainingService.record({
+                                                                    matchId: m.event_key || m.matchId,
+                                                                    match: `${m.event_home_team} vs ${m.event_away_team}`,
+                                                                    homeTeam: m.event_home_team,
+                                                                    awayTeam: m.event_away_team,
+                                                                    league: m.league_name,
+                                                                    startTime: m.event_time || m.event_start_time,
+                                                                    market: config.name,
+                                                                    prediction: config.name,
+                                                                    odds: m.odds || 1.50,
+                                                                    features: m.filterStats || m.stats || {}
+                                                                });
+                                                                alert("✅ Maç geçmişe ve AI Dataset'e eklendi!");
                                                             } else alert("Hata: " + res.error);
                                                         } catch (e) { alert(e.message); }
                                                     }}
