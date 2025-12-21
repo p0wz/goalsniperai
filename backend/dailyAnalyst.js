@@ -646,8 +646,10 @@ DETAILED STATS:
 ${memoryContext}
 
 CLASSIFICATION RULES (Strict adherence required):
-- BANKO (Banker): Confidence 85%+, Low Risk. (Target Odds: 1.15 - 1.60).
-- VALUE: Confidence 65-84%, Moderate Risk. (Target Odds: 1.60 - 2.20).
+Since we do not have live odds, you must ESTIMATE the probable market odds based on the dominance shown in stats.
+
+- BANKO (Banker): High Probability (80%+). Estimated Odds: 1.15 - 1.60.
+- VALUE: Moderate Probability (50-79%). Estimated Odds: 1.60 - 2.20.
 
 OUTPUT JSON (Must be valid JSON, no markdown text outside the block):
 {
@@ -656,6 +658,7 @@ OUTPUT JSON (Must be valid JSON, no markdown text outside the block):
       "market": "String (e.g. 'Over 2.5 Goals', 'Home Win', '1H Over 0.5')",
       "classification": "BANKO" | "VALUE",
       "confidence": Number (0-100),
+      "estimated_odds": Number (e.g. 1.45),
       "reasoning": "Specific statistical reason citing the data above."
     }
   ]
