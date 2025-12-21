@@ -2,7 +2,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
 /**
  * AI Service for GoalSniper Pro
@@ -82,7 +82,7 @@ OUTPUT FORMAT (Markdown):
      */
     async analyzeMatchForBanker(match) {
         const prompt = `Act as a professional high-stakes betting consultant.
-Model: Google Gemini 3 Flash Preview
+Model: DeepSeek R1 (Reasoner)
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
 
@@ -144,7 +144,7 @@ If no market is safe enough, return null.`;
         ).join('\n');
 
         const prompt = `Act as a Master Betting Strategist.
-Model: Google Gemini 3 Flash Preview
+Model: DeepSeek R1 (Reasoner)
 
 SOURCE POOL (Best Matches of the Day):
 ${candidatesList}
@@ -190,41 +190,40 @@ OUTPUT JSON ONLY:
      * Internal helper to call LLM
      */
     async _callLLM(prompt, mode = 'fast') {
-        // User explicitly requested "gemini-3-flash-preview"
-        const GEMINI_MODEL = 'gemini-3-flash-preview';
-
-        if (GEMINI_API_KEY) {
+        if (DEEPSEEK_API_KEY) {
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+                // User explicitly requested DeepSeek V3
+                const url = 'https://api.deepseek.com/chat/completions';
 
                 const response = await axios.post(url, {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 2048,
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: 'You are a professional sports betting analyst. Return valid JSON only when requested.' },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.1,
+                    max_tokens: 2048,
+                    stream: false
+                }, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
                     }
                 });
 
-                const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!text) throw new Error("Empty response from Gemini");
+                const text = response.data?.choices?.[0]?.message?.content;
+                if (!text) throw new Error("Empty response from DeepSeek");
                 return text;
 
             } catch (e) {
-                console.error(`Gemini (${GEMINI_MODEL}) Error:`, e.response?.data || e.message);
-                // Fallback to Groq if Gemini fails? Or just return error?
-                // User said "We switch to Gemini", so maybe we stick to it. 
-                // But for resilience, I will keep Groq as fallback if keys exist.
+                console.error(`DeepSeek API Error:`, e.response?.data || e.message);
             }
+        } else {
+            console.error("DEEPSEEK_API_KEY is missing! Please add it to .env file.");
         }
 
-        // Fallback: Groq (if Gemini key missing or failed)
-        // ... (Previously existing Groq logic removed to respect "Switching to Gemini" as primary)
-        // Actually, no harm in keeping it as backup, but I will deprioritize it heavily.
-        if (GROQ_API_KEY) {
-            // ... existing fallback code if needed ...
-        }
-
-        return "AI Service Unavailable (Check GEMINI_API_KEY)";
+        // Fallback or Error
+        return "AI Service Unavailable (Check DEEPSEEK_API_KEY)";
     }
 };
 
