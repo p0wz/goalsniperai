@@ -186,4 +186,20 @@ export const trainingService = {
     }
 };
 
+// SENTIO Chat Service
+export const sentioService = {
+    getMemoryStatus: async () => {
+        const response = await api.get('/sentio/memory');
+        return response.data;
+    },
+    populate: async (leagueFilter = true) => {
+        const response = await api.post('/sentio/populate', { leagueFilter });
+        return response.data;
+    },
+    chat: async (message) => {
+        const response = await api.post('/sentio/chat', { message });
+        return response.data;
+    }
+};
+
 export default api;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { signalService, picksService } from '../../services/api';
 import NeuCard from '../../components/ui/NeuCard';
 import NeuButton from '../../components/ui/NeuButton';
+import SentioChat from '../../components/SentioChat';
 import { Trophy, Flame, Target, Activity, TrendingUp, Shield, Clock } from 'lucide-react';
 
 export default function ProDashboard({ user }) {
@@ -166,6 +167,16 @@ export default function ProDashboard({ user }) {
                         </div>
                     </div>
 
+                </div>
+            </div>
+
+            {/* SENTIO CHAT SECTION */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                        💬 SENTIO AI Assistant
+                    </h2>
+                    <SentioChat />
                 </div>
             </div>
         </div>

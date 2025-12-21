@@ -225,6 +225,76 @@ OUTPUT JSON ONLY:
             console.error("GROQ_API_KEY is missing! Please add it to .env file.");
             throw new Error("GROQ_API_KEY Missing");
         }
+    },
+
+    // ============================================
+    // 💬 SENTIO Chat System
+    // ============================================
+
+    /**
+     * Format matches for SENTIO memory (raw data, no market predictions)
+     * @param {Array} matches - Array of match objects with stats
+     */
+    formatForSentioMemory(matches) {
+        return matches.map(m => ({
+            id: m.event_key || m.match_id,
+            home: m.event_home_team,
+            away: m.event_away_team,
+            league: m.league_name,
+            time: m.event_time,
+            stats: {
+                homeWinRate: m.filterStats?.homeHomeStats?.winRate || 0,
+                homeAvgScored: m.filterStats?.homeHomeStats?.avgScored || 0,
+                awayLossRate: m.filterStats?.awayAwayStats?.lossRate || 0,
+                awayAvgConceded: m.filterStats?.awayAwayStats?.avgConceded || 0,
+                over15Rate: m.filterStats?.homeForm?.over15Rate || 0,
+                over25Rate: m.filterStats?.homeForm?.over25Rate || 0,
+                bttsRate: m.filterStats?.homeForm?.bttsRate || 0
+            },
+            h2h: m.h2h || null
+        }));
+    },
+
+    /**
+     * SENTIO Chat - Answer user questions based on memory context
+     * @param {string} userMessage - User's question
+     * @param {Object} memory - SENTIO memory containing matches
+     */
+    async chatWithSentio(userMessage, memory) {
+        if (!memory || !memory.matches || memory.matches.length === 0) {
+            return "Henüz analiz yapılmamış. Lütfen admin'e danışın.";
+        }
+
+        const matchContext = memory.matches.map((m, i) =>
+            `${i + 1}. ${m.home} vs ${m.away} (${m.league}, ${m.time})
+   - Ev Galibiyet: ${m.stats?.homeWinRate || '?'}%, Ev Ort. Gol: ${m.stats?.homeAvgScored || '?'}
+   - Dep. Mağlubiyet: ${m.stats?.awayLossRate || '?'}%, Dep. Ort. Yenilen: ${m.stats?.awayAvgConceded || '?'}
+   - +1.5 Gol: ${m.stats?.over15Rate || '?'}%, +2.5 Gol: ${m.stats?.over25Rate || '?'}%`
+        ).join('\n');
+
+        const prompt = `Sen SENTIO'sun - profesyonel bir futbol analisti ve bahis danışmanı.
+Dil: Türkçe cevap ver.
+
+BUGÜNÜN MAÇLARI (${memory.date}):
+${matchContext}
+
+KULLANICI SORUSU: "${userMessage}"
+
+GÖREV:
+1. Yukarıdaki istatistiklere dayanarak kullanıcının sorusunu cevapla.
+2. Tavsiyelerin net ve gerekçeli olsun.
+3. Eğer "banko" veya "güvenli" maç soruluyorsa, istatistikleri analiz et ve en güçlü 2-3 seçeneği sun.
+4. Oran tahmini yapma, sadece istatistik analizi yap.
+
+CEVAP (Türkçe, samimi ve profesyonel):`;
+
+        try {
+            const response = await this._callLLM(prompt, 'sentio');
+            return response;
+        } catch (e) {
+            console.error("SENTIO Chat Error:", e);
+            return "Üzgünüm, şu anda cevap veremiyorum. Lütfen daha sonra tekrar deneyin.";
+        }
     }
 };
 

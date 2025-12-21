@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { signalService, betService, adminService, picksService, trainingService } from '../../services/api';
+import { signalService, betService, adminService, picksService, trainingService, sentioService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import clsx from 'clsx';
 import NeuButton from '../../components/ui/NeuButton';
@@ -28,6 +28,10 @@ export default function AdminPanel({ user, handleLogout }) {
     // AI Training Dataset State
     const [trainingData, setTrainingData] = useState([]);
     const [loadingTraining, setLoadingTraining] = useState(false);
+
+    // SENTIO Chat State
+    const [sentioMemory, setSentioMemory] = useState({ date: null, matchCount: 0 });
+    const [sentioPopulating, setSentioPopulating] = useState(false);
 
     useEffect(() => {
         fetchLiveSignals();
@@ -465,7 +469,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'ai-analiz', 'ai-dataset', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'ai-analiz', 'sentio', 'ai-dataset', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -481,6 +485,7 @@ export default function AdminPanel({ user, handleLogout }) {
                             {tab === 'analiz' && '🎯 Analiz'}
                             {tab === 'history' && '📜 Geçmiş'}
                             {tab === 'ai-dataset' && '📊 AI Dataset'}
+                            {tab === 'sentio' && '💬 SENTIO'}
                             {tab === 'picks' && '⭐ Yönetin'}
                             {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
                         </button>
@@ -681,6 +686,93 @@ export default function AdminPanel({ user, handleLogout }) {
                                     Sonuçlar burada görünecek.
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab Content: SENTIO CHAT ADMIN */}
+                {activeTab === 'sentio' && (
+                    <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
+                        <div className="bg-card border border-cyan-500/20 rounded-xl shadow-sm p-6">
+                            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">💬 SENTIO Chat Yönetimi</h2>
+                            <p className="text-muted-foreground mb-6">
+                                PRO kullanıcıların soru sorabilmesi için SENTIO'nun belleğini güncel maç verileriyle doldurun.
+                            </p>
+
+                            {/* Memory Status */}
+                            <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <span className="font-bold">Bellek Durumu:</span>
+                                        {sentioMemory.date ? (
+                                            <span className="ml-2 text-green-500">
+                                                ✅ {sentioMemory.matchCount} maç yüklü ({sentioMemory.date})
+                                            </span>
+                                        ) : (
+                                            <span className="ml-2 text-yellow-500">⚠️ Boş - Henüz veri yüklenmedi</span>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            const res = await sentioService.getMemoryStatus();
+                                            if (res.success) setSentioMemory(res);
+                                        }}
+                                        className="text-sm text-cyan-500 hover:underline"
+                                    >
+                                        🔄 Yenile
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Populate Buttons */}
+                            <div className="flex gap-4 flex-wrap">
+                                <button
+                                    onClick={async () => {
+                                        setSentioPopulating(true);
+                                        try {
+                                            const res = await sentioService.populate(true);
+                                            if (res.success) {
+                                                alert(`✅ ${res.count} maç SENTIO belleğine yüklendi!`);
+                                                setSentioMemory({ date: new Date().toISOString().split('T')[0], matchCount: res.count });
+                                            } else {
+                                                alert('Hata: ' + res.error);
+                                            }
+                                        } catch (e) {
+                                            alert('Hata: ' + e.message);
+                                        }
+                                        setSentioPopulating(false);
+                                    }}
+                                    disabled={sentioPopulating}
+                                    className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold disabled:opacity-50"
+                                >
+                                    {sentioPopulating ? '⏳ Yükleniyor...' : '🔍 Lig Filtreli Yükle'}
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setSentioPopulating(true);
+                                        try {
+                                            const res = await sentioService.populate(false);
+                                            if (res.success) {
+                                                alert(`✅ ${res.count} maç SENTIO belleğine yüklendi!`);
+                                                setSentioMemory({ date: new Date().toISOString().split('T')[0], matchCount: res.count });
+                                            } else {
+                                                alert('Hata: ' + res.error);
+                                            }
+                                        } catch (e) {
+                                            alert('Hata: ' + e.message);
+                                        }
+                                        setSentioPopulating(false);
+                                    }}
+                                    disabled={sentioPopulating}
+                                    className="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-bold disabled:opacity-50"
+                                >
+                                    {sentioPopulating ? '⏳ Yükleniyor...' : '🌍 Tüm Maçları Yükle'}
+                                </button>
+                            </div>
+
+                            <p className="text-xs text-muted-foreground mt-4">
+                                💡 Belleği günde 1-2 kez yenilemek yeterli. Yenileme işlemi mevcut veriyi tamamen değiştirir.
+                            </p>
                         </div>
                     </div>
                 )}

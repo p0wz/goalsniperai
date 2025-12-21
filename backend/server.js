@@ -2216,6 +2216,111 @@ app.delete('/api/training-data/:id', requireAuth, (req, res) => {
 });
 
 // ============================================
+// 💬 SENTIO Chat System Routes
+// ============================================
+const aiService = require('./services/aiService');
+const SENTIO_MEMORY_FILE = path.join(__dirname, 'data', 'sentioMemory.json');
+
+// Load SENTIO memory
+function loadSentioMemory() {
+    try {
+        if (fs.existsSync(SENTIO_MEMORY_FILE)) {
+            return JSON.parse(fs.readFileSync(SENTIO_MEMORY_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.error('[SENTIO] Memory load error:', e);
+    }
+    return { date: null, matches: [], populatedAt: null };
+}
+
+// Save SENTIO memory
+function saveSentioMemory(data) {
+    try {
+        fs.writeFileSync(SENTIO_MEMORY_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('[SENTIO] Memory save error:', e);
+    }
+}
+
+// Admin: Populate SENTIO memory with daily matches
+app.post('/api/sentio/populate', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { leagueFilter } = req.body;
+
+    try {
+        log.info(`[SENTIO] Populating memory (League Filter: ${leagueFilter})`);
+
+        // Fetch matches with stats (reuse daily analysis logic)
+        const analysisResults = await runDailyAnalysis(log, 100, leagueFilter !== false);
+
+        // Collect all unique matches
+        const allMatches = new Map();
+        Object.values(analysisResults).forEach(list => {
+            if (Array.isArray(list)) {
+                list.forEach(m => {
+                    if (!allMatches.has(m.event_key || m.match_id)) {
+                        allMatches.set(m.event_key || m.match_id, m);
+                    }
+                });
+            }
+        });
+
+        const matchArray = Array.from(allMatches.values());
+        const formattedMatches = aiService.formatForSentioMemory(matchArray);
+
+        const memory = {
+            date: new Date().toISOString().split('T')[0],
+            matches: formattedMatches,
+            populatedAt: new Date().toISOString()
+        };
+
+        saveSentioMemory(memory);
+        log.success(`[SENTIO] Memory populated with ${formattedMatches.length} matches`);
+
+        res.json({ success: true, count: formattedMatches.length });
+    } catch (error) {
+        log.error('[SENTIO] Populate error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get SENTIO memory status
+app.get('/api/sentio/memory', requireAuth, (req, res) => {
+    const memory = loadSentioMemory();
+    res.json({
+        success: true,
+        date: memory.date,
+        matchCount: memory.matches?.length || 0,
+        populatedAt: memory.populatedAt
+    });
+});
+
+// PRO User: Chat with SENTIO
+app.post('/api/sentio/chat', requireAuth, async (req, res) => {
+    // Allow PRO and Admin
+    if (req.user.role === 'free') {
+        return res.status(403).json({ success: false, error: 'PRO subscription required' });
+    }
+
+    const { message } = req.body;
+    if (!message || message.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'Message required' });
+    }
+
+    try {
+        const memory = loadSentioMemory();
+        const response = await aiService.chatWithSentio(message, memory);
+        res.json({ success: true, response });
+    } catch (error) {
+        log.error('[SENTIO] Chat error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
 // 📡 SSE Streaming Endpoint for Live Analysis
 // ============================================
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
