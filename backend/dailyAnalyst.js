@@ -1332,9 +1332,37 @@ AWAY (${m.event_away_team}):
 INSTRUCTIONS:
 - Prioritize high confidence (BANKO) or high value.
 - Use your browser tool to find REAL ODDS for these specific matches.
-- Good luck!`;
+
+IMPORTANT: Output your response ONLY as valid JSON. Do not add markdown or intro text.
+Format:
+{
+  "picks": [
+    {
+      "home_team": "Team A",
+      "away_team": "Team B",
+      "market": "Over 2.5 Goals",
+      "classification": "BANKO" | "VALUE",
+      "odds": 1.85,
+      "confidence": 85,
+      "reason": "Short reason..."
+    }
+  ]
+}
+`;
 
     return { prompt, count: processedCount };
+}
+
+// Helper: Parse Gemini Response
+function parseGeminiResponse(jsonText) {
+    try {
+        const clean = jsonText.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        return parsed.picks || [];
+    } catch (e) {
+        console.error("Gemini Parse Error:", e);
+        return [];
+    }
 }
 
 module.exports = {
@@ -1343,6 +1371,7 @@ module.exports = {
     runSingleMarketAnalysis,
     MARKET_MAP,
     generateGeminiPrompt, // New Export
+    parseGeminiResponse, // New Export
     analyzeMatchOracle,
     fetchMatchOdds,
     generateAnalysisDetails
