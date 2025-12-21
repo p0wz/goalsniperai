@@ -1258,5 +1258,93 @@ DETAILED STATISTICS:
 TASK: Analyze this match for '${market}' bet. Is it a solid value? Provide your verdict (PLAY/SKIP) with confidence %.`;
 }
 
-module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP };
+// ----------------------------------------------------------------
+// 🧠 GEMINI MANUAL MODE (Prompt Generator)
+// ----------------------------------------------------------------
+async function generateGeminiPrompt(leagueFilter = true) {
+    console.log('[DailyAnalyst] 🧠 Generating Gemini Mega-Prompt...');
+
+    // 1. Fetch Matches
+    const matches = await fetchDailyMatches(leagueFilter);
+    console.log(`[DailyAnalyst] Found ${matches.length} matches.`);
+
+    let prompt = `ROLE: You are an Expert Football Analyst with access to the internet.
+TASK: 
+1. I will provide stats for matches playing today.
+2. For each match, SEARCH ONLINE for the latest odds (1X2, Over 2.5, BTTS).
+3. Analyze the stats + odds to find the Best Value.
+4. If a match is risky, SKIP it. Only output the best picks.
+
+OUTPUT FORMAT:
+Match: Home vs Away
+Market: [Selection]
+Odds: [Odds found online]
+Confidence: [80-95%]
+Reason: [Brief Analysis]
+
+---
+MATCH DATA:
+`;
+
+    // 2. Process Stats for each match
+    let processedCount = 0;
+    // Limit to 30 matches for Gemini Context Window safety if huge list
+    const limitedMatches = matches.slice(0, 30);
+
+    for (const m of limitedMatches) {
+        // Fetch H2H
+        const h2h = await fetchH2H(m.event_key || m.match_id);
+        if (!h2h || !h2h.sections) continue;
+
+        const sections = h2h.sections;
+        const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
+        const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
+
+        const homeAllHistory = homeRawHistory.slice(0, 5);
+        const awayAllHistory = awayRawHistory.slice(0, 5);
+        const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
+        const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
+
+        const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
+        const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
+        const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
+        const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
+
+        if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) continue;
+
+        processedCount++;
+        prompt += `
+[MATCH ${processedCount}] ${m.event_home_team} vs ${m.event_away_team}
+LEAGUE: ${m.league_name}
+HOME (${m.event_home_team}):
+- Form (Last 5): Scored ${homeForm.avgScored.toFixed(1)}, Conceded ${homeForm.avgConceded.toFixed(1)}
+- Trends: BTTS ${homeForm.bttsRate}%, O2.5 ${homeForm.over25Rate}%, CleanSheet ${homeForm.cleanSheetRate}%
+- At Home: Win ${homeHomeStats.winRate}%, Scored ${homeHomeStats.avgScored.toFixed(1)}
+
+AWAY (${m.event_away_team}):
+- Form (Last 5): Scored ${awayForm.avgScored.toFixed(1)}, Conceded ${awayForm.avgConceded.toFixed(1)}
+- Trends: BTTS ${awayForm.bttsRate}%, O2.5 ${awayForm.over25Rate}%, CleanSheet ${awayForm.cleanSheetRate}%
+- At Away: Win ${awayAwayStats.winRate}%, Conceded ${awayAwayStats.avgConceded.toFixed(1)}
+---`;
+    }
+
+    prompt += `\n
+INSTRUCTIONS:
+- Prioritize high confidence (BANKO) or high value.
+- Use your browser tool to find REAL ODDS for these specific matches.
+- Good luck!`;
+
+    return { prompt, count: processedCount };
+}
+
+module.exports = {
+    runDailyAnalysis,
+    runFirstHalfScan,
+    runSingleMarketAnalysis,
+    MARKET_MAP,
+    generateGeminiPrompt, // New Export
+    analyzeMatchOracle,
+    fetchMatchOdds,
+    generateAnalysisDetails
+};
 
