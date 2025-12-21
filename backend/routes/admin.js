@@ -7,6 +7,8 @@ const express = require('express');
 const router = express.Router();
 const { getAllUsers, getUserStats, updateUserPlan, deleteUser, getUserById, getRecentLogs, createPick, deletePick } = require('../database');
 const { requireAdmin } = require('../auth');
+const aiService = require('../services/aiService');
+const betTracker = require('../betTracker');
 
 // All admin routes require admin role
 router.use(requireAdmin);
@@ -21,6 +23,30 @@ router.get('/logs', async (req, res) => {
     } catch (error) {
         console.error('[ADMIN] Logs error:', error);
         res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// ============================================
+// 🧠 AI Strategy Optimization
+// ============================================
+router.post('/optimize-strategy', async (req, res) => {
+    try {
+        // 1. Get History (Last 100 settled bets)
+        const bets = betTracker.getAllBets()
+            .filter(b => b.status === 'WON' || b.status === 'LOST')
+            .slice(0, 100);
+
+        if (bets.length === 0) {
+            return res.json({ success: false, error: 'No settled bets found for analysis.' });
+        }
+
+        // 2. Generate Report
+        const report = await aiService.generateOptimizationReport(bets);
+
+        res.json({ success: true, report });
+    } catch (error) {
+        console.error('[ADMIN] Strategy Optimize Error:', error);
+        res.status(500).json({ success: false, error: 'AI Analysis failed' });
     }
 });
 

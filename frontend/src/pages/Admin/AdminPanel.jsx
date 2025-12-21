@@ -17,6 +17,8 @@ export default function AdminPanel({ user, handleLogout }) {
     const [isAnalysingFH, setIsAnalysingFH] = useState(false);
     const [botRunning, setBotRunning] = useState(false);
     const [botStatusLoading, setBotStatusLoading] = useState(false);
+    const [optimizationReport, setOptimizationReport] = useState(null);
+    const [isOptimizing, setIsOptimizing] = useState(false);
 
     useEffect(() => {
         fetchLiveSignals();
@@ -144,6 +146,16 @@ export default function AdminPanel({ user, handleLogout }) {
             console.error(`Action ${action} failed`, err);
             alert('Action failed');
         }
+    };
+
+    const handleOptimize = async () => {
+        try {
+            setIsOptimizing(true);
+            const res = await adminService.optimizeStrategy();
+            if (res.success) setOptimizationReport(res.report);
+            else alert('Optimization failed: ' + res.error);
+        } catch (err) { alert('Error: ' + err.message); }
+        finally { setIsOptimizing(false); }
     };
 
     const handleAddToPicks = async (match, marketName, type = 'single') => {
@@ -504,13 +516,16 @@ ${promptContent}
 
 ════════════════════════════════════════
 GÖREV:
-Yukarıdaki maç havuzunu detaylı incele. Sadece istatistiksel olarak EN GÜÇLÜ fırsatları (Value Bets) seç.
-Her maç için bir "Market" zorunluluğu yok, istatistikler neyi işaret ediyorsa onu bul (Örn: MS1, Üst, KG Var, vb.).
-Eğer maç riskliyse veya veri yetersizse PAS geç.
+Yukarıdaki maç havuzunu detaylı incele. Amacımız "BANKO" (Güvenilir) kupon oluşturmak.
 
-ÇIKTI FORMATI:
-1. [Maç Adı] - [Tahmin] (Güven: %XX) - [Kısa Gerekçe]
-...
+1. 🎯 **ODAK: BANKO BAHİSLER (1.15 - 1.50 Oran Arası)**
+   - Sadece istatistiksel olarak çok güçlü (Win Rate > %80) olan tercihleri seç.
+   - Örnek: "Ev Sahibi Yemez", "Deplasman 0.5 Üst", "ÇŞ 1X", "Toplam Gol 1.5 Üst".
+   - Sürpriz veya riskli maçları ELE.
+
+2. ÇIKTI FORMATI:
+   - [Maç Adı] - [Tahmin] (Güven: %XX) - [Tahmini Oran: 1.XX]
+   - Kısa gerekçe (Örn: "Ev sahibi evinde 10 maçtır kaybetmiyor.")
 `;
                                         navigator.clipboard.writeText(bulkPrompt);
                                         alert(`✅ ${allMatches.length} maçın detaylı istatistikleri kopyalandı!`);
@@ -652,7 +667,28 @@ ${prompt}
                 {/* Tab Content: HISTORY */}
                 {activeTab === 'history' && (
                     <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-                        <h2 className="text-xl font-semibold mb-4">Bet History</h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-semibold">Bet History</h2>
+                            <button
+                                onClick={handleOptimize}
+                                disabled={isOptimizing}
+                                className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded shadow-md font-bold text-sm flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+                            >
+                                {isOptimizing ? 'Analiz Ediliyor...' : '🧠 Optimize Strategy (AI)'}
+                            </button>
+                        </div>
+
+                        {optimizationReport && (
+                            <div className="mb-6 p-4 rounded-lg bg-card border border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-300">
+                                <div className="flex justify-between items-start border-b pb-2 mb-2">
+                                    <h3 className="font-bold text-lg text-primary">📊 AI Strategy Report</h3>
+                                    <button onClick={() => setOptimizationReport(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+                                </div>
+                                <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed p-2 bg-muted/30 rounded max-h-[400px] overflow-y-auto">
+                                    {optimizationReport}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="overflow-x-auto rounded-lg border shadow-sm">
                             <table className="w-full text-sm">

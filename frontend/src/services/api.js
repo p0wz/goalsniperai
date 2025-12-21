@@ -148,6 +148,10 @@ export const adminService = {
     deletePick: async (id) => {
         const response = await api.delete(`/admin/picks/${id}`);
         return response.data;
+    },
+    optimizeStrategy: async () => {
+        const response = await api.post('/admin/optimize-strategy');
+        return response.data;
     }
 };
 
