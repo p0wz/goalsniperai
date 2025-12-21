@@ -663,8 +663,22 @@ If NO market is safe, return empty array.`;
             );
 
             let text = response.data?.choices?.[0]?.message?.content || '{}';
+            console.log(`[Oracle Raw] Match: ${match.event_home_team} vs ${match.event_away_team}`);
+            console.log(`[Oracle Raw] Response: ${text.substring(0, 100)}...`); // Peek at response
+
             text = text.replace(/```json|```/g, '').trim();
-            const json = JSON.parse(text);
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (parseError) {
+                console.error(`[Oracle Error] JSON Parse Failed: ${parseError.message}`);
+                console.error(`[Oracle Error] Raw Text: ${text}`);
+                return { recommendations: [] }; // Fail gracefully but log
+            }
+
+            if (!json.recommendations || json.recommendations.length === 0) {
+                console.log(`[Oracle] Valid JSON but NO recommendations found.`);
+            }
 
             return {
                 recommendations: json.recommendations || [],
@@ -676,6 +690,11 @@ If NO market is safe, return empty array.`;
             };
 
         } catch (e) {
+            console.error(`[Oracle API Error] ${e.message}`);
+            if (e.response && e.response.data) {
+                console.error(`[Oracle API Details]`, e.response.data);
+            }
+
             const isRateLimited = e.message?.includes('429') || e.message?.includes('quota');
             if (isRateLimited && attempt < retries) {
                 await sleep(attempt * 2500);
