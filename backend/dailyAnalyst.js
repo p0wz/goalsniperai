@@ -1107,7 +1107,7 @@ Analyze and provide your verdict.`;
     return `Act as a professional football betting analyst.
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
-Market: ${market}
+
 
 DETAILED STATISTICS:
 1. LEAGUE CONTEXT
@@ -1130,7 +1130,7 @@ DETAILED STATISTICS:
 4. HEAD-TO-HEAD (Last ${mutual.length})
    ${mutual.map(g => `- ${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name}`).join('\n   ')}
 
-TASK: Analyze this match for '${market}' bet. Is it a solid value? Provide your verdict (PLAY/SKIP) with confidence %.`;
+TASK: Analyze this match based on the detailed statistics above. Identify the SINGLE BEST betting market for this match (e.g., Over 2.5, BTTS, Home Win, etc.). Provide your verdict and reasoning with a confidence score.`;
 }
 
 module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP };
