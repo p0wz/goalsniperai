@@ -422,10 +422,13 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         // 🧠 PHASE 15: AI-FIRST ORACLE ANALYSIS
         // ----------------------------------------------------------------
         // We skip hardcoded filters and ask the Oracle directly.
-
         log.info(`   🤖 Asking Oracle (Groq/Llama-17b)...`);
 
-        const oracleResult = await analyzeMatchOracle({ ...m, filterStats: stats });
+        // Fetch Real Odds
+        log.info(`   💰 Fetching Real Odds...`);
+        const oddsData = await fetchMatchOdds(m.match_id || m.event_key);
+
+        const oracleResult = await analyzeMatchOracle({ ...m, filterStats: stats, oddsData: oddsData });
 
         if (oracleResult.recommendations && oracleResult.recommendations.length > 0) {
             log.info(`   💡 Oracle found ${oracleResult.recommendations.length} picks!`);
@@ -622,9 +625,12 @@ async function analyzeMatchOracle(match, retries = 3) {
     const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = match.filterStats;
     const leagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
 
+    // Format Odds
+    const oddsInfo = formatOddsForPrompt(match.oddsData);
+
     const prompt = `ROLE: You are "The Oracle", a senior betting syndicate analyst.
 TASK: Analyze this match and find the single BEST value market.
-You are NOT restricted to any list. You can choose ANY standard betting market (e.g., 1X2, Goals, Handicaps, First Half, etc.) that offers the best Value or Safety.
+You are NOT restricted to any list. You can choose ANY standard betting market (e.g., 1X2, Goals, Handicaps, etc.) that offers the best Value or Safety.
 
 MATCH: ${match.event_home_team} vs ${match.event_away_team}
 LEAGUE: ${match.league_name} (Avg Goals: ~${leagueAvg.toFixed(2)})
@@ -632,24 +638,26 @@ LEAGUE: ${match.league_name} (Avg Goals: ~${leagueAvg.toFixed(2)})
 DETAILED STATS:
 [HOME TEAM: ${match.event_home_team}]
 - Recent Form (Last 5): Scored ${homeForm.avgScored.toFixed(1)}, Conceded ${homeForm.avgConceded.toFixed(1)}/game.
-- Trends: Over 2.5 in ${homeForm.over25Rate}% | BTTS in ${homeForm.bttsRate}% | Clean Sheets: ${homeForm.cleanSheetRate || 0}% | 1H Goals: ${homeForm.htGoalRate || 0}%
-- At Home (Last 8): Wins ${homeHomeStats.winRate}% | Scored in ${homeHomeStats.scoringRate}% | 1H Goal Potential: ${homeHomeStats.htGoalRate || 0}%
+- Trends: Over 2.5 in ${homeForm.over25Rate}% | BTTS in ${homeForm.bttsRate}% | Clean Sheets: ${homeForm.cleanSheetRate || 0}%
+- At Home (Last 8): Wins ${homeHomeStats.winRate}% | Scored in ${homeHomeStats.scoringRate}% | Avg Scored ${homeHomeStats.avgScored.toFixed(1)}
 
 [AWAY TEAM: ${match.event_away_team}]
 - Recent Form (Last 5): Scored ${awayForm.avgScored.toFixed(1)}, Conceded ${awayForm.avgConceded.toFixed(1)}/game.
-- Trends: Over 2.5 in ${awayForm.over25Rate}% | BTTS in ${awayForm.bttsRate}% | Clean Sheets: ${awayForm.cleanSheetRate || 0}% | 1H Goals: ${awayForm.htGoalRate || 0}%
-- Away (Last 8): Wins ${awayAwayStats.winRate}% | Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0))}% | 1H Goal Potential: ${awayAwayStats.htGoalRate || 0}%
+- Trends: Over 2.5 in ${awayForm.over25Rate}% | BTTS in ${awayForm.bttsRate}% | Clean Sheets: ${awayForm.cleanSheetRate || 0}%
+- Away (Last 8): Wins ${awayAwayStats.winRate}% | Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0))}% | Avg Conceded ${awayAwayStats.avgConceded.toFixed(1)}
 
 [HEAD-TO-HEAD]
 - Mutual Matches: ${mutual.map(g => `${g.home_team_score}-${g.away_team_score}`).join(', ')}
 
+${oddsInfo}
 ${memoryContext}
 
 CLASSIFICATION RULES (Strict adherence required):
-Since we do not have live odds, you must ESTIMATE the probable market odds based on the dominance shown in stats.
+- Use the PROVIDED ODDS above to determine Value.
+- If Odds are NOT provided, estimate them based on dominance.
 
-- BANKO (Banker): High Probability (80%+). Estimated Odds: 1.15 - 1.60.
-- VALUE: Moderate Probability (50-79%). Estimated Odds: 1.60 - 2.20.
+- BANKO (Banker): Confidence 85%+, Low Risk. (Odds: 1.15 - 1.60).
+- VALUE: Confidence 65-84%, Moderate Risk. (Odds: 1.60 - 2.20).
 
 OUTPUT JSON (Must be valid JSON, no markdown text outside the block):
 {
