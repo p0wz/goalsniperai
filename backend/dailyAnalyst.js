@@ -666,7 +666,14 @@ If NO market is safe, return empty array.`;
             text = text.replace(/```json|```/g, '').trim();
             const json = JSON.parse(text);
 
-            return { recommendations: json.recommendations || [] };
+            return {
+                recommendations: json.recommendations || [],
+                training_data: {
+                    input: prompt,
+                    output: text,
+                    model: 'meta-llama/llama-4-scout-17b-16e-instruct'
+                }
+            };
 
         } catch (e) {
             const isRateLimited = e.message?.includes('429') || e.message?.includes('quota');
