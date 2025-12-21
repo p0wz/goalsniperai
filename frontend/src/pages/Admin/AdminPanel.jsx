@@ -475,7 +475,129 @@ export default function AdminPanel({ user, handleLogout }) {
                             </button>
                         </div>
 
-                        {/* RESULTS */}
+                        {/* ORACLE DASHBOARD (AI-FIRST) */}
+                        {dailyAnalysis?.oracle && dailyAnalysis.oracle.length > 0 && (
+                            <div className="mb-12 space-y-6">
+                                <div className="p-1 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600">
+                                    <div className="bg-background rounded-lg p-6">
+                                        <h3 className="text-2xl font-bold flex items-center gap-2 mb-6">
+                                            🤖 AI ORACLE RECOMMENDATIONS
+                                            <span className="text-sm font-normal text-muted-foreground ml-2">
+                                                (Based on detailed AI analysis of {dailyAnalysis.oracle.length} matches)
+                                            </span>
+                                        </h3>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            {/* COLUMN 1: BANKO */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between border-b pb-2">
+                                                    <h4 className="text-xl font-bold text-green-600 flex items-center gap-2">
+                                                        🏆 BANKO (High Confidence)
+                                                    </h4>
+                                                    <button
+                                                        onClick={() => {
+                                                            const bankos = dailyAnalysis.oracle.flatMap(m =>
+                                                                (m.recommendations || []).filter(r => r.classification === 'BANKO').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
+                                                            );
+                                                            if (confirm(`Approve all ${bankos.length} BANKO bets?`)) {
+                                                                signalService.bulkApprove(bankos, 'oracle');
+                                                                alert('Bankos Approved!');
+                                                            }
+                                                        }}
+                                                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200 font-bold"
+                                                    >
+                                                        ✅ Approve All Bankos
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {dailyAnalysis.oracle.flatMap(m =>
+                                                        (m.recommendations || []).filter(r => r.classification === 'BANKO').map((r, idx) => ({ ...r, match: m, idx: `${m.id}_${idx}` }))
+                                                    ).map(item => (
+                                                        <div key={item.idx} className="p-4 rounded-lg border bg-green-50/50 dark:bg-green-900/10 hover:shadow-md transition-all">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <div className="font-bold">{item.match.event_home_team} vs {item.match.event_away_team}</div>
+                                                                    <div className="text-xs text-muted-foreground">{item.match.league_name}</div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="font-bold text-green-600">{item.market}</div>
+                                                                    <div className="text-xs font-mono">{item.confidence}% Conf.</div>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-sm text-foreground/80 italic mb-3">"{item.reasoning}"</p>
+                                                            <button
+                                                                onClick={() => handleDailyAction({ ...item.match, market: item.market }, 'approve', 'oracle')}
+                                                                className="w-full py-1.5 rounded bg-green-600 text-white text-xs font-bold hover:bg-green-700"
+                                                            >
+                                                                APPROVE
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    {dailyAnalysis.oracle.flatMap(m => (m.recommendations || []).filter(r => r.classification === 'BANKO')).length === 0 && (
+                                                        <div className="text-center p-8 text-muted-foreground italic">No Banko opportunities found today.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* COLUMN 2: VALUE */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between border-b pb-2">
+                                                    <h4 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+                                                        💎 VALUE (High Reward)
+                                                    </h4>
+                                                    <button
+                                                        onClick={() => {
+                                                            const values = dailyAnalysis.oracle.flatMap(m =>
+                                                                (m.recommendations || []).filter(r => r.classification === 'VALUE').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
+                                                            );
+                                                            if (confirm(`Approve all ${values.length} VALUE bets?`)) {
+                                                                signalService.bulkApprove(values, 'oracle');
+                                                                alert('Value Bets Approved!');
+                                                            }
+                                                        }}
+                                                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 font-bold"
+                                                    >
+                                                        ✅ Approve All Value
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {dailyAnalysis.oracle.flatMap(m =>
+                                                        (m.recommendations || []).filter(r => r.classification === 'VALUE').map((r, idx) => ({ ...r, match: m, idx: `${m.id}_${idx}` }))
+                                                    ).map(item => (
+                                                        <div key={item.idx} className="p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 hover:shadow-md transition-all">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <div className="font-bold">{item.match.event_home_team} vs {item.match.event_away_team}</div>
+                                                                    <div className="text-xs text-muted-foreground">{item.match.league_name}</div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="font-bold text-blue-600">{item.market}</div>
+                                                                    <div className="text-xs font-mono">{item.confidence}% Conf.</div>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-sm text-foreground/80 italic mb-3">"{item.reasoning}"</p>
+                                                            <button
+                                                                onClick={() => handleDailyAction({ ...item.match, market: item.market }, 'approve', 'oracle')}
+                                                                className="w-full py-1.5 rounded bg-blue-600 text-white text-xs font-bold hover:bg-blue-700"
+                                                            >
+                                                                APPROVE
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    {dailyAnalysis.oracle.flatMap(m => (m.recommendations || []).filter(r => r.classification === 'VALUE')).length === 0 && (
+                                                        <div className="text-center p-8 text-muted-foreground italic">No Value opportunities found today.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* RESULTS (Legacy Grid) */}
                         <div className="space-y-6">
                             {Object.entries(MARKET_CONFIG).map(([key, config]) => {
                                 const items = dailyAnalysis?.[key] || [];
