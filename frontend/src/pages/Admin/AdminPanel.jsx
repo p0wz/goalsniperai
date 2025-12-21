@@ -487,11 +487,11 @@ ${allMatches.map((m, idx) => {
 
                                             // Cleaning specifically for Bulk Context
                                             // 1. Remove "Act as..." header
-                                            promptContent = promptContent.replace(/^Act as a professional.*$/zm, '');
+                                            promptContent = promptContent.replace(/^Act as a professional.*$/gm, '');
                                             // 2. Remove "Market: ..." line completely
-                                            promptContent = promptContent.replace(/^Market:.*$/zm, '');
+                                            promptContent = promptContent.replace(/^Market:.*$/gm, '');
                                             // 3. Remove "TASK: ..." footer
-                                            promptContent = promptContent.replace(/^TASK:.*$/zm, '');
+                                            promptContent = promptContent.replace(/^TASK:.*$/gm, '');
                                             // 4. Trim whitespace
                                             promptContent = promptContent.trim();
 
