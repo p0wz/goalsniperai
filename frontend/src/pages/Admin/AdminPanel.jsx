@@ -494,20 +494,35 @@ export default function AdminPanel({ user, handleLogout }) {
                                                     <h4 className="text-xl font-bold text-green-600 flex items-center gap-2">
                                                         🏆 BANKO (High Confidence)
                                                     </h4>
-                                                    <button
-                                                        onClick={() => {
-                                                            const bankos = dailyAnalysis.oracle.flatMap(m =>
-                                                                (m.recommendations || []).filter(r => r.classification === 'BANKO').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
-                                                            );
-                                                            if (confirm(`Approve all ${bankos.length} BANKO bets?`)) {
-                                                                signalService.bulkApprove(bankos, 'oracle');
-                                                                alert('Bankos Approved!');
-                                                            }
-                                                        }}
-                                                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200 font-bold"
-                                                    >
-                                                        ✅ Approve All Bankos
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                const bankos = dailyAnalysis.oracle.flatMap(m =>
+                                                                    (m.recommendations || []).filter(r => r.classification === 'BANKO').map(r => ({ ...r, match: m }))
+                                                                );
+                                                                const prompt = `Review these BANKO candidates and analyze if they are truly safe:\n\n${bankos.map((b, i) => `${i + 1}. ${b.match.event_home_team} vs ${b.match.event_away_team} (${b.match.league_name})\n   Pick: ${b.market}\n   AI Confidence: ${b.confidence}%\n   Reason: ${b.reasoning}`).join('\n\n')}`;
+                                                                navigator.clipboard.writeText(prompt);
+                                                                alert('Banko Prompt Copied! Paste into ChatGPT.');
+                                                            }}
+                                                            className="text-xs bg-muted text-muted-foreground px-3 py-1 rounded hover:bg-muted/80 font-bold border"
+                                                        >
+                                                            📋 Copy for Review
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const bankos = dailyAnalysis.oracle.flatMap(m =>
+                                                                    (m.recommendations || []).filter(r => r.classification === 'BANKO').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
+                                                                );
+                                                                if (confirm(`Approve all ${bankos.length} BANKO bets?`)) {
+                                                                    signalService.bulkApprove(bankos, 'oracle');
+                                                                    alert('Bankos Approved!');
+                                                                }
+                                                            }}
+                                                            className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200 font-bold"
+                                                        >
+                                                            ✅ Approve All Bankos
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div className="space-y-3">
@@ -546,20 +561,35 @@ export default function AdminPanel({ user, handleLogout }) {
                                                     <h4 className="text-xl font-bold text-blue-600 flex items-center gap-2">
                                                         💎 VALUE (High Reward)
                                                     </h4>
-                                                    <button
-                                                        onClick={() => {
-                                                            const values = dailyAnalysis.oracle.flatMap(m =>
-                                                                (m.recommendations || []).filter(r => r.classification === 'VALUE').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
-                                                            );
-                                                            if (confirm(`Approve all ${values.length} VALUE bets?`)) {
-                                                                signalService.bulkApprove(values, 'oracle');
-                                                                alert('Value Bets Approved!');
-                                                            }
-                                                        }}
-                                                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 font-bold"
-                                                    >
-                                                        ✅ Approve All Value
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                const values = dailyAnalysis.oracle.flatMap(m =>
+                                                                    (m.recommendations || []).filter(r => r.classification === 'VALUE').map(r => ({ ...r, match: m }))
+                                                                );
+                                                                const prompt = `Review these VALUE candidates and analyze if the risk is worth the reward:\n\n${values.map((b, i) => `${i + 1}. ${b.match.event_home_team} vs ${b.match.event_away_team} (${b.match.league_name})\n   Pick: ${b.market}\n   AI Confidence: ${b.confidence}%\n   Reason: ${b.reasoning}`).join('\n\n')}`;
+                                                                navigator.clipboard.writeText(prompt);
+                                                                alert('Value Prompt Copied! Paste into ChatGPT.');
+                                                            }}
+                                                            className="text-xs bg-muted text-muted-foreground px-3 py-1 rounded hover:bg-muted/80 font-bold border"
+                                                        >
+                                                            📋 Copy for Review
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const values = dailyAnalysis.oracle.flatMap(m =>
+                                                                    (m.recommendations || []).filter(r => r.classification === 'VALUE').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
+                                                                );
+                                                                if (confirm(`Approve all ${values.length} VALUE bets?`)) {
+                                                                    signalService.bulkApprove(values, 'oracle');
+                                                                    alert('Value Bets Approved!');
+                                                                }
+                                                            }}
+                                                            className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 font-bold"
+                                                        >
+                                                            ✅ Approve All Value
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div className="space-y-3">
