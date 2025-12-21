@@ -419,35 +419,34 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         log.info(`      • Home AvgScored@Home: ${homeHomeStats.avgScored.toFixed(2)} | Away AvgConceded@Away: ${awayAwayStats.avgConceded.toFixed(2)}`);
 
         // ----------------------------------------------------------------
-        // 🧠 PHASE 15: AI-FIRST ORACLE ANALYSIS
+        // 🧠 PHASE 15: AI-FIRST ORACLE ANALYSIS (DISABLED - STATS ONLY MODE)
         // ----------------------------------------------------------------
-        // We skip hardcoded filters and ask the Oracle directly.
-        log.info(`   🤖 Asking Oracle (Groq/Llama-17b)...`);
 
-        // Fetch Real Odds
-        log.info(`   💰 Fetching Real Odds...`);
-        const oddsData = await fetchMatchOdds(m.match_id || m.event_key);
+        // log.info(`   🤖 Asking Oracle (Groq/Llama-17b)...`);
+        // const oddsData = await fetchMatchOdds(m.match_id || m.event_key);
+        // const oracleResult = await analyzeMatchOracle({ ...m, filterStats: stats, oddsData: oddsData });
 
-        const oracleResult = await analyzeMatchOracle({ ...m, filterStats: stats, oddsData: oddsData });
+        // BYPASS: push all matches with stats to the list for manual review
+        candidates.oracle.push({
+            ...m,
+            filterStats: stats,
+            recommendations: [
+                {
+                    market: "Analyze Manually",
+                    classification: "STATS",
+                    confidence: 0,
+                    reasoning: "AI Disabled. Use Gemini Prompt."
+                }
+            ],
+            ai_analysis_raw: {}
+        });
 
-        if (oracleResult.recommendations && oracleResult.recommendations.length > 0) {
-            log.info(`   💡 Oracle found ${oracleResult.recommendations.length} picks!`);
+        // if (oracleResult.recommendations && oracleResult.recommendations.length > 0) {
+        // ... (lines commented out)
+        // } else { ... }
 
-            candidates.oracle.push({
-                ...m,
-                filterStats: stats,
-                recommendations: oracleResult.recommendations,
-                ai_analysis_raw: oracleResult
-            });
-
-            // Rate Limit Safety (30 RPM = 2s delay)
-            log.info(`   ⏳ Cooling down (2100ms)...`);
-            await sleep(2100);
-
-        } else {
-            log.info(`   skipping (Oracle found no value)`);
-            await sleep(2100);
-        }
+        // Minimal delay to prevent CPU spiking if sync
+        // await sleep(10);
     }
 
     // Summary
