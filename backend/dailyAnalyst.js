@@ -842,14 +842,16 @@ What is the "Ice Cold" risk here? Even with high percentage rates, could a recen
                 startTime: match.event_start_time,
                 league: match.league_name,
                 league_name: match.league_name,
-                market: match.market,
+                market: match.market || 'AI Analysis',
+                recommendations: match.recommendations || [], // Preserve AI picks
+                ai_analysis_raw: match.ai_analysis_raw,       // Preserve raw debug data
                 stats: match.filterStats,
                 detailed_analysis: analysisDetails,
                 ai_prompts: aiPrompts,
-                aiPrompt: aiPrompts[0], // Primary prompt for easy access
-                odds: oddsData, // Raw odds data (if available)
-                oddsText: oddsText, // Formatted odds text
-                status: 'PENDING_APPROVAL' // Admin needs to approve
+                aiPrompt: aiPrompts[0],
+                odds: oddsData,
+                oddsText: oddsText,
+                status: 'PENDING_APPROVAL'
             });
             log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
         }
