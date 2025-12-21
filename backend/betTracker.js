@@ -209,36 +209,7 @@ async function settleBets() {
 
                     // 🧠 Data Flywheel: Log to Training Dataset
                     if (bet.training_data) {
-                        try {
-                            const datasetPath = path.join(__dirname, 'data', 'training_dataset.jsonl');
-                            const trainingEntry = {
-                                messages: [
-                                    { role: "system", content: "You are a professional football betting analyst." },
-                                    { role: "user", content: bet.training_data.input },
-                                    {
-                                        role: "assistant",
-                                        content: bet.status === 'WON'
-                                            ? bet.training_data.analyst_output // If WON, the analysis was GOOD.
-                                            : `[CORRECTION] The previous analysis was wrong. The result was ${bet.result_score} (LOST). I should have been more skeptical.`
-                                    }
-                                ],
-                                meta: {
-                                    match: bet.match,
-                                    market: bet.market,
-                                    result: bet.status,
-                                    score: bet.result_score
-                                }
-                            };
-
-                            // Ensure directory exists
-                            const dataDir = path.join(__dirname, 'data');
-                            if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-
-                            fs.appendFileSync(datasetPath, JSON.stringify(trainingEntry) + '\n');
-                            console.log(`[Flywheel] 🧠 Saved training example for ${bet.match}`);
-                        } catch (err) {
-                            console.error(`[Flywheel] Error saving dataset: ${err.message}`);
-                        }
+                        logToFlywheel(bet);
                     }
                 }
             }
@@ -340,7 +311,45 @@ function manualSettle(betId, status, resultScore = null) {
     saveDb(db);
     console.log(`[BetTracker] ✅ Manual settle: ${bet.match} -> ${status}`);
 
+    // Trigger Flywheel if finalized
+    if (['WON', 'LOST'].includes(status) && bet.training_data) {
+        logToFlywheel(bet);
+    }
+
     return { success: true, bet };
+}
+
+// Helper: Log to Training Data (Flywheel)
+function logToFlywheel(bet) {
+    try {
+        const datasetPath = path.join(__dirname, 'data', 'training_dataset.jsonl');
+        const trainingEntry = {
+            messages: [
+                { role: "system", content: "You are a professional football betting analyst." },
+                { role: "user", content: bet.training_data.input },
+                {
+                    role: "assistant",
+                    content: bet.status === 'WON'
+                        ? bet.training_data.analyst_output
+                        : `[CORRECTION] The previous analysis was wrong. The result was ${bet.result_score || 'UNKNOWN'} (LOST). I should have been more skeptical.`
+                }
+            ],
+            meta: {
+                match: bet.match,
+                market: bet.market,
+                result: bet.status,
+                score: bet.result_score
+            }
+        };
+
+        const dataDir = path.join(__dirname, 'data');
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+
+        fs.appendFileSync(datasetPath, JSON.stringify(trainingEntry) + '\n');
+        console.log(`[Flywheel] 🧠 Saved training example for ${bet.match} (${bet.status})`);
+    } catch (err) {
+        console.error(`[Flywheel] Error saving dataset: ${err.message}`);
+    }
 }
 
 module.exports = {
