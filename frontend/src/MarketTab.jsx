@@ -170,6 +170,32 @@ function MarketTab({ marketKey, handleAddToPicks }) {
                                                 >
                                                     🔥 Parlay
                                                 </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res = await signalService.approveSignal(m.event_key || m.matchId, {
+                                                                matchData: {
+                                                                    matchId: m.event_key || m.matchId,
+                                                                    home_team: m.event_home_team,
+                                                                    away_team: m.event_away_team,
+                                                                    startTime: m.event_start_time
+                                                                },
+                                                                market: config.name,
+                                                                category: 'DAILY_ANALYSIS',
+                                                                confidence: 85
+                                                            });
+                                                            if (res.success) {
+                                                                alert("✅ Maç geçmişe eklendi!");
+                                                                // Optionally remove from list or highlight? 
+                                                                // Let's just notify for now as removing might be confusing if user wants to analyze again.
+                                                            } else alert("Hata: " + res.error);
+                                                        } catch (e) { alert(e.message); }
+                                                    }}
+                                                    className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
+                                                    title="Geçmişe Ekle & Takip Et"
+                                                >
+                                                    ✅ Takip
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
