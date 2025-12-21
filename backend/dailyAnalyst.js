@@ -326,7 +326,8 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     // 🧠 STATS ONLY MODE (Clean)
     // ----------------------------------------------------------------
     const candidates = {
-        all_stats: [] // Single bucket
+        all_stats: [], // Complete list for Manual Gemini Prompt
+        oracle: []     // Automated AI Picks (Phase 15)
     };
 
     let processed = 0;
@@ -350,7 +351,7 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         log.info(`\n───────────────────────────────────────────────────────`);
         log.info(`📌 [${matchNum}/${limit}] ${m.event_home_team} vs ${m.event_away_team}`);
 
-        await sleep(200); // Politeness
+        await sleep(50); // Small check delay
 
         // Fetch H2H
         const h2hData = await fetchMatchH2H(mid);
@@ -389,15 +390,48 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         log.info(`   ✅ Stats Calculated.`);
 
         // PUSH TO SINGLE LIST
-        candidates.all_stats.push({
+        const matchData = {
             ...m,
             filterStats: stats,
             recommendations: []
-        });
+        };
+        candidates.all_stats.push(matchData);
+    }
+
+    // ----------------------------------------------------------------
+    // 🤖 ORACLE AUTOMATION (Sequential for Ratelimits)
+    // ----------------------------------------------------------------
+    log.info(`\n🤖 Starting Oracle AI Analysis on ${candidates.all_stats.length} matches...`);
+
+    for (let i = 0; i < candidates.all_stats.length; i++) {
+        const match = candidates.all_stats[i];
+        log.info(`   🔮 Analyzing [${i + 1}/${candidates.all_stats.length}]: ${match.event_home_team} vs ${match.event_away_team}`);
+
+        // ORACLE CALL
+        // Rate limit: 2.5s delay
+        await sleep(2500);
+
+        try {
+            const oracleResult = await analyzeMatchOracle(match);
+
+            if (oracleResult && oracleResult.recommendations && oracleResult.recommendations.length > 0) {
+                log.success(`      ✅ Oracle found ${oracleResult.recommendations.length} opportunities!`);
+                candidates.oracle.push({
+                    ...match,
+                    recommendations: oracleResult.recommendations,
+                    ai_analysis_raw: oracleResult
+                });
+            } else {
+                log.info(`      zzz No strong signal.`);
+            }
+        } catch (e) {
+            log.error(`      ❌ Oracle Error: ${e.message}`);
+        }
     }
 
     log.info(`\n═══════════════════════════════════════════════════════`);
     log.info(`📊 STATS SUMMARY: Found ${candidates.all_stats.length} matches.`);
+    log.info(`🤖 ORACLE SUMMARY: Found ${candidates.oracle.length} matches with recommendations.`);
     log.info(`═══════════════════════════════════════════════════════`);
 
     return candidates;
