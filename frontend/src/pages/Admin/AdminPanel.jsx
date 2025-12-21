@@ -18,10 +18,6 @@ export default function AdminPanel({ user, handleLogout }) {
     const [botRunning, setBotRunning] = useState(false);
     const [botStatusLoading, setBotStatusLoading] = useState(false);
 
-    // Gemini Import State
-    const [showImportModal, setShowImportModal] = useState(false);
-    const [importText, setImportText] = useState('');
-
     useEffect(() => {
         fetchLiveSignals();
         fetchBetHistory();
@@ -477,256 +473,9 @@ export default function AdminPanel({ user, handleLogout }) {
                             >
                                 {isAnalysing ? '⏳ Taranıyor...' : '🌍 TÜM MAÇLAR (Filtresiz)'}
                             </button>
-                            <button
-                                onClick={() => setShowImportModal(true)}
-                                disabled={isAnalysing}
-                                className="px-6 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
-                            >
-                                📥 MANUEL GEMINI SONUCU YÜKLE
-                            </button>
                         </div>
 
-                        {/* MANUAL AI DASHBOARD (IMPORTED) */}
-                        {dailyAnalysis?.gemini && dailyAnalysis.gemini.length > 0 && (
-                            <div className="mb-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="p-1 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500">
-                                    <div className="bg-background rounded-lg p-6">
-                                        <h3 className="text-2xl font-bold flex items-center gap-2 mb-6 text-orange-600">
-                                            🧠 MANUAL GEMINI PICKS
-                                            <span className="text-sm font-normal text-muted-foreground ml-2">
-                                                (Imported from your manual analysis)
-                                            </span>
-                                        </h3>
-
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                            {/* ALL GEMINI PICKS RENDERED HERE */}
-                                            {['BANKO', 'VALUE'].map(type => {
-                                                const picks = dailyAnalysis.gemini.filter(p => p.classification === type);
-                                                if (picks.length === 0) return null;
-
-                                                return (
-                                                    <div key={type} className="space-y-4">
-                                                        <h4 className={`text-xl font-bold flex items-center gap-2 ${type === 'BANKO' ? 'text-green-600' : 'text-blue-600'}`}>
-                                                            {type === 'BANKO' ? '🏆 BANKO' : '💎 VALUE'}
-                                                        </h4>
-                                                        <button
-                                                            onClick={() => {
-                                                                const items = picks.map(r => ({
-                                                                    id: r.id,
-                                                                    matchData: {
-                                                                        matchId: r.event_key || `gemini_${Date.now()}`, // Fallback ID
-                                                                        home_team: r.home_team,
-                                                                        away_team: r.away_team
-                                                                    },
-                                                                    market: r.market,
-                                                                    category: 'gemini', // TRACK HISTORY SEPARATELY
-                                                                    confidence: r.confidence,
-                                                                    reason: r.reason
-                                                                }));
-                                                                if (confirm(`Approve all ${items.length} MANUAL ${type} bets?`)) {
-                                                                    signalService.bulkApprove(items, 'gemini');
-                                                                    alert(`${type} Bets Approved!`);
-                                                                }
-                                                            }}
-                                                            className={`text-xs ml-auto px-3 py-1 rounded font-bold text-white ${type === 'BANKO' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-                                                        >
-                                                            ✅ Approve All {type}
-                                                        </button>
-
-                                                        <div className="space-y-3">
-                                                            {picks.map((item, idx) => (
-                                                                <div key={idx} className="p-4 rounded-lg border hover:shadow-md transition-all bg-card">
-                                                                    <div className="flex justify-between items-start mb-2">
-                                                                        <div>
-                                                                            <div className="font-bold">{item.home_team} vs {item.away_team}</div>
-                                                                            <div className="text-xs text-muted-foreground">{item.market}</div>
-                                                                        </div>
-                                                                        <div className="text-right">
-                                                                            <div className="text-xs font-mono">{item.odds} Odds</div>
-                                                                            <div className="font-bold text-orange-600">{item.confidence}%</div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <p className="text-sm text-foreground/80 italic mb-3">"{item.reason}"</p>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            // Construct a mock 'match' object for handleDailyAction
-                                                                            const mockMatch = {
-                                                                                id: item.id,
-                                                                                event_home_team: item.home_team,
-                                                                                event_away_team: item.away_team,
-                                                                                matchId: item.event_key || `gemini_${Date.now()}`
-                                                                            };
-                                                                            handleDailyAction({ ...mockMatch, market: item.market }, 'approve', 'gemini');
-                                                                        }}
-                                                                        className="w-full py-1.5 rounded bg-orange-600 text-white text-xs font-bold hover:bg-orange-700"
-                                                                    >
-                                                                        APPROVE
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ORACLE DASHBOARD (AI-FIRST) */}
-                        {dailyAnalysis?.oracle && dailyAnalysis.oracle.length > 0 && (
-                            <div className="mb-12 space-y-6">
-                                <div className="p-1 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600">
-                                    <div className="bg-background rounded-lg p-6">
-                                        <h3 className="text-2xl font-bold flex items-center gap-2 mb-6">
-                                            🤖 AI ORACLE RECOMMENDATIONS
-                                            <span className="text-sm font-normal text-muted-foreground ml-2">
-                                                (Based on detailed AI analysis of {dailyAnalysis.oracle.length} matches)
-                                            </span>
-                                        </h3>
-
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                            {/* COLUMN 1: BANKO */}
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between border-b pb-2">
-                                                    <h4 className="text-xl font-bold text-green-600 flex items-center gap-2">
-                                                        🏆 BANKO (High Confidence)
-                                                    </h4>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                const bankos = dailyAnalysis.oracle.flatMap(m =>
-                                                                    (m.recommendations || []).filter(r => r.classification === 'BANKO').map(r => ({ ...r, match: m }))
-                                                                );
-                                                                const prompt = `Review these BANKO candidates and analyze if they are truly safe:\n\n${bankos.map((b, i) => `${i + 1}. ${b.match.event_home_team} vs ${b.match.event_away_team} (${b.match.league_name})\n   Pick: ${b.market}\n   AI Confidence: ${b.confidence}%\n   Reason: ${b.reasoning}`).join('\n\n')}`;
-                                                                navigator.clipboard.writeText(prompt);
-                                                                alert('Banko Prompt Copied! Paste into ChatGPT.');
-                                                            }}
-                                                            className="text-xs bg-muted text-muted-foreground px-3 py-1 rounded hover:bg-muted/80 font-bold border"
-                                                        >
-                                                            📋 Copy for Review
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const bankos = dailyAnalysis.oracle.flatMap(m =>
-                                                                    (m.recommendations || []).filter(r => r.classification === 'BANKO').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
-                                                                );
-                                                                if (confirm(`Approve all ${bankos.length} BANKO bets?`)) {
-                                                                    signalService.bulkApprove(bankos, 'oracle');
-                                                                    alert('Bankos Approved!');
-                                                                }
-                                                            }}
-                                                            className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200 font-bold"
-                                                        >
-                                                            ✅ Approve All Bankos
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    {dailyAnalysis.oracle.flatMap(m =>
-                                                        (m.recommendations || []).filter(r => r.classification === 'BANKO').map((r, idx) => ({ ...r, match: m, idx: `${m.id}_${idx}` }))
-                                                    ).map(item => (
-                                                        <div key={item.idx} className="p-4 rounded-lg border bg-green-50/50 dark:bg-green-900/10 hover:shadow-md transition-all">
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <div>
-                                                                    <div className="font-bold">{item.match.event_home_team} vs {item.match.event_away_team}</div>
-                                                                    <div className="text-xs text-muted-foreground">{item.match.league_name}</div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <div className="font-bold text-green-600">{item.market}</div>
-                                                                    <div className="text-xs font-mono">{item.confidence}% Conf.</div>
-                                                                </div>
-                                                            </div>
-                                                            <p className="text-sm text-foreground/80 italic mb-3">"{item.reasoning}"</p>
-                                                            <button
-                                                                onClick={() => handleDailyAction({ ...item.match, market: item.market }, 'approve', 'oracle')}
-                                                                className="w-full py-1.5 rounded bg-green-600 text-white text-xs font-bold hover:bg-green-700"
-                                                            >
-                                                                APPROVE
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {dailyAnalysis.oracle.flatMap(m => (m.recommendations || []).filter(r => r.classification === 'BANKO')).length === 0 && (
-                                                        <div className="text-center p-8 text-muted-foreground italic">No Banko opportunities found today.</div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* COLUMN 2: VALUE */}
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between border-b pb-2">
-                                                    <h4 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-                                                        💎 VALUE (High Reward)
-                                                    </h4>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                const values = dailyAnalysis.oracle.flatMap(m =>
-                                                                    (m.recommendations || []).filter(r => r.classification === 'VALUE').map(r => ({ ...r, match: m }))
-                                                                );
-                                                                const prompt = `Review these VALUE candidates and analyze if the risk is worth the reward:\n\n${values.map((b, i) => `${i + 1}. ${b.match.event_home_team} vs ${b.match.event_away_team} (${b.match.league_name})\n   Pick: ${b.market}\n   AI Confidence: ${b.confidence}%\n   Reason: ${b.reasoning}`).join('\n\n')}`;
-                                                                navigator.clipboard.writeText(prompt);
-                                                                alert('Value Prompt Copied! Paste into ChatGPT.');
-                                                            }}
-                                                            className="text-xs bg-muted text-muted-foreground px-3 py-1 rounded hover:bg-muted/80 font-bold border"
-                                                        >
-                                                            📋 Copy for Review
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const values = dailyAnalysis.oracle.flatMap(m =>
-                                                                    (m.recommendations || []).filter(r => r.classification === 'VALUE').map(r => ({ id: m.id, matchData: { matchId: m.event_key || m.match_id, home_team: m.event_home_team, away_team: m.event_away_team, training_data: m.ai_analysis_raw?.training_data }, market: r.market, category: 'oracle' }))
-                                                                );
-                                                                if (confirm(`Approve all ${values.length} VALUE bets?`)) {
-                                                                    signalService.bulkApprove(values, 'oracle');
-                                                                    alert('Value Bets Approved!');
-                                                                }
-                                                            }}
-                                                            className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 font-bold"
-                                                        >
-                                                            ✅ Approve All Value
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    {dailyAnalysis.oracle.flatMap(m =>
-                                                        (m.recommendations || []).filter(r => r.classification === 'VALUE').map((r, idx) => ({ ...r, match: m, idx: `${m.id}_${idx}` }))
-                                                    ).map(item => (
-                                                        <div key={item.idx} className="p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 hover:shadow-md transition-all">
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <div>
-                                                                    <div className="font-bold">{item.match.event_home_team} vs {item.match.event_away_team}</div>
-                                                                    <div className="text-xs text-muted-foreground">{item.match.league_name}</div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <div className="font-bold text-blue-600">{item.market}</div>
-                                                                    <div className="text-xs font-mono">{item.confidence}% Conf.</div>
-                                                                </div>
-                                                            </div>
-                                                            <p className="text-sm text-foreground/80 italic mb-3">"{item.reasoning}"</p>
-                                                            <button
-                                                                onClick={() => handleDailyAction({ ...item.match, market: item.market }, 'approve', 'oracle')}
-                                                                className="w-full py-1.5 rounded bg-blue-600 text-white text-xs font-bold hover:bg-blue-700"
-                                                            >
-                                                                APPROVE
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {dailyAnalysis.oracle.flatMap(m => (m.recommendations || []).filter(r => r.classification === 'VALUE')).length === 0 && (
-                                                        <div className="text-center p-8 text-muted-foreground italic">No Value opportunities found today.</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* RESULTS (Legacy Grid) */}
+                        {/* RESULTS */}
                         <div className="space-y-6">
                             {Object.entries(MARKET_CONFIG).map(([key, config]) => {
                                 const items = dailyAnalysis?.[key] || [];
@@ -740,51 +489,23 @@ export default function AdminPanel({ user, handleLogout }) {
                                                 {items.length > 0 && (
                                                     <button
                                                         onClick={() => {
-                                                            // Generate Bulk Prompt on Client Side
-                                                            let bulkPrompt = `ROLE: Expert Football Analyst (Stats Only Mode)\n`;
-                                                            bulkPrompt += `TASK: Analyze these matches using the detailed statistics provided. DO NOT ask for odds. Use the stats to estimate probability.\n`;
-                                                            bulkPrompt += `CLASSIFICATION RULES (Strict):\n`;
-                                                            bulkPrompt += `1. BANKO: Very High Probability. If you think the "True Odds" would be between 1.15 - 1.50. Safe bet.\n`;
-                                                            bulkPrompt += `2. VALUE: Good Probability but moderate risk. If "True Odds" would be > 1.50. High reward.\n\n`;
-                                                            bulkPrompt += `IMPORTANT: Output JSON ONLY with "classification": "BANKO" | "VALUE".\n\n`;
+                                                            const bulkPrompt = `📊 ${config.name.toUpperCase()} ANALİZİ (${items.length} Maç)
+════════════════════════════════════════
 
-                                                            items.forEach((m, idx) => {
-                                                                const stats = m.filterStats || {};
-                                                                const hHome = stats.homeHomeStats || {};
-                                                                const aAway = stats.awayAwayStats || {};
-                                                                const hForm = stats.homeForm || {};
-                                                                const aForm = stats.awayForm || {};
-                                                                const mutual = stats.mutual || [];
-
-                                                                bulkPrompt += `[MATCH ${idx + 1}] ${m.event_home_team} vs ${m.event_away_team}\n`;
-                                                                bulkPrompt += `LEAGUE: ${m.league_name}\n`;
-
-                                                                if (hForm.avgScored) {
-                                                                    bulkPrompt += `HOME (${m.event_home_team}):\n`;
-                                                                    bulkPrompt += `  - Form (Last 5): Scored ${hForm.avgScored?.toFixed(2)}, Conceded ${hForm.avgConceded?.toFixed(2)}\n`;
-                                                                    bulkPrompt += `  - Trends: Over 2.5 ${hForm.over25Rate?.toFixed(0)}%, BTTS ${hForm.bttsRate?.toFixed(0)}%, CleanSheet ${hForm.cleanSheetRate?.toFixed(0)}%\n`;
-                                                                    bulkPrompt += `  - At Home: Win ${hHome.winRate?.toFixed(0)}%, Scored in ${hHome.scoringRate?.toFixed(0)}% of games\n`;
-
-                                                                    bulkPrompt += `AWAY (${m.event_away_team}):\n`;
-                                                                    bulkPrompt += `  - Form (Last 5): Scored ${aForm.avgScored?.toFixed(2)}, Conceded ${aForm.avgConceded?.toFixed(2)}\n`;
-                                                                    bulkPrompt += `  - Trends: Over 2.5 ${aForm.over25Rate?.toFixed(0)}%, BTTS ${aForm.bttsRate?.toFixed(0)}%, CleanSheet ${aForm.cleanSheetRate?.toFixed(0)}%\n`;
-                                                                    bulkPrompt += `  - At Away: Win ${aAway.winRate?.toFixed(0)}%, Conceded in ${aAway.lossCount} games (clean sheets: ${aAway.cleanSheetRate?.toFixed(0)}%)\n`;
-
-                                                                    if (mutual.length > 0) {
-                                                                        bulkPrompt += `HEAD-TO-HEAD (Last ${mutual.length}): ${mutual.map(g => `${g.home_team_score}-${g.away_team_score}`).join(', ')}\n`;
-                                                                    }
-                                                                }
-                                                                bulkPrompt += `----------------------------------------\n`;
-                                                            });
-
-                                                            bulkPrompt += `\nOutput Format:\n{ "picks": [ { "home_team": "...", "away_team": "...", "market": "Over 2.5 or Home Win etc", "classification": "BANKO", "confidence": 90, "reason": "Brief reason based on stats" } ] }`;
-
+${items.map((m, idx) => {
+                                                                const prompt = m.aiPrompt || m.ai_prompts?.[0] || '';
+                                                                return `\n[${idx + 1}/${items.length}] ${m.event_home_team} vs ${m.event_away_team}
+----------------------------------------
+${prompt}
+`;
+                                                            }).join('\n')}
+════════════════════════════════════════`;
                                                             navigator.clipboard.writeText(bulkPrompt);
-                                                            alert(`✅ ${items.length} maç için Gemini Prompt kopyalandı!`);
+                                                            alert('TOPLU AI PROMPT KOPYALANDI! 📋');
                                                         }}
-                                                        className="px-3 py-1.5 text-xs font-bold bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-1 shadow-sm"
+                                                        className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 flex items-center gap-1 shadow-sm"
                                                     >
-                                                        🤖 GEMINI PROMPT KOPYALA (TÜMÜ)
+                                                        🤖 TOPLU COPY
                                                     </button>
                                                 )}
                                                 <span className="text-xs px-2 py-1 bg-background rounded border font-mono">
@@ -945,36 +666,6 @@ export default function AdminPanel({ user, handleLogout }) {
                     match={selectedDailyMatch}
                     onClose={() => setSelectedDailyMatch(null)}
                 />
-            )}
-
-            {/* GEMINI IMPORT MODAL */}
-            {showImportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-2xl rounded-lg border bg-card p-6 shadow-xl animate-in fade-in zoom-in duration-200">
-                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                            📥 Gemini/AI Yanıtını İçe Aktar
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            Gemini'nin verdiği JSON formatındaki yanıtı buraya yapıştırın.
-                        </p>
-
-                        <textarea
-                            value={importText}
-                            onChange={(e) => setImportText(e.target.value)}
-                            placeholder='{"picks": [...] }'
-                            className="w-full h-64 p-3 rounded border bg-background font-mono text-sm mb-4 focus:ring-2 focus:ring-primary"
-                        />
-
-                        <div className="flex justify-end gap-2">
-                            <NeuButton variant="secondary" onClick={() => setShowImportModal(false)}>
-                                İptal
-                            </NeuButton>
-                            <NeuButton variant="primary" onClick={handleImportGemini} disabled={!importText.trim() || refreshing}>
-                                {refreshing ? 'İşleniyor...' : 'İçe Aktar ve Kaydet'}
-                            </NeuButton>
-                        </div>
-                    </div>
-                </div>
             )}
         </div>
     );

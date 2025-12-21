@@ -5,7 +5,6 @@
 const axios = require('axios');
 const betTracker = require('./betTracker');
 const { analyzeFirstHalfPreMatch } = require('./analysis/firstHalfAnalyzer');
-const memoryService = require('./services/memoryService');
 require('dotenv').config();
 
 // Config
@@ -322,15 +321,21 @@ function calculateAdvancedStats(history, teamName) {
 
 // 3. Process & Filter
 async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
-    // ----------------------------------------------------------------
-    // 🧠 STATS ONLY MODE (Clean)
-    // ----------------------------------------------------------------
     const candidates = {
-        all_stats: [], // Complete list for Manual Gemini Prompt
-        oracle: []     // Automated AI Picks (Phase 15)
+        over25: [],
+        doubleChance: [],
+        homeOver15: [],
+        under35: [],
+        under25: [],
+        btts: [],
+        firstHalfOver05: [],
+        ms1AndOver15: [],
+        awayOver05: [],
+        handicap: []
     };
 
     let processed = 0;
+    let consecutiveErrors = 0;
     let skippedNoH2H = 0;
     let skippedNoStats = 0;
 
@@ -339,29 +344,39 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`═══════════════════════════════════════════════════════`);
 
     for (const m of matches) {
-        if (processed >= limit) break;
+        if (processed >= limit) {
+            log.info(`\n⏹️ Reached limit of ${limit} matches. Stopping.`);
+            break;
+        }
+        if (consecutiveErrors >= 3) {
+            log.error('[DailyAnalyst] Circuit Breaker: Too many consecutive errors. Aborting.');
+            break;
+        }
 
         const mid = m.event_key || m.match_id;
         if (!mid) continue;
 
-        // SKIP INVALID LEAGUES (if strict)
-        if (m.league_name.includes('Women') || m.league_name.includes('U19') || m.league_name.includes('Reserve')) continue;
-
         const matchNum = processed + 1;
         log.info(`\n───────────────────────────────────────────────────────`);
         log.info(`📌 [${matchNum}/${limit}] ${m.event_home_team} vs ${m.event_away_team}`);
+        log.info(`   📍 League: ${m.league_name}`);
 
-        await sleep(50); // Small check delay
+        await sleep(800);
 
-        // Fetch H2H
+        log.info(`   🔍 Fetching H2H data...`);
         const h2hData = await fetchMatchH2H(mid);
         if (!h2hData) {
+            log.warn(`   ❌ H2H fetch failed - skipping`);
+            consecutiveErrors++;
             skippedNoH2H++;
             continue;
         }
 
         const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+        log.info(`   ✅ H2H fetched: ${sections.length} historical matches`);
 
+        // Filter History
+        // Use full history for 1H Analysis
         const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
         const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
 
@@ -374,64 +389,158 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             (x.home_team?.name === m.event_away_team && x.away_team?.name === m.event_home_team)
         ).slice(0, 3);
 
+        log.info(`   📈 History: Home(${homeAllHistory.length}) Away(${awayAllHistory.length}) H@H(${homeAtHomeHistory.length}) A@A(${awayAtAwayHistory.length}) Mutual(${mutualH2H.length})`);
+
         const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
         const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
         const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
         const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
 
         if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
+            log.warn(`   ❌ Insufficient stats - skipping`);
+            consecutiveErrors = 0;
             skippedNoStats++;
             continue;
         }
 
+        consecutiveErrors = 0;
         processed++;
         const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
+        const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
 
-        log.info(`   ✅ Stats Calculated.`);
+        // Log calculated stats
+        log.info(`   📊 STATS:`);
+        log.info(`      • League Avg Goals: ${proxyLeagueAvg.toFixed(2)}`);
+        log.info(`      • Home Over1.5: ${homeForm.over15Rate.toFixed(0)}% | Away Over1.5: ${awayForm.over15Rate.toFixed(0)}%`);
+        log.info(`      • Home Scoring@Home: ${homeHomeStats.scoringRate.toFixed(0)}% | Away Scoring@Away: ${awayAwayStats.scoringRate.toFixed(0)}%`);
+        log.info(`      • Home AvgScored@Home: ${homeHomeStats.avgScored.toFixed(2)} | Away AvgConceded@Away: ${awayAwayStats.avgConceded.toFixed(2)}`);
 
-        // PUSH TO SINGLE LIST
-        const matchData = {
-            ...m,
-            filterStats: stats,
-            recommendations: []
-        };
-        candidates.all_stats.push(matchData);
-    }
+        // Check each filter
+        const passedFilters = [];
 
-    // ----------------------------------------------------------------
-    // 🤖 ORACLE AUTOMATION (Sequential for Ratelimits)
-    // ----------------------------------------------------------------
-    log.info(`\n🤖 Starting Oracle AI Analysis on ${candidates.all_stats.length} matches...`);
+        // Logic A: Over 2.5 (IMPROVED)
+        // Lig ort ≥3.0, Her iki takım O2.5 ≥70%, Ev avgScored ≥1.5
+        if (proxyLeagueAvg >= 3.0 &&
+            homeForm.over25Rate >= 70 && awayForm.over25Rate >= 70 &&
+            homeHomeStats.avgScored >= 1.5) {
+            candidates.over25.push({ ...m, filterStats: stats, market: 'Over 2.5 Goals' });
+            passedFilters.push('Over 2.5');
+        }
 
-    for (let i = 0; i < candidates.all_stats.length; i++) {
-        const match = candidates.all_stats[i];
-        log.info(`   🔮 Analyzing [${i + 1}/${candidates.all_stats.length}]: ${match.event_home_team} vs ${match.event_away_team}`);
 
-        // ORACLE CALL
-        // Rate limit: 2.5s delay
-        await sleep(2500);
+        // Logic C: BTTS (Both Teams To Score)
+        // Ev evinde gol atma ≥75%, Dep deplasmanda gol atma ≥70%, Her iki takım BTTS ≥60%
+        if (homeHomeStats.scoringRate >= 75 && awayAwayStats.scoringRate >= 70 &&
+            homeForm.bttsRate >= 60 && awayForm.bttsRate >= 60) {
+            candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS (Both Teams To Score)' });
+            passedFilters.push('BTTS');
+        }
 
-        try {
-            const oracleResult = await analyzeMatchOracle(match);
+        // Logic D: 1X Double Chance (IMPROVED)
+        // Ev mağlubiyet ≤1, Dep kazanma <30%, Ev winRate ≥50%, Ev scoringRate ≥75%
+        if (homeHomeStats.lossCount <= 1 && awayAwayStats.winRate < 30 &&
+            homeHomeStats.winRate >= 50 && homeHomeStats.scoringRate >= 75) {
+            candidates.doubleChance.push({ ...m, filterStats: stats, market: '1X Double Chance' });
+            passedFilters.push('1X DC');
+        }
 
-            if (oracleResult && oracleResult.recommendations && oracleResult.recommendations.length > 0) {
-                log.success(`      ✅ Oracle found ${oracleResult.recommendations.length} opportunities!`);
-                candidates.oracle.push({
-                    ...match,
-                    recommendations: oracleResult.recommendations,
-                    ai_analysis_raw: oracleResult
-                });
-            } else {
-                log.info(`      zzz No strong signal.`);
+        // Logic E: Home Over 1.5 (IMPROVED)
+        // Ev avgScored ≥1.6, Dep avgConceded ≥1.4, Ev scoringRate ≥80%, Ev over15Rate ≥60%
+        // Logic E: Home Over 1.5 (IMPROVED - STRICTER)
+        // Ev avgScored >= 2.0, Dep avgConceded >= 1.5, Ev scoringRate >= 85%, Ev over15Rate >= 80%
+        if (homeHomeStats.avgScored >= 2.0 && awayAwayStats.avgConceded >= 1.5 &&
+            homeHomeStats.scoringRate >= 85 && homeForm.over15Rate >= 80) {
+            candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
+            passedFilters.push('Home O1.5');
+        }
+        // Logic E: Under 3.5
+        let h2hSafe = mutualH2H.every(g => (parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0)) <= 4);
+        if (proxyLeagueAvg < 2.4 && homeForm.under35Rate >= 80 && awayForm.under35Rate >= 80 && h2hSafe) {
+            candidates.under35.push({ ...m, filterStats: stats, market: 'Under 3.5 Goals' });
+            passedFilters.push('Under 3.5');
+        }
+
+        // Logic F: Under 2.5 (NEW)
+        // Strict low-scoring check: League Avg < 2.5, Both Teams U2.5 Rate >= 75%
+        if (proxyLeagueAvg < 2.5 && homeForm.under25Rate >= 75 && awayForm.under25Rate >= 75) {
+            // Extra Safety: Check H2H history for high scoring games
+            const mutualOver35 = mutualH2H.some(g => (parseInt(g.home_team?.score || 0) + parseInt(g.away_team?.score || 0)) > 3);
+
+            if (!mutualOver35) {
+                candidates.under25.push({ ...m, filterStats: stats, market: 'Under 2.5 Goals' });
+                passedFilters.push('Under 2.5');
             }
-        } catch (e) {
-            log.error(`      ❌ Oracle Error: ${e.message}`);
+        }
+
+        // Logic G: First Half Over 0.5 (NEW)
+        // Uses separate pure form analysis
+        const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
+        if (fhAnalysis.signal) {
+            // Attach the specific analysis to the match object for later use
+            candidates.firstHalfOver05.push({ ...m, filterStats: stats, fhStats: fhAnalysis, market: 'First Half Over 0.5' });
+            passedFilters.push('1H Over 0.5');
+        }
+
+        // Logic H: MS1 & 1.5 Üst (IMPROVED - STRICTER)
+        // Home Win >= 60%, Home Avg Scored > 1.9, Away Avg Conceded > 1.2
+        if (homeHomeStats.winRate >= 60 && homeHomeStats.avgScored >= 1.9 &&
+            awayAwayStats.avgConceded >= 1.2 &&
+            homeForm.over15Rate >= 75) {
+            candidates.ms1AndOver15.push({ ...m, filterStats: stats, market: 'MS1 & 1.5 Üst' });
+            passedFilters.push('MS1 & 1.5+');
+        }
+
+        // Logic I: Dep 0.5 Üst (NEW)
+        // Away Scoring Rate >= 70% AND Home Clean Sheet Rate <= 30%
+        const homeConcedeRate = 100 - (homeHomeStats.cleanSheetRate || (100 - (homeHomeStats.lossCount + homeHomeStats.draws) * 10)); // Approximate check if simple stats
+        // Actually cleaner: homeHomeStats.scoringRate is offense. Defense check:
+        // Let's use avgConceded.
+        // Logic I: Dep 0.5 Üst (IMPROVED - STRICTER)
+        // Away Scoring Rate >= 80%, Away Avg Scored >= 1.2, Home Concede Rate >= 80% (CleanSheet <= 20%)
+        if (awayAwayStats.scoringRate >= 80 && awayAwayStats.avgScored >= 1.2 &&
+            (100 - (homeHomeStats.cleanSheetRate || 0)) >= 80) {
+            candidates.awayOver05.push({ ...m, filterStats: stats, market: 'Dep 0.5 Üst' });
+            passedFilters.push('Away 0.5+');
+        }
+
+        // Logic J: Handikaplı Maç Sonucu (-1) (NEW)
+        // Strong Home: WinRate >= 60%, Avg Scored > Conceded + 1.2
+        // Logic J: Handicap Match Result (-1.5) (DUAL SIDE)
+        // Home Fav: Win >= 70%, GoalDiff >= 1.8 | Away Fav: Win >= 70%, GoalDiff >= 1.8
+        const homeGoalDiff = homeHomeStats.avgScored - homeHomeStats.avgConceded;
+        const awayGoalDiff = awayAwayStats.avgScored - awayAwayStats.avgConceded;
+
+        if (homeHomeStats.winRate >= 70 && homeGoalDiff >= 1.8) {
+            candidates.handicap.push({ ...m, filterStats: stats, market: 'Hnd. MS1 (-1.5)' });
+            passedFilters.push('Hnd. MS1 -1.5');
+        } else if (awayAwayStats.winRate >= 70 && awayGoalDiff >= 1.8) {
+            candidates.handicap.push({ ...m, filterStats: stats, market: 'Hnd. MS2 (-1.5)' });
+            passedFilters.push('Hnd. MS2 -1.5');
+        }
+
+        if (passedFilters.length > 0) {
+            log.info(`   ✅ PASSED: ${passedFilters.join(', ')}`);
+        } else {
+            log.info(`   ⏭️ No filters passed`);
         }
     }
 
+    // Summary
     log.info(`\n═══════════════════════════════════════════════════════`);
-    log.info(`📊 STATS SUMMARY: Found ${candidates.all_stats.length} matches.`);
-    log.info(`🤖 ORACLE SUMMARY: Found ${candidates.oracle.length} matches with recommendations.`);
+    log.info(`📊 FILTER SUMMARY`);
+    log.info(`   • Processed: ${processed}/${limit}`);
+    log.info(`   • Skipped (No H2H): ${skippedNoH2H}`);
+    log.info(`   • Skipped (No Stats): ${skippedNoStats}`);
+    log.info(`   • Over 2.5 candidates: ${candidates.over25.length}`);
+    log.info(`   • BTTS candidates: ${candidates.btts.length}`);
+    log.info(`   • 1X DC candidates: ${candidates.doubleChance.length}`);
+    log.info(`   • Home O1.5 candidates: ${candidates.homeOver15.length}`);
+    log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
+    log.info(`   • Under 2.5 candidates: ${candidates.under25.length}`);
+    log.info(`   • 1H Over 0.5 candidates: ${candidates.firstHalfOver05.length}`);
+    log.info(`   • MS1 & 1.5+ candidates: ${candidates.ms1AndOver15.length}`);
+    log.info(`   • Away 0.5+ candidates: ${candidates.awayOver05.length}`);
+    log.info(`   • Handicap candidates: ${candidates.handicap.length}`);
     log.info(`═══════════════════════════════════════════════════════`);
 
     return candidates;
@@ -443,26 +552,6 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 async function validateWithAI(match, retries = 3) {
     if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
 
-
-    // Get Historical Context (Memory)
-    const similarMatches = memoryService.findSimilarMatches(match, match.market);
-    let memoryContext = '';
-
-    if (similarMatches.length > 0) {
-        const wonCount = similarMatches.filter(m => m.status === 'WON').length;
-        const lostCount = similarMatches.filter(m => m.status === 'LOST').length;
-
-        memoryContext = `
-HISTORICAL MEMORY (GoalSniper Experience):
-I have found ${similarMatches.length} past matches with similar profile for this team/market:
-- Results: ${wonCount} WON, ${lostCount} LOST
-- Recent examples:
-${similarMatches.map(m => `  • ${m.match} (${m.date}): ${m.status} (Score: ${m.result_score})`).join('\n')}
-
-Use this memory to adjust your confidence. If past results are bad, be skeptical.
-`;
-    }
-
     const prompt = `You are a professional football betting analyst. Analyze this match for market: ${match.market}.
 
 Match: ${match.event_home_team} vs ${match.event_away_team}
@@ -473,91 +562,44 @@ Statistics:
 - Home @ Home: Scored in ${match.filterStats.homeHomeStats.scoringRate.toFixed(0)}% of games, Avg Scored ${match.filterStats.homeHomeStats.avgScored.toFixed(2)}
 - Away @ Away: Scored in ${match.filterStats.awayAwayStats.scoringRate.toFixed(0)}% of games, Avg Conceded ${match.filterStats.awayAwayStats.avgConceded.toFixed(2)}
 
-${memoryContext}
-
 IMPORTANT: These matches have ALREADY passed strict statistical filters. If you recommend PLAY, give confidence between 80-95%. Only use 70-79% if there are significant concerns.
 
 RESPOND WITH ONLY JSON: {"verdict": "PLAY", "confidence": 85, "reason": "Brief reason"}`;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            // 1. Analyst Pass
-            console.log(`[AI] Analyst Pass...`);
-            const analystResponse = await axios.post(
+            // Groq API
+            const response = await axios.post(
                 'https://api.groq.com/openai/v1/chat/completions',
                 {
                     model: 'meta-llama/llama-4-scout-17b-16e-instruct',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.2,
-                    max_tokens: 300
-                },
-                { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 15000 }
-            );
-
-            let analystText = analystResponse.data?.choices?.[0]?.message?.content || '{}';
-            // Clean markdown
-            analystText = analystText.replace(/```json|```/g, '').trim();
-            const analystJson = JSON.parse(analystText);
-
-            // If Analyst says SKIP, we stop here (no need to critique)
-            if (analystJson.verdict !== 'PLAY') {
-                return analystJson;
-            }
-
-            // 2. Critic Pass (The Devil's Advocate)
-            console.log(`[AI] Critic Pass...`);
-            const criticPrompt = `
-You are a SKEPTICAL Betting Auditor. Your job is to find flaws in the analyst's recommendation.
-The Analyst recommends PLAYING this match: ${match.event_home_team} vs ${match.event_away_team} for ${match.market}.
-
-Analyst's Reasoning: "${analystJson.reason}"
-
-STATS:
-- Home WinRate: ${match.filterStats.homeHomeStats.winRate}% (Scoring ${match.filterStats.homeHomeStats.scoringRate}%)
-- Away WinRate: ${match.filterStats.awayAwayStats.winRate}% (Conceding ${match.filterStats.awayAwayStats.avgConceded})
-${memoryContext}
-
-TASK:
-Find 1 reason why this bet might FAIL. Be harsh. Is the Analyst over-optimistic? 
-If you find a MAJOR flaw (e.g. low recent scoring, poor H2H), recommend REJECT.
-If the stats are truly solid and the risk is low, recommend AGREE.
-
-RESPOND WITH ONLY JSON: {"verdict": "AGREE" or "REJECT", "critique": "Brief critique logic"}
-            `;
-
-            const criticResponse = await axios.post(
-                'https://api.groq.com/openai/v1/chat/completions',
-                {
-                    model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-                    messages: [{ role: 'user', content: criticPrompt }],
-                    temperature: 0.3,
                     max_tokens: 200
                 },
-                { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 15000 }
-            );
-
-            let criticText = criticResponse.data?.choices?.[0]?.message?.content || '{}';
-            criticText = criticText.replace(/```json|```/g, '').trim();
-            const criticJson = JSON.parse(criticText);
-
-            // 3. Synthesis (Implicit Judge)
-            // 3. Synthesis (Implicit Judge)
-            if (criticJson.verdict === 'REJECT') {
-                return { verdict: 'SKIP', reason: `Critic Blocked: ${criticJson.critique}` };
-            }
-
-            // Validated
-            return {
-                verdict: 'PLAY',
-                confidence: analystJson.confidence,
-                reason: analystJson.reason,
-                critique_audit: criticJson.critique,
-                training_data: {
-                    input: prompt,
-                    analyst_output: analystText,
-                    critic_output: criticText
+                {
+                    headers: {
+                        'Authorization': `Bearer ${GROQ_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 15000
                 }
-            };
+            );
+            let text = response.data?.choices?.[0]?.message?.content || '{}';
+
+            // Log raw response
+            console.log(`[DeepSeek Raw] ${text.substring(0, 200)}...`);
+
+            // Clean up markdown formatting
+            text = text.trim();
+            if (text.startsWith('```json')) text = text.slice(7);
+            if (text.startsWith('```')) text = text.slice(3);
+            if (text.endsWith('```')) text = text.slice(0, -3);
+            text = text.trim();
+
+            console.log(`[DeepSeek Clean] ${text}`);
+
+            return JSON.parse(text);
         } catch (e) {
             const isRateLimited = e.message?.includes('429') || e.message?.includes('quota');
             const isOverloaded = e.message?.includes('503') || e.message?.includes('overloaded');
@@ -572,139 +614,8 @@ RESPOND WITH ONLY JSON: {"verdict": "AGREE" or "REJECT", "critique": "Brief crit
             return { verdict: 'SKIP', reason: 'AI Error' };
         }
     }
+    return { verdict: 'SKIP', reason: 'Max retries exceeded' };
 }
-
-// 5. Oracle Analyst (Phase 15: AI-First Architecture)
-async function analyzeMatchOracle(match, retries = 3) {
-    if (!GROQ_API_KEY) return { recommendations: [] };
-
-    // Get Memory Context
-    const similarMatches = memoryService.findSimilarMatches(match, 'any'); // Market agnostic memory
-    let memoryContext = '';
-    if (similarMatches.length > 0) {
-        const wonCount = similarMatches.filter(m => m.status === 'WON').length;
-        const lostCount = similarMatches.filter(m => m.status === 'LOST').length;
-        memoryContext = `\nHISTORICAL CONTEXT:\nIn past ${similarMatches.length} similar matches: ${wonCount} WON, ${lostCount} LOST.`;
-    }
-
-    // Construct Rich Prompt
-    const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = match.filterStats;
-    const leagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
-
-    // Format Odds
-    const oddsInfo = formatOddsForPrompt(match.oddsData);
-
-    const prompt = `ROLE: You are "The Oracle", a senior betting syndicate analyst.
-TASK: Analyze this match and find the single BEST value market.
-You are NOT restricted to any list. You can choose ANY standard betting market (e.g., 1X2, Goals, Handicaps, etc.) that offers the best Value or Safety.
-
-MATCH: ${match.event_home_team} vs ${match.event_away_team}
-LEAGUE: ${match.league_name} (Avg Goals: ~${leagueAvg.toFixed(2)})
-
-DETAILED STATS:
-[HOME TEAM: ${match.event_home_team}]
-- Recent Form (Last 5): Scored ${homeForm.avgScored.toFixed(1)}, Conceded ${homeForm.avgConceded.toFixed(1)}/game.
-- Trends: Over 2.5 in ${homeForm.over25Rate}% | BTTS in ${homeForm.bttsRate}% | Clean Sheets: ${homeForm.cleanSheetRate || 0}%
-- At Home (Last 8): Wins ${homeHomeStats.winRate}% | Scored in ${homeHomeStats.scoringRate}% | Avg Scored ${homeHomeStats.avgScored.toFixed(1)}
-
-[AWAY TEAM: ${match.event_away_team}]
-- Recent Form (Last 5): Scored ${awayForm.avgScored.toFixed(1)}, Conceded ${awayForm.avgConceded.toFixed(1)}/game.
-- Trends: Over 2.5 in ${awayForm.over25Rate}% | BTTS in ${awayForm.bttsRate}% | Clean Sheets: ${awayForm.cleanSheetRate || 0}%
-- Away (Last 8): Wins ${awayAwayStats.winRate}% | Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0))}% | Avg Conceded ${awayAwayStats.avgConceded.toFixed(1)}
-
-[HEAD-TO-HEAD]
-- Mutual Matches: ${mutual.map(g => `${g.home_team_score}-${g.away_team_score}`).join(', ')}
-
-${oddsInfo}
-${memoryContext}
-
-CLASSIFICATION RULES (Strict adherence required):
-- Use the PROVIDED ODDS above to determine Value.
-- If Odds are NOT provided, estimate them based on dominance.
-
-- BANKO (Banker): Confidence 85%+, Low Risk. (Odds: 1.15 - 1.60).
-- VALUE: Confidence 65-84%, Moderate Risk. (Odds: 1.60 - 2.20).
-
-OUTPUT JSON (Must be valid JSON, no markdown text outside the block):
-{
-  "recommendations": [
-    {
-      "market": "String (e.g. 'Over 2.5 Goals', 'Home Win', '1H Over 0.5')",
-      "classification": "BANKO" | "VALUE",
-      "confidence": Number (0-100),
-      "estimated_odds": Number (e.g. 1.45),
-      "reasoning": "Specific statistical reason citing the data above."
-    }
-  ]
-}
-If no market offers good value/safety, return empty array.`;
-
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            const response = await axios.post(
-                'https://api.groq.com/openai/v1/chat/completions',
-                {
-                    model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-                    messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.1, // Lower temp for strict json
-                    max_tokens: 1000 // Increased from 400 to prevent truncation
-                },
-                { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 20000 }
-            );
-
-            let text = response.data?.choices?.[0]?.message?.content || '{}';
-            console.log(`[Oracle Raw] Match: ${match.event_home_team} vs ${match.event_away_team}`);
-            console.log(`[Oracle Raw] Response: ${text.substring(0, 100)}...`);
-
-            // Robust JSON Extraction
-            let jsonString = text.replace(/```json|```/g, '').trim();
-            const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-
-            if (jsonMatch) {
-                jsonString = jsonMatch[0];
-            }
-
-            let json;
-            try {
-                json = JSON.parse(jsonString);
-            } catch (parseError) {
-                console.error(`[Oracle Error] JSON Parse Failed: ${parseError.message}`);
-                console.error(`[Oracle Error] Cleaned Text: ${jsonString}`);
-                // Retry with relaxed mode or just fail? 
-                // Let's fail for now but log clearly.
-                return { recommendations: [] };
-            }
-
-            if (!json.recommendations || json.recommendations.length === 0) {
-                console.log(`[Oracle] Valid JSON but NO recommendations found.`);
-            }
-
-            return {
-                recommendations: json.recommendations || [],
-                training_data: {
-                    input: prompt,
-                    output: text, // Save full original text (with reasoning)
-                    model: 'meta-llama/llama-4-scout-17b-16e-instruct'
-                }
-            };
-
-        } catch (e) {
-            console.error(`[Oracle API Error] ${e.message}`);
-            if (e.response && e.response.data) {
-                console.error(`[Oracle API Details]`, e.response.data);
-            }
-
-            const isRateLimited = e.message?.includes('429') || e.message?.includes('quota');
-            if (isRateLimited && attempt < retries) {
-                await sleep(attempt * 2500);
-                continue;
-            }
-            return { recommendations: [] };
-        }
-    }
-    return { recommendations: [] };
-}
-
 
 // Main Runner
 async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, leagueFilter = true) {
@@ -867,16 +778,14 @@ What is the "Ice Cold" risk here? Even with high percentage rates, could a recen
                 startTime: match.event_start_time,
                 league: match.league_name,
                 league_name: match.league_name,
-                market: match.market || 'AI Analysis',
-                recommendations: match.recommendations || [], // Preserve AI picks
-                ai_analysis_raw: match.ai_analysis_raw,       // Preserve raw debug data
+                market: match.market,
                 stats: match.filterStats,
                 detailed_analysis: analysisDetails,
                 ai_prompts: aiPrompts,
-                aiPrompt: aiPrompts[0],
-                odds: oddsData,
-                oddsText: oddsText,
-                status: 'PENDING_APPROVAL'
+                aiPrompt: aiPrompts[0], // Primary prompt for easy access
+                odds: oddsData, // Raw odds data (if available)
+                oddsText: oddsText, // Formatted odds text
+                status: 'PENDING_APPROVAL' // Admin needs to approve
             });
             log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
         }
@@ -1224,122 +1133,5 @@ DETAILED STATISTICS:
 TASK: Analyze this match for '${market}' bet. Is it a solid value? Provide your verdict (PLAY/SKIP) with confidence %.`;
 }
 
-// ----------------------------------------------------------------
-// 🧠 GEMINI MANUAL MODE (Prompt Generator)
-// ----------------------------------------------------------------
-async function generateGeminiPrompt(leagueFilter = true) {
-    console.log('[DailyAnalyst] 🧠 Generating Gemini Mega-Prompt...');
-
-    // 1. Fetch Matches
-    const matches = await fetchDailyMatches(leagueFilter);
-    console.log(`[DailyAnalyst] Found ${matches.length} matches.`);
-
-    let prompt = `ROLE: You are an Expert Football Analyst with access to the internet.
-TASK: 
-1. I will provide stats for matches playing today.
-2. For each match, SEARCH ONLINE for the latest odds (1X2, Over 2.5, BTTS).
-3. Analyze the stats + odds to find the Best Value.
-4. If a match is risky, SKIP it. Only output the best picks.
-
-OUTPUT FORMAT:
-Match: Home vs Away
-Market: [Selection]
-Odds: [Odds found online]
-Confidence: [80-95%]
-Reason: [Brief Analysis]
-
----
-MATCH DATA:
-`;
-
-    // 2. Process Stats for each match
-    let processedCount = 0;
-    // Limit to 30 matches for Gemini Context Window safety if huge list
-    const limitedMatches = matches.slice(0, 30);
-
-    for (const m of limitedMatches) {
-        // Fetch H2H
-        const h2h = await fetchH2H(m.event_key || m.match_id);
-        if (!h2h || !h2h.sections) continue;
-
-        const sections = h2h.sections;
-        const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
-        const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
-
-        const homeAllHistory = homeRawHistory.slice(0, 5);
-        const awayAllHistory = awayRawHistory.slice(0, 5);
-        const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
-        const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
-
-        const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
-        const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
-        const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
-        const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
-
-        if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) continue;
-
-        processedCount++;
-        prompt += `
-[MATCH ${processedCount}] ${m.event_home_team} vs ${m.event_away_team}
-LEAGUE: ${m.league_name}
-HOME (${m.event_home_team}):
-- Form (Last 5): Scored ${homeForm.avgScored.toFixed(1)}, Conceded ${homeForm.avgConceded.toFixed(1)}
-- Trends: BTTS ${homeForm.bttsRate}%, O2.5 ${homeForm.over25Rate}%, CleanSheet ${homeForm.cleanSheetRate}%
-- At Home: Win ${homeHomeStats.winRate}%, Scored ${homeHomeStats.avgScored.toFixed(1)}
-
-AWAY (${m.event_away_team}):
-- Form (Last 5): Scored ${awayForm.avgScored.toFixed(1)}, Conceded ${awayForm.avgConceded.toFixed(1)}
-- Trends: BTTS ${awayForm.bttsRate}%, O2.5 ${awayForm.over25Rate}%, CleanSheet ${awayForm.cleanSheetRate}%
-- At Away: Win ${awayAwayStats.winRate}%, Conceded ${awayAwayStats.avgConceded.toFixed(1)}
----`;
-    }
-
-    prompt += `\n
-INSTRUCTIONS:
-- Prioritize high confidence (BANKO) or high value.
-- Use your browser tool to find REAL ODDS for these specific matches.
-
-IMPORTANT: Output your response ONLY as valid JSON. Do not add markdown or intro text.
-Format:
-{
-  "picks": [
-    {
-      "home_team": "Team A",
-      "away_team": "Team B",
-      "market": "Over 2.5 Goals",
-      "classification": "BANKO" | "VALUE",
-      "odds": 1.85,
-      "confidence": 85,
-      "reason": "Short reason..."
-    }
-  ]
-}
-`;
-
-    return { prompt, count: processedCount };
-}
-
-// Helper: Parse Gemini Response
-function parseGeminiResponse(jsonText) {
-    try {
-        const clean = jsonText.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(clean);
-        return parsed.picks || [];
-    } catch (e) {
-        console.error("Gemini Parse Error:", e);
-        return [];
-    }
-}
-
-module.exports = {
-    runDailyAnalysis,
-    runFirstHalfScan,
-    runSingleMarketAnalysis,
-    MARKET_MAP,
-    generateGeminiPrompt, // New Export
-    parseGeminiResponse, // New Export
-    analyzeMatchOracle,
-    fetchMatchOdds,
-    generateDetailedPrompt // Fixed export name
-};
+module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP };
 

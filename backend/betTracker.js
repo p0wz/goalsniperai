@@ -50,10 +50,8 @@ function saveDb(data) {
  * @param {String} market - 'Over 1.5 Goals', 'BTTS', etc.
  * @param {String} strategyCode - Code for the strategy used
  * @param {Number} confidence - Confidence score
- * @param {String} source - 'live' or 'daily'
- * @param {Object} trainingData - Optional {input, analyst_output, critic_output}
  */
-function recordBet(matchData, market, strategyCode, confidence, source = 'live', trainingData = null) {
+function recordBet(matchData, market, strategyCode, confidence, source = 'live') {
     const db = loadDb();
 
     // Prevent Duplicates: Check if we already have a bet for this match & market
@@ -76,8 +74,7 @@ function recordBet(matchData, market, strategyCode, confidence, source = 'live',
         source: source, // 'live' or 'daily'
         status: 'PENDING', // PENDING, WON, LOST, VOID
         result_score: null,
-        settled_at: null,
-        training_data: trainingData
+        settled_at: null
     };
 
     db.push(newBet);
@@ -89,16 +86,33 @@ function recordBet(matchData, market, strategyCode, confidence, source = 'live',
 // ⚖️ Settlement Engine (Batch Processing)
 // ============================================
 
-// Helper: Fetch Match Details (Targeted)
-async function fetchMatchResult(matchId) {
+// Helper: Fetch finished matches for a specific day
+async function fetchFinishedMatches(dayOffset) {
     try {
-        const response = await axios.get(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${matchId}`, {
+        const response = await axios.get(`${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/list/${dayOffset}/0`, {
             headers: FLASHSCORE_API.headers
         });
-        return response.data; // Returns { DATA: { event: { ... } } } or similar structure
+
+        const data = response.data;
+        const list = Array.isArray(data) ? data : Object.values(data);
+        const finishedMatches = [];
+
+        list.forEach(tournament => {
+            if (tournament.matches) {
+                tournament.matches.forEach(m => {
+                    // Filter for Finished matches: score must be present and not null
+                    // API returns null score for unplayed/live matches sometimes
+                    if (m.home_team && m.home_team.score !== null && m.away_team && m.away_team.score !== null) {
+                        finishedMatches.push(m);
+                    }
+                });
+            }
+        });
+
+        return finishedMatches;
     } catch (e) {
-        console.error(`[BetTracker] Details fetch failed for ${matchId}: ${e.message}`);
-        return null;
+        console.error(`[BetTracker] Batch fetch failed for day ${dayOffset}: ${e.message}`);
+        return [];
     }
 }
 
@@ -133,47 +147,8 @@ function checkWinCondition(market, homeScore, awayScore) {
     }
 }
 
-// Core Logic: Resolve specific markets
-function checkWinCondition(market, homeScore, awayScore) {
-    const h = parseInt(homeScore);
-    const a = parseInt(awayScore);
-    const total = h + a;
-
-    switch (market) {
-        case 'Over 1.5 Goals':
-            return total >= 2;
-
-        case 'Under 3.5 Goals':
-            return total < 4;
-
-        case 'BTTS': // KG Var
-            return h > 0 && a > 0;
-
-        case '1X Double Chance':
-            return h >= a;
-
-        case 'Home Team Over 1.5':
-            return h >= 2;
-
-        case 'Over 2.5 Goals':
-            return total >= 2.5;
-
-        case 'Under 2.5 Goals':
-            return total < 2.5;
-
-        case 'MS1 & 1.5 Üst':
-            return h > a && total > 1.5;
-
-        case 'Dep 0.5 Üst':
-            return a > 0;
-
-        default:
-            return null; // Unknown market
-    }
-}
-
 async function settleBets() {
-    console.log('[BetTracker] 🔄 Running Settlement (Targeted Check)...');
+    console.log('[BetTracker] 🔄 Running Batch Settlement...');
     const db = loadDb();
     const pendingBets = db.filter(b => b.status === 'PENDING');
 
@@ -182,57 +157,56 @@ async function settleBets() {
         return;
     }
 
+    // Optimization: Fetch Day 0 (Today) and Day -1 (Yesterday)
+    const batches = [
+        await fetchFinishedMatches(0),
+        await fetchFinishedMatches(-1)
+    ];
+    const allFinishedRaw = batches.flat();
+
+    // Index map for O(1) lookup
+    const resultMap = {};
+    allFinishedRaw.forEach(m => {
+        resultMap[m.match_id] = m;
+    });
+
     let settledCount = 0;
 
-    for (const bet of pendingBets) {
-        // Rate Limit Protection (1 request per 1.5s)
-        await new Promise(r => setTimeout(r, 1500));
+    pendingBets.forEach(bet => {
+        const matchResult = resultMap[bet.api_fixture_id];
 
-        const mid = bet.api_fixture_id;
-        if (!mid) continue;
+        if (matchResult) {
+            // SAFEGUARD: The API list endpoint often lacks a specific 'Finished' status string.
+            // To prevent settling LIVE matches (e.g., min 10, score 1-0) as finished,
+            // we enforce a "3-Hour Rule": Only process if current time > match_start + 3 hours.
+            const matchTime = parseInt(matchResult.timestamp) * 1000;
+            const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
 
-        // 3-Hour Rule: Don't check if match started recently
-        const betDate = new Date(bet.date); // Need start time really, but date is approx
-        // Better: We stored match start time in some objects but maybe not all? 
-        // If api_fixture_id is 'timestamp_...', use that.
-        // Assuming we check regardless if it's been a while since 'date'.
+            if (matchTime > threeHoursAgo) {
+                // Match started less than 3 hours ago, likely still playing or just finished.
+                // Skip to be safe.
+                return;
+            }
 
-        // Actually, let's just fetch details. The API will tell us if it's 'Finished'.
-        const detailsData = await fetchMatchResult(mid);
+            // In new format, we check if scores exist
+            if (matchResult.home_team.score !== null && matchResult.away_team.score !== null) {
+                // NOTE: We use 'score' (Regular Time) instead of 'score_after' (Penalties/ET).
+                // Standard betting markets (O1.5, BTTS) settle on 90 mins.
+                const homeScore = matchResult.home_team.score;
+                const awayScore = matchResult.away_team.score;
 
-        if (!detailsData || !detailsData.DATA) continue;
-        const event = detailsData.DATA.event;
+                const isWin = checkWinCondition(bet.market, homeScore, awayScore);
 
-        // Check Status codes: 3 = Finished, 33 = Finished After Extra Time? 
-        // Safer: Check absolute status. Flashscore usually has 'status_type' or similar.
-        // Let's rely on scores being final.
-
-        // If event.status_type !== 'FINISHED' (mapping required), skip.
-        // Simplified: Check if we have FT scores and status indicates end.
-        // Flashscore API v1 generic structure inspection:
-        // event.stage_start_time, event.status (e.g., "FINISHED")
-
-        // Logic: If we have scores and it looks done.
-        const homeScore = event.home_score?.current;
-        const awayScore = event.away_score?.current;
-
-        if (homeScore !== undefined && awayScore !== undefined && event.status_type === 'finished') {
-            const isWin = checkWinCondition(bet.market, homeScore, awayScore);
-
-            if (isWin !== null) {
-                bet.status = isWin ? 'WON' : 'LOST';
-                bet.result_score = `${homeScore}-${awayScore}`;
-                bet.settled_at = new Date().toISOString();
-                settledCount++;
-                console.log(`[BetTracker] 🏁 Settled: ${bet.match} [${bet.market}] -> ${bet.status} (${bet.result_score})`);
-
-                // 🧠 Data Flywheel
-                if (bet.training_data) {
-                    logToFlywheel(bet);
+                if (isWin !== null) {
+                    bet.status = isWin ? 'WON' : 'LOST';
+                    bet.result_score = `${homeScore}-${awayScore}`;
+                    bet.settled_at = new Date().toISOString();
+                    settledCount++;
+                    console.log(`[BetTracker] 🏁 Settled: ${bet.match} [${bet.market}] -> ${bet.status} (${bet.result_score})`);
                 }
             }
         }
-    }
+    });
 
     if (settledCount > 0) {
         saveDb(db);
@@ -329,45 +303,7 @@ function manualSettle(betId, status, resultScore = null) {
     saveDb(db);
     console.log(`[BetTracker] ✅ Manual settle: ${bet.match} -> ${status}`);
 
-    // Trigger Flywheel if finalized
-    if (['WON', 'LOST'].includes(status) && bet.training_data) {
-        logToFlywheel(bet);
-    }
-
     return { success: true, bet };
-}
-
-// Helper: Log to Training Data (Flywheel)
-function logToFlywheel(bet) {
-    try {
-        const datasetPath = path.join(__dirname, 'data', 'training_dataset.jsonl');
-        const trainingEntry = {
-            messages: [
-                { role: "system", content: "You are a professional football betting analyst." },
-                { role: "user", content: bet.training_data.input },
-                {
-                    role: "assistant",
-                    content: bet.status === 'WON'
-                        ? bet.training_data.analyst_output
-                        : `[CORRECTION] The previous analysis was wrong. The result was ${bet.result_score || 'UNKNOWN'} (LOST). I should have been more skeptical.`
-                }
-            ],
-            meta: {
-                match: bet.match,
-                market: bet.market,
-                result: bet.status,
-                score: bet.result_score
-            }
-        };
-
-        const dataDir = path.join(__dirname, 'data');
-        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-
-        fs.appendFileSync(datasetPath, JSON.stringify(trainingEntry) + '\n');
-        console.log(`[Flywheel] 🧠 Saved training example for ${bet.match} (${bet.status})`);
-    } catch (err) {
-        console.error(`[Flywheel] Error saving dataset: ${err.message}`);
-    }
 }
 
 module.exports = {

@@ -2011,7 +2011,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
     // Helper to filter results based on role & approval
     const filterResults = (results) => {
-        const categories = ['over15', 'over25', 'btts', 'doubleChance', 'homeOver15', 'under35', 'under25', 'firstHalfOver05', 'ms1AndOver15', 'awayOver05', 'handicap', 'oracle', 'all_stats', 'gemini'];
+        const categories = ['over15', 'over25', 'btts', 'doubleChance', 'homeOver15', 'under35', 'under25', 'firstHalfOver05', 'ms1AndOver15', 'awayOver05', 'handicap'];
         const filtered = {};
 
         categories.forEach(cat => {
@@ -2055,7 +2055,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
         // Post-processing: Assign IDs immediately for consistency
         const processedResults = { ...results };
-        ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35', 'firstHalfOver05', 'ms1AndOver15', 'awayOver05', 'handicap', 'oracle'].forEach(cat => {
+        ['over15', 'btts', 'doubleChance', 'homeOver15', 'under35', 'firstHalfOver05', 'ms1AndOver15', 'awayOver05', 'handicap'].forEach(cat => {
             if (processedResults[cat]) {
                 processedResults[cat].forEach(m => {
                     m.id = `${m.event_key || m.match_id}_${cat}`;
@@ -2070,59 +2070,6 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
     } catch (error) {
         log.error(`Daily Analyst Error: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ============================================
-// 🧠 Import Gemini Response
-// ============================================
-app.post('/api/daily-analysis/import-gemini', requireAuth, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ success: false });
-
-    try {
-        const { parseGeminiResponse } = require('./dailyAnalyst');
-        const picks = parseGeminiResponse(req.body.jsonText);
-
-        if (picks.length > 0) {
-            // Initialize cache if needed
-            if (!DAILY_ANALYSIS_CACHE) DAILY_ANALYSIS_CACHE = {};
-            if (!DAILY_ANALYSIS_CACHE.gemini) DAILY_ANALYSIS_CACHE.gemini = [];
-
-            // Try to link with real matches from all_stats if available
-            const realMatches = DAILY_ANALYSIS_CACHE.all_stats || [];
-
-            // Add IDs and merge
-            const newPicks = picks.map(p => {
-                // Fuzzy match home team to find real event info
-                const matchFound = realMatches.find(m =>
-                    m.event_home_team.toLowerCase().includes(p.home_team.toLowerCase()) ||
-                    p.home_team.toLowerCase().includes(m.event_home_team.toLowerCase())
-                );
-
-                const eventKey = matchFound ? matchFound.event_key : `manual_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-
-                return {
-                    ...p,
-                    id: `gemini_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    event_key: eventKey, // Important for history
-                    event_home_team: matchFound ? matchFound.event_home_team : p.home_team,
-                    event_away_team: matchFound ? matchFound.event_away_team : p.away_team,
-                    league_name: matchFound ? matchFound.league_name : 'Manual Import',
-                    analysis: p.reason,
-                    confidence: p.confidence,
-                    isManual: true
-                };
-            });
-
-            // Append to "Gemini" category
-            DAILY_ANALYSIS_CACHE.gemini = [...DAILY_ANALYSIS_CACHE.gemini, ...newPicks];
-
-            res.json({ success: true, count: newPicks.length, picks: newPicks });
-        } else {
-            res.status(400).json({ success: false, error: 'No valid picks found in JSON.' });
-        }
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
     }
 });
 
@@ -2145,72 +2092,15 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
         // Record bet if match data provided
         if (matchData) {
             betTracker.recordBet({
-                match_id: matchData.matchId || matchData.event_key,
-                home_team: matchData.home_team || matchData.event_home_team,
-                away_team: matchData.away_team || matchData.event_away_team
-            }, market, category, confidence || 85, 'daily', matchData.training_data);
+                match_id: matchData.matchId,
+                home_team: matchData.home_team,
+                away_team: matchData.away_team
+            }, market, category, confidence || 85, 'daily');
         }
 
         log.success(`Daily candidate approved: ${id}`);
         res.json({ success: true, id });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ============================================
-// ✅ Bulk Approve Daily Candidates
-// ============================================
-app.post('/api/daily-analysis/approve-all', requireAuth, async (req, res) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ success: false, error: 'Admin only' });
-    }
-
-    const { candidates, market, category } = req.body; // candidates is array of { id, matchData, ... }
-
-    if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
-        return res.status(400).json({ success: false, error: 'No candidates provided' });
-    }
-
-    let approvedCount = 0;
-
-    try {
-        for (const c of candidates) {
-            const mid = c.id;
-            if (!APPROVED_IDS.has(mid) && !REJECTED_IDS.has(mid)) {
-                APPROVED_IDS.add(mid);
-
-                // Determine ID arguments
-                // Prioritize finding a valid match ID
-                const matchId = c.matchData?.matchId || c.event_key || c.match_id || `manual_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-                const homeTeam = c.matchData?.home_team || c.event_home_team || 'Unknown';
-                const awayTeam = c.matchData?.away_team || c.event_away_team || 'Unknown';
-                const betMarket = c.market || market;
-                // Use category as strategy if not provided
-                // For manuals, category is 'gemini' usually
-                const finalCategory = c.category || category || 'MANUAL';
-
-                // Record Bet logic
-                if (matchId) {
-                    await betTracker.recordBet({
-                        match_id: matchId,
-                        home_team: homeTeam,
-                        away_team: awayTeam
-                    }, betMarket, finalCategory, c.confidence || 85, 'daily', c.matchData?.training_data);
-
-                    approvedCount++;
-                }
-            }
-        }
-
-        if (approvedCount > 0) {
-            saveApprovals();
-            log.success(`Bulk approved ${approvedCount} candidates for ${market}`);
-        }
-
-        res.json({ success: true, count: approvedCount });
-    } catch (error) {
-        log.error(`Bulk Approval Error: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
     }
 });

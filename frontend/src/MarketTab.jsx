@@ -3,9 +3,17 @@ import { signalService, betService } from './services/api';
 import clsx from 'clsx';
 
 // Market Configuration
-// Market Configuration (STATS ONLY MODE)
 const MARKET_CONFIG = {
-    all_stats: { name: 'Günlük Maçlar (Stats)', icon: '📊', desc: 'Tüm istatistiksel veriler' }
+    over25: { name: 'Over 2.5', icon: '🔥', desc: 'Maç sonu 3+ gol' },
+    btts: { name: 'BTTS', icon: '⚽', desc: 'İki takım da gol atar' },
+    doubleChance: { name: '1X DC', icon: '🛡️', desc: 'Ev sahibi kaybetmez' },
+    homeOver15: { name: 'Ev 1.5+', icon: '🏠', desc: 'Ev sahibi 2+ gol' },
+    under35: { name: 'Alt 3.5', icon: '🔒', desc: 'Maç sonu maks 3 gol' },
+    under25: { name: 'Alt 2.5', icon: '🧊', desc: 'Maç sonu maks 2 gol' },
+    firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' },
+    ms1AndOver15: { name: 'MS1 & 1.5 Üst', icon: '1️⃣', desc: 'Ev Kazanır ve 1.5 Üst' },
+    awayOver05: { name: 'Dep 0.5 Üst', icon: '🚀', desc: 'Deplasman gol atar' },
+    handicap: { name: 'Hnd. -1.5', icon: '💪', desc: 'Favori takım farklı kazanır (-1.5)' }
 };
 
 function MarketTab({ marketKey, handleAddToPicks }) {

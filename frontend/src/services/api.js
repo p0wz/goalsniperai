@@ -102,11 +102,6 @@ export const signalService = {
         const response = await api.post(`/daily-analysis/approve/${id}`, data);
         return response.data;
     },
-    // New: Bulk Approve
-    bulkApprove: async (data) => {
-        const response = await api.post('/daily-analysis/approve-all', data);
-        return response.data;
-    },
     rejectSignal: async (id) => {
         const response = await api.post(`/daily-analysis/reject/${id}`);
         return response.data;
