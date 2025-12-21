@@ -22,6 +22,7 @@ export default function AdminPanel({ user, handleLogout }) {
 
     // AI Auto Analysis State
     const [aiCandidates, setAiCandidates] = useState([]);
+    const [aiCoupons, setAiCoupons] = useState(null);
     const [isAutoAnalysing, setIsAutoAnalysing] = useState(false);
 
     useEffect(() => {
@@ -169,6 +170,7 @@ export default function AdminPanel({ user, handleLogout }) {
             const res = await adminService.getAIAnalysis(leagueFilter);
             if (res.success) {
                 setAiCandidates(res.candidates);
+                setAiCoupons(res.coupons);
                 if (res.candidates.length === 0) alert("AI kriterlerine uygun maç bulunamadı.");
             }
             else alert('AI Analysis failed: ' + res.error);
@@ -538,6 +540,76 @@ export default function AdminPanel({ user, handleLogout }) {
                                 </button>
                             </div>
 
+
+
+                            {/* COUPONS SECTION */}
+                            {aiCoupons && (
+                                <div className="mb-12 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-bottom duration-500">
+                                    {/* Banker 1 */}
+                                    <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 border border-emerald-500/30 rounded-xl p-6 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">BANKO #1</div>
+                                        <h3 className="text-xl font-bold text-emerald-500 mb-4 flex items-center gap-2">🛡️ Güvenli Liman</h3>
+                                        <div className="space-y-3 mb-4">
+                                            {aiCoupons.banker1?.matches.map((m, i) => (
+                                                <div key={i} className="text-sm border-b border-emerald-500/10 pb-2 last:border-0">
+                                                    <div className="font-bold">{m.match}</div>
+                                                    <div className="flex justify-between text-muted-foreground text-xs mt-0.5">
+                                                        <span>{m.pick}</span>
+                                                        <span className="font-mono text-emerald-600 font-bold">{m.odds}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-auto pt-4 border-t border-emerald-500/20 flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">Toplam Oran</span>
+                                            <span className="text-2xl font-bold text-emerald-600">{aiCoupons.banker1?.totalOdds}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Banker 2 */}
+                                    <div className="bg-gradient-to-br from-teal-500/10 to-cyan-500/10 border border-teal-500/30 rounded-xl p-6 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-teal-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">BANKO #2</div>
+                                        <h3 className="text-xl font-bold text-teal-500 mb-4 flex items-center gap-2">⚓ Sağlam Kale</h3>
+                                        <div className="space-y-3 mb-4">
+                                            {aiCoupons.banker2?.matches.map((m, i) => (
+                                                <div key={i} className="text-sm border-b border-teal-500/10 pb-2 last:border-0">
+                                                    <div className="font-bold">{m.match}</div>
+                                                    <div className="flex justify-between text-muted-foreground text-xs mt-0.5">
+                                                        <span>{m.pick}</span>
+                                                        <span className="font-mono text-teal-600 font-bold">{m.odds}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-auto pt-4 border-t border-teal-500/20 flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">Toplam Oran</span>
+                                            <span className="text-2xl font-bold text-teal-600">{aiCoupons.banker2?.totalOdds}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* High Odds */}
+                                    <div className="bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-xl p-6 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-violet-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">SÜRPRİZ 🚀</div>
+                                        <h3 className="text-xl font-bold text-violet-500 mb-4 flex items-center gap-2">💎 Yüksek Kazanç</h3>
+                                        <div className="space-y-3 mb-4">
+                                            {aiCoupons.highOdds?.matches.map((m, i) => (
+                                                <div key={i} className="text-sm border-b border-violet-500/10 pb-2 last:border-0">
+                                                    <div className="font-bold">{m.match}</div>
+                                                    <div className="flex justify-between text-muted-foreground text-xs mt-0.5">
+                                                        <span>{m.pick}</span>
+                                                        <span className="font-mono text-violet-600 font-bold">{m.odds}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-auto pt-4 border-t border-violet-500/20 flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">Toplam Oran</span>
+                                            <span className="text-2xl font-bold text-violet-600">{aiCoupons.highOdds?.totalOdds}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Results Grid - NEW LAYOUT */}
                             {aiCandidates.length > 0 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
@@ -579,58 +651,60 @@ export default function AdminPanel({ user, handleLogout }) {
                             )}
                         </div>
                     </div>
+                )}
 
                 {/* Tab Content: ANALYSIS HUB */}
-                {activeTab === 'analiz' && (
-                    <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
-                        <div className="text-center mb-6">
-                            <h2 className="text-3xl font-bold mb-2">🎯 Analiz Merkezi</h2>
-                            {isAnalysing && <span className="text-sm animate-pulse text-indigo-500 font-bold">Analiz yapılıyor... (Bu işlem 1-2 dk sürebilir)</span>}
+                {
+                    activeTab === 'analiz' && (
+                        <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
+                            <div className="text-center mb-6">
+                                <h2 className="text-3xl font-bold mb-2">🎯 Analiz Merkezi</h2>
+                                {isAnalysing && <span className="text-sm animate-pulse text-indigo-500 font-bold">Analiz yapılıyor... (Bu işlem 1-2 dk sürebilir)</span>}
 
-                            {/* New Bulk Prompt Button */}
-                            {dailyAnalysis && (
-                                <button
-                                    onClick={() => {
-                                        // 1. Collect all unique matches from all categories
-                                        const uniqueMatches = new Map();
-                                        Object.values(dailyAnalysis).forEach(categoryList => {
-                                            if (Array.isArray(categoryList)) {
-                                                categoryList.forEach(m => {
-                                                    if (!uniqueMatches.has(m.id)) {
-                                                        uniqueMatches.set(m.id, m);
-                                                    }
-                                                });
-                                            }
-                                        });
+                                {/* New Bulk Prompt Button */}
+                                {dailyAnalysis && (
+                                    <button
+                                        onClick={() => {
+                                            // 1. Collect all unique matches from all categories
+                                            const uniqueMatches = new Map();
+                                            Object.values(dailyAnalysis).forEach(categoryList => {
+                                                if (Array.isArray(categoryList)) {
+                                                    categoryList.forEach(m => {
+                                                        if (!uniqueMatches.has(m.id)) {
+                                                            uniqueMatches.set(m.id, m);
+                                                        }
+                                                    });
+                                                }
+                                            });
 
-                                        const allMatches = Array.from(uniqueMatches.values());
-                                        if (allMatches.length === 0) return alert('Kopyalanacak maç yok!');
+                                            const allMatches = Array.from(uniqueMatches.values());
+                                            if (allMatches.length === 0) return alert('Kopyalanacak maç yok!');
 
-                                        // 2. Format the Bulk Prompt
-                                        const bulkPrompt = `📊 GÜNLÜK MAÇ HAVUZU (${allMatches.length} Maç)
+                                            // 2. Format the Bulk Prompt
+                                            const bulkPrompt = `📊 GÜNLÜK MAÇ HAVUZU (${allMatches.length} Maç)
 Tarih: ${new Date().toLocaleDateString('tr-TR')}
 ════════════════════════════════════════
 
 ${allMatches.map((m, idx) => {
-                                            // Extract base prompt content (remove Market line and Task line to act as "raw stats")
-                                            let promptContent = m.aiPrompt || m.ai_prompts?.[0] || '';
+                                                // Extract base prompt content (remove Market line and Task line to act as "raw stats")
+                                                let promptContent = m.aiPrompt || m.ai_prompts?.[0] || '';
 
-                                            // Cleaning specifically for Bulk Context
-                                            // 1. Remove "Act as..." header
-                                            promptContent = promptContent.replace(/^Act as a professional.*$/gm, '');
-                                            // 2. Remove "Market: ..." line completely
-                                            promptContent = promptContent.replace(/^Market:.*$/gm, '');
-                                            // 3. Remove "TASK: ..." footer
-                                            promptContent = promptContent.replace(/^TASK:.*$/gm, '');
-                                            // 4. Trim whitespace
-                                            promptContent = promptContent.trim();
+                                                // Cleaning specifically for Bulk Context
+                                                // 1. Remove "Act as..." header
+                                                promptContent = promptContent.replace(/^Act as a professional.*$/gm, '');
+                                                // 2. Remove "Market: ..." line completely
+                                                promptContent = promptContent.replace(/^Market:.*$/gm, '');
+                                                // 3. Remove "TASK: ..." footer
+                                                promptContent = promptContent.replace(/^TASK:.*$/gm, '');
+                                                // 4. Trim whitespace
+                                                promptContent = promptContent.trim();
 
-                                            // 5. Add specific header
-                                            return `📌 MAÇ ${idx + 1}: ${m.event_home_team} vs ${m.event_away_team}
+                                                // 5. Add specific header
+                                                return `📌 MAÇ ${idx + 1}: ${m.event_home_team} vs ${m.event_away_team}
 Lig: ${m.league_name}
 ${promptContent}
 ----------------------------------------`;
-                                        }).join('\n\n')}
+                                            }).join('\n\n')}
 
 ════════════════════════════════════════
 GÖREV:
@@ -645,253 +719,260 @@ Yukarıdaki maç havuzunu detaylı incele. Amacımız "BANKO" (Güvenilir) kupon
    - [Maç Adı] - [Tahmin] (Güven: %XX) - [Tahmini Oran: 1.XX]
    - Kısa gerekçe (Örn: "Ev sahibi evinde 10 maçtır kaybetmiyor.")
 `;
-                                        navigator.clipboard.writeText(bulkPrompt);
-                                        alert(`✅ ${allMatches.length} maçın detaylı istatistikleri kopyalandı!`);
-                                    }}
-                                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.01] transition-all font-bold text-lg flex flex-col items-center gap-1 mb-6"
+                                            navigator.clipboard.writeText(bulkPrompt);
+                                            alert(`✅ ${allMatches.length} maçın detaylı istatistikleri kopyalandı!`);
+                                        }}
+                                        className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.01] transition-all font-bold text-lg flex flex-col items-center gap-1 mb-6"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {/* Assuming CopyIcon is defined or imported elsewhere */}
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2" /></svg> 📑 Tüm Maçları Kopyala (AI Prompt)
+                                        </div>
+                                        <span className="text-xs font-normal opacity-80 font-mono">1.15 - 1.50 Banko Kupon Odaklı</span>
+                                    </button>
+                                )}
+
+                                {/* AI AUTO ANALYSIS SECTION REMOVED (Moved to dedicated tab) */}
+                            </div>
+
+                            {/* Analysis Content Grid */}
+                            <div className="flex justify-center gap-4 mb-8 flex-wrap">
+                                <button
+                                    onClick={() => handleRunDaily(true)}
+                                    disabled={isAnalysing}
+                                    className="px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        {/* Assuming CopyIcon is defined or imported elsewhere */}
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2" /></svg> 📑 Tüm Maçları Kopyala (AI Prompt)
-                                    </div>
-                                    <span className="text-xs font-normal opacity-80 font-mono">1.15 - 1.50 Banko Kupon Odaklı</span>
+                                    {isAnalysing ? '⏳ Taranıyor...' : '🏆 LİG FİLTRELİ ANALİZ'}
                                 </button>
-                            )}
+                                <button
+                                    onClick={() => handleRunDaily(false)}
+                                    disabled={isAnalysing}
+                                    className="px-6 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+                                >
+                                    {isAnalysing ? '⏳ Taranıyor...' : '🌍 TÜM MAÇLAR (Filtresiz)'}
+                                </button>
+                            </div>
 
-                            {/* AI AUTO ANALYSIS SECTION REMOVED (Moved to dedicated tab) */}
-                        </div>
-
-                        {/* Analysis Content Grid */}
-                        <div className="flex justify-center gap-4 mb-8 flex-wrap">
-                            <button
-                                onClick={() => handleRunDaily(true)}
-                                disabled={isAnalysing}
-                                className="px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
-                            >
-                                {isAnalysing ? '⏳ Taranıyor...' : '🏆 LİG FİLTRELİ ANALİZ'}
-                            </button>
-                            <button
-                                onClick={() => handleRunDaily(false)}
-                                disabled={isAnalysing}
-                                className="px-6 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
-                            >
-                                {isAnalysing ? '⏳ Taranıyor...' : '🌍 TÜM MAÇLAR (Filtresiz)'}
-                            </button>
-                        </div>
-
-                        {/* RESULTS */}
-                        <div className="space-y-6">
-                            {Object.entries(MARKET_CONFIG).map(([key, config]) => {
-                                const items = dailyAnalysis?.[key] || [];
-                                return (
-                                    <div key={key} className="rounded-xl border bg-card shadow-sm overflow-hidden">
-                                        <div className="flex items-center justify-between p-4 bg-muted/50 border-b">
-                                            <h4 className="font-bold text-lg flex items-center gap-2">
-                                                {config.icon} {config.name} ({items.length})
-                                            </h4>
-                                            <div className="flex items-center gap-2">
-                                                {items.length > 0 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const bulkPrompt = `📊 ${config.name.toUpperCase()} ANALİZİ (${items.length} Maç)
+                            {/* RESULTS */}
+                            <div className="space-y-6">
+                                {Object.entries(MARKET_CONFIG).map(([key, config]) => {
+                                    const items = dailyAnalysis?.[key] || [];
+                                    return (
+                                        <div key={key} className="rounded-xl border bg-card shadow-sm overflow-hidden">
+                                            <div className="flex items-center justify-between p-4 bg-muted/50 border-b">
+                                                <h4 className="font-bold text-lg flex items-center gap-2">
+                                                    {config.icon} {config.name} ({items.length})
+                                                </h4>
+                                                <div className="flex items-center gap-2">
+                                                    {items.length > 0 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const bulkPrompt = `📊 ${config.name.toUpperCase()} ANALİZİ (${items.length} Maç)
 ════════════════════════════════════════
 
 ${items.map((m, idx) => {
-                                                                const prompt = m.aiPrompt || m.ai_prompts?.[0] || '';
-                                                                return `\n[${idx + 1}/${items.length}] ${m.event_home_team} vs ${m.event_away_team}
+                                                                    const prompt = m.aiPrompt || m.ai_prompts?.[0] || '';
+                                                                    return `\n[${idx + 1}/${items.length}] ${m.event_home_team} vs ${m.event_away_team}
 ----------------------------------------
 ${prompt}
 `;
-                                                            }).join('\n')}
+                                                                }).join('\n')}
 ════════════════════════════════════════`;
-                                                            navigator.clipboard.writeText(bulkPrompt);
-                                                            alert('TOPLU AI PROMPT KOPYALANDI! 📋');
-                                                        }}
-                                                        className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 flex items-center gap-1 shadow-sm"
-                                                    >
-                                                        🤖 TOPLU COPY
-                                                    </button>
-                                                )}
-                                                <span className="text-xs px-2 py-1 bg-background rounded border font-mono">
-                                                    ID: {key}
-                                                </span>
+                                                                navigator.clipboard.writeText(bulkPrompt);
+                                                                alert('TOPLU AI PROMPT KOPYALANDI! 📋');
+                                                            }}
+                                                            className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 flex items-center gap-1 shadow-sm"
+                                                        >
+                                                            🤖 TOPLU COPY
+                                                        </button>
+                                                    )}
+                                                    <span className="text-xs px-2 py-1 bg-background rounded border font-mono">
+                                                        ID: {key}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Table */}
-                                        {items.length > 0 ? (
-                                            <table className="w-full text-sm">
-                                                <thead className="bg-muted/30">
-                                                    <tr>
-                                                        <th className="p-3 text-left font-medium">Maç</th>
-                                                        <th className="p-3 text-center font-medium">Saat</th>
-                                                        <th className="p-3 text-left font-medium">Lig</th>
-                                                        <th className="p-3 text-center font-medium">AI Prompt</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {items.map((m, i) => (
-                                                        <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
-                                                            <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
-                                                            <td className="p-3 text-center text-sm">
-                                                                {m.startTime ? new Date(m.startTime * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                            </td>
-                                                            <td className="p-3 text-muted-foreground">{m.league_name}</td>
-                                                            <td className="p-3 text-center">
-                                                                <div className="flex justify-center gap-2">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            if (m.aiPrompt || m.ai_prompts?.[0]) {
-                                                                                navigator.clipboard.writeText(m.aiPrompt || m.ai_prompts?.[0]);
-                                                                                alert('AI Prompt kopyalandı!');
-                                                                            }
-                                                                        }}
-                                                                        className="px-3 py-1 rounded text-xs font-medium bg-muted hover:bg-primary hover:text-primary-foreground transition-all"
-                                                                    >
-                                                                        📋
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleAddToPicks(m, config.name, 'single')}
-                                                                        className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
-                                                                        title="Add to Daily Picks"
-                                                                    >
-                                                                        ⭐ Pick
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleAddToPicks(m, config.name, 'parlay')}
-                                                                        className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
-                                                                        title="Add to Daily Parlay"
-                                                                    >
-                                                                        🔥 Parlay
-                                                                    </button>
-                                                                </div>
-                                                            </td>
+                                            {/* Table */}
+                                            {items.length > 0 ? (
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-muted/30">
+                                                        <tr>
+                                                            <th className="p-3 text-left font-medium">Maç</th>
+                                                            <th className="p-3 text-center font-medium">Saat</th>
+                                                            <th className="p-3 text-left font-medium">Lig</th>
+                                                            <th className="p-3 text-center font-medium">AI Prompt</th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        ) : (
-                                            <div className="p-6 text-center text-muted-foreground italic">
-                                                Analiz bekleniyor...
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                                    </thead>
+                                                    <tbody>
+                                                        {items.map((m, i) => (
+                                                            <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+                                                                <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
+                                                                <td className="p-3 text-center text-sm">
+                                                                    {m.startTime ? new Date(m.startTime * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                                </td>
+                                                                <td className="p-3 text-muted-foreground">{m.league_name}</td>
+                                                                <td className="p-3 text-center">
+                                                                    <div className="flex justify-center gap-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (m.aiPrompt || m.ai_prompts?.[0]) {
+                                                                                    navigator.clipboard.writeText(m.aiPrompt || m.ai_prompts?.[0]);
+                                                                                    alert('AI Prompt kopyalandı!');
+                                                                                }
+                                                                            }}
+                                                                            className="px-3 py-1 rounded text-xs font-medium bg-muted hover:bg-primary hover:text-primary-foreground transition-all"
+                                                                        >
+                                                                            📋
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleAddToPicks(m, config.name, 'single')}
+                                                                            className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
+                                                                            title="Add to Daily Picks"
+                                                                        >
+                                                                            ⭐ Pick
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleAddToPicks(m, config.name, 'parlay')}
+                                                                            className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
+                                                                            title="Add to Daily Parlay"
+                                                                        >
+                                                                            🔥 Parlay
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            ) : (
+                                                <div className="p-6 text-center text-muted-foreground italic">
+                                                    Analiz bekleniyor...
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-6 p-4 rounded-lg bg-muted/50 border text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    💡 <strong>Lig Filtreli:</strong> Sadece seçili liglerdeki maçları tarar.
+                                    <strong>Tüm Maçlar:</strong> Lig filtresi olmadan tüm maçları tarar.
+                                </p>
+                            </div>
                         </div>
-                        <div className="mt-6 p-4 rounded-lg bg-muted/50 border text-center">
-                            <p className="text-sm text-muted-foreground">
-                                💡 <strong>Lig Filtreli:</strong> Sadece seçili liglerdeki maçları tarar.
-                                <strong>Tüm Maçlar:</strong> Lig filtresi olmadan tüm maçları tarar.
-                            </p>
-                        </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Tab Content: HISTORY */}
-                {activeTab === 'history' && (
-                    <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold">Bet History</h2>
-                            <button
-                                onClick={handleOptimize}
-                                disabled={isOptimizing}
-                                className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded shadow-md font-bold text-sm flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
-                            >
-                                {isOptimizing ? 'Analiz Ediliyor...' : '🧠 Optimize Strategy (AI)'}
-                            </button>
-                        </div>
-
-                        {optimizationReport && (
-                            <div className="mb-6 p-4 rounded-lg bg-card border border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-300">
-                                <div className="flex justify-between items-start border-b pb-2 mb-2">
-                                    <h3 className="font-bold text-lg text-primary">📊 AI Strategy Report</h3>
-                                    <button onClick={() => setOptimizationReport(null)} className="text-muted-foreground hover:text-foreground">✕</button>
-                                </div>
-                                <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed p-2 bg-muted/30 rounded max-h-[400px] overflow-y-auto">
-                                    {optimizationReport}
-                                </div>
+                {
+                    activeTab === 'history' && (
+                        <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-semibold">Bet History</h2>
+                                <button
+                                    onClick={handleOptimize}
+                                    disabled={isOptimizing}
+                                    className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded shadow-md font-bold text-sm flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {isOptimizing ? 'Analiz Ediliyor...' : '🧠 Optimize Strategy (AI)'}
+                                </button>
                             </div>
-                        )}
 
-                        <div className="overflow-x-auto rounded-lg border shadow-sm">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted">
-                                    <tr>
-                                        <th className="p-3 text-left">Date</th>
-                                        <th className="p-3 text-left">Match</th>
-                                        <th className="p-3 text-left">Strategy</th>
-                                        <th className="p-3 text-left">Result</th>
-                                        <th className="p-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {betHistory.map((bet) => (
-                                        <tr key={bet.id} className="hover:bg-muted/50">
-                                            <td className="p-3 text-muted-foreground">{new Date(bet.timestamp).toLocaleDateString()}</td>
-                                            <td className="p-3 font-medium">
-                                                <div>{bet.homeTeam} vs {bet.awayTeam}</div>
-                                                <div className="text-xs text-muted-foreground">{bet.league}</div>
-                                            </td>
-                                            <td className="p-3">
-                                                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-bold">{bet.strategyId}</span>
-                                            </td>
-                                            <td className="p-3">
-                                                <span className={clsx(
-                                                    "px-2 py-1 rounded text-xs font-bold",
-                                                    bet.result === 'WIN' && "bg-green-100 text-green-700",
-                                                    bet.result === 'LOSS' && "bg-red-100 text-red-700",
-                                                    bet.result === 'PENDING' && "bg-yellow-100 text-yellow-700",
-                                                )}>
-                                                    {bet.result}
-                                                </span>
-                                                {bet.actualScore && <span className="ml-2 text-xs font-mono">({bet.actualScore})</span>}
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                {bet.result === 'PENDING' && (
-                                                    <div className="flex justify-end gap-2">
-                                                        <button onClick={() => handleSettle(bet.id, 'WIN')} className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">WIN</button>
-                                                        <button onClick={() => handleSettle(bet.id, 'LOSS')} className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">LOSS</button>
-                                                    </div>
-                                                )}
-                                                <button onClick={() => handleDeleteHistory(bet.id)} className="ml-2 text-xs text-red-400 hover:text-red-500" title="Delete record">🗑</button>
-                                            </td>
+                            {optimizationReport && (
+                                <div className="mb-6 p-4 rounded-lg bg-card border border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-300">
+                                    <div className="flex justify-between items-start border-b pb-2 mb-2">
+                                        <h3 className="font-bold text-lg text-primary">📊 AI Strategy Report</h3>
+                                        <button onClick={() => setOptimizationReport(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+                                    </div>
+                                    <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed p-2 bg-muted/30 rounded max-h-[400px] overflow-y-auto">
+                                        {optimizationReport}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto rounded-lg border shadow-sm">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted">
+                                        <tr>
+                                            <th className="p-3 text-left">Date</th>
+                                            <th className="p-3 text-left">Match</th>
+                                            <th className="p-3 text-left">Strategy</th>
+                                            <th className="p-3 text-left">Result</th>
+                                            <th className="p-3 text-right">Actions</th>
                                         </tr>
-                                    ))}
-                                    {betHistory.length === 0 && (
-                                        <tr><td colSpan="5" className="p-8 text-center text-muted-foreground">No history yet.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {betHistory.map((bet) => (
+                                            <tr key={bet.id} className="hover:bg-muted/50">
+                                                <td className="p-3 text-muted-foreground">{new Date(bet.timestamp).toLocaleDateString()}</td>
+                                                <td className="p-3 font-medium">
+                                                    <div>{bet.homeTeam} vs {bet.awayTeam}</div>
+                                                    <div className="text-xs text-muted-foreground">{bet.league}</div>
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-bold">{bet.strategyId}</span>
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className={clsx(
+                                                        "px-2 py-1 rounded text-xs font-bold",
+                                                        bet.result === 'WIN' && "bg-green-100 text-green-700",
+                                                        bet.result === 'LOSS' && "bg-red-100 text-red-700",
+                                                        bet.result === 'PENDING' && "bg-yellow-100 text-yellow-700",
+                                                    )}>
+                                                        {bet.result}
+                                                    </span>
+                                                    {bet.actualScore && <span className="ml-2 text-xs font-mono">({bet.actualScore})</span>}
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    {bet.result === 'PENDING' && (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => handleSettle(bet.id, 'WIN')} className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">WIN</button>
+                                                            <button onClick={() => handleSettle(bet.id, 'LOSS')} className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">LOSS</button>
+                                                        </div>
+                                                    )}
+                                                    <button onClick={() => handleDeleteHistory(bet.id)} className="ml-2 text-xs text-red-400 hover:text-red-500" title="Delete record">🗑</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {betHistory.length === 0 && (
+                                            <tr><td colSpan="5" className="p-8 text-center text-muted-foreground">No history yet.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Market Tabs (Legacy/Other) */}
-                {MARKET_CONFIG[activeTab] && (
-                    <MarketTab
-                        marketKey={activeTab}
-                        config={MARKET_CONFIG[activeTab]}
-                        // renderDailyTable removed as it is not defined and not used inside MarketTab
-                        dailyAnalysis={dailyAnalysis?.[activeTab] || []}
-                        firstHalfData={firstHalfData}
-                        handleRunFirstHalf={handleRunFirstHalf}
-                        isAnalysingFH={isAnalysingFH}
-                        handleDailyAction={handleDailyAction}
-                        copyMarketPrompt={copyMarketPrompt}
-                        setSelectedDailyMatch={setSelectedDailyMatch}
-                        handleAddToPicks={handleAddToPicks}
-                    />
-                )}
-            </main>
+                {
+                    MARKET_CONFIG[activeTab] && (
+                        <MarketTab
+                            marketKey={activeTab}
+                            config={MARKET_CONFIG[activeTab]}
+                            // renderDailyTable removed as it is not defined and not used inside MarketTab
+                            dailyAnalysis={dailyAnalysis?.[activeTab] || []}
+                            firstHalfData={firstHalfData}
+                            handleRunFirstHalf={handleRunFirstHalf}
+                            isAnalysingFH={isAnalysingFH}
+                            handleDailyAction={handleDailyAction}
+                            copyMarketPrompt={copyMarketPrompt}
+                            setSelectedDailyMatch={setSelectedDailyMatch}
+                            handleAddToPicks={handleAddToPicks}
+                        />
+                    )
+                }
+            </main >
 
             {/* Logic for Modal */}
-            {selectedDailyMatch && (
-                <MatchDetailsModal
-                    match={selectedDailyMatch}
-                    onClose={() => setSelectedDailyMatch(null)}
-                />
-            )}
-        </div>
+            {
+                selectedDailyMatch && (
+                    <MatchDetailsModal
+                        match={selectedDailyMatch}
+                        onClose={() => setSelectedDailyMatch(null)}
+                    />
+                )
+            }
+        </div >
     );
 }

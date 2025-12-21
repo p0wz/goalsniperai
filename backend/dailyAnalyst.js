@@ -1186,25 +1186,23 @@ async function runAIAutomatedAnalysis(leagueFilter = true, log = console) {
 
             log.info(`🤖 Asking AI: ${m.event_home_team} vs ${m.event_away_team}...`);
             log.info(`🤖 Asking AI: ${m.event_home_team} vs ${m.event_away_team}...`);
-            const aiDecisions = await aiService.analyzeMatchForBanker(matchForAI);
+            // 3. AI Analysis (SINGLE BEST)
+            const aiDecision = await aiService.analyzeMatchForBanker(matchForAI);
 
-            if (aiDecisions && Array.isArray(aiDecisions)) {
-                // Loop through all suggested markets
-                for (const decision of aiDecisions) {
-                    // Check User Constraints again (Confidence > 80, Odds < 1.60)
-                    if (decision.estimated_odds <= 1.60 && decision.estimated_odds >= 1.10) {
-                        aiCandidates.push({
-                            id: m.event_key + '_' + decision.market.replace(/\s+/g, ''), // Unique ID per market
-                            matchId: m.event_key,
-                            match: `${m.event_home_team} vs ${m.event_away_team}`,
-                            league: m.league_name,
-                            home_team: m.event_home_team,
-                            away_team: m.event_away_team,
-                            ai: decision, // { market, confidence, estimated_odds, reason }
-                            startTime: m.event_start_time
-                        });
-                        log.info(`✅ AI FOUND BANKER: ${decision.market} (${decision.estimated_odds})`);
-                    }
+            if (aiDecision && aiDecision.market) {
+                // Check User Constraints again (Confidence > 80, Odds < 1.60)
+                if (aiDecision.estimated_odds <= 1.60 && aiDecision.estimated_odds >= 1.10) {
+                    aiCandidates.push({
+                        id: m.event_key, // Single result per match
+                        matchId: m.event_key,
+                        match: `${m.event_home_team} vs ${m.event_away_team}`,
+                        league: m.league_name,
+                        home_team: m.event_home_team,
+                        away_team: m.event_away_team,
+                        ai: aiDecision, // { market, confidence, estimated_odds, reason }
+                        startTime: m.event_start_time
+                    });
+                    log.info(`✅ AI FOUND BANKER: ${aiDecision.market} (${aiDecision.estimated_odds})`);
                 }
             }
 
@@ -1215,7 +1213,11 @@ async function runAIAutomatedAnalysis(leagueFilter = true, log = console) {
         }
     }
 
-    return aiCandidates;
+    // STAGE 2: GENERATE COUPONS FROM POOL
+    log.info(` Generating Coupons from ${aiCandidates.length} candidates...`);
+    const coupons = await aiService.generateDailyCoupons(aiCandidates);
+
+    return { candidates: aiCandidates, coupons };
 }
 
 module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, MARKET_MAP };

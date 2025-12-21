@@ -92,7 +92,7 @@ STATISTICS:
 - Over 1.5 Rate: Home ${match.filterStats.homeForm.over15Rate}%, Away ${match.filterStats.awayForm.over15Rate}%
 - BTTS Rate: Home ${match.filterStats.homeForm.bttsRate}%, Away ${match.filterStats.awayForm.bttsRate}%
 
-ALLOWED MARKETS (Only select from this list):
+ALLOWED MARKETS:
 1. Over 2.5 Goals
 2. Under 3.5 Goals
 3. Match Winner (MS 1/2)
@@ -103,40 +103,86 @@ ALLOWED MARKETS (Only select from this list):
 
 TASK:
 1. Analyze ALL markets above for this match.
-2. Select ALL markets that qualify as "Banker Bets" (High Confidence, Low Risk).
-3. Constraint: Estimated Odds must be between 1.15 and 1.60 (slightly flexible). Confidence > 80%.
+2. Select the SINGLE BEST "Banker" bet (Highest Confidence).
+3. Constraint: Estimated Odds must be between 1.15 and 1.60. Confidence > 80%.
 4. If Real Odds are missing, ESTIMATE them.
 
-OUTPUT JSON ONLY (Array of Objects):
-[
-  {
-    "market": "Home Over 1.5 Goals", 
-    "confidence": 88,
-    "estimated_odds": 1.45,
-    "reason": "Home team scored 2+ in last 5 home games."
-  },
-  ...
-]
-If no markets qualify, return empty array [].`;
+OUTPUT JSON ONLY (Single Object):
+{
+  "market": "Home Over 1.5 Goals", 
+  "confidence": 88,
+  "estimated_odds": 1.45,
+  "reason": "Home team scored 2+ in last 5 home games."
+}
+If no market is safe enough, return null.`;
 
         try {
             const responseText = await this._callLLM(prompt, 'scout');
-
-            // Clean markdown code blocks if present
             const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
-            // Regex to find the JSON array
-            const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
+            if (cleanText === 'null' || cleanText.includes('null')) return null;
+
+            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
             if (jsonMatch) return JSON.parse(jsonMatch[0]);
 
-            // Fallback: If AI returns single object instead of array
-            const singleMatch = cleanText.match(/\{[\s\S]*\}/);
-            if (singleMatch) return [JSON.parse(singleMatch[0])];
-
-            return [];
+            return null;
         } catch (e) {
             console.error("AI Analysis Failed:", e);
-            return [];
+            return null;
+        }
+    },
+
+    /**
+     * Generate 3 Coupons (2 Banker, 1 High Odds) from a list of candidates
+     * @param {Array} candidates - Array of approved single bets
+     */
+    async generateDailyCoupons(candidates) {
+        if (!candidates || candidates.length < 3) return null;
+
+        const candidatesList = candidates.map((c, i) =>
+            `${i + 1}. ${c.match} (${c.league}) - Pick: ${c.ai.market} - Odds: ${c.ai.estimated_odds} - Conf: ${c.ai.confidence}%`
+        ).join('\n');
+
+        const prompt = `Act as a Master Betting Strategist.
+Model: Google Gemini 3 Flash Preview
+
+SOURCE POOL (Best Matches of the Day):
+${candidatesList}
+
+TASK: convert this pool into 3 distinct coupons.
+
+1. 🎟️ BANKER COUPON 1 (Safe)
+   - Combine 2-3 very safest matches.
+   - Total Odds ~2.00 - 3.00.
+
+2. 🎟️ BANKER COUPON 2 (Safe)
+   - Combine 2-3 DIFFERENT safe matches (try not to overlap with Coupon 1 if possible).
+   - Total Odds ~2.00 - 3.00.
+
+3. 🚀 HIGH ODDS SURPRISE (Value)
+   - Combine 3-4 matches for higher return.
+   - Total Odds ~5.00+.
+
+OUTPUT JSON ONLY:
+{
+  "banker1": {
+    "matches": [ { "id": 1, "match": "...", "pick": "...", "odds": 1.45 } ],
+    "totalOdds": 2.10
+  },
+  "banker2": { ... },
+  "highOdds": { ... }
+}`;
+
+        try {
+            const responseText = await this._callLLM(prompt, 'scout');
+            const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+
+            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            return null;
+        } catch (e) {
+            console.error("Coupon Generation Failed:", e);
+            return null;
         }
     },
 
