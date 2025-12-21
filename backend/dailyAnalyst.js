@@ -702,8 +702,7 @@ If NO market is safe, return empty array.`;
     }
     return { recommendations: [] };
 }
-return { verdict: 'SKIP', reason: 'Max retries exceeded' };
-    }
+
 
 // Main Runner
 async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, leagueFilter = true) {
