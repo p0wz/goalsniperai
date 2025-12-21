@@ -130,6 +130,21 @@ export default function AdminPanel({ user, handleLogout }) {
                     category: category,
                     confidence: 85
                 });
+
+                // Also record to AI Training Dataset
+                await trainingService.record({
+                    matchId: match.matchId || match.event_key,
+                    match: `${match.event_home_team} vs ${match.event_away_team}`,
+                    homeTeam: match.event_home_team,
+                    awayTeam: match.event_away_team,
+                    league: match.league_name,
+                    startTime: match.event_time,
+                    market: match.market,
+                    prediction: match.market,
+                    odds: match.odds || 1.50,
+                    features: match.filterStats || match.stats || {}
+                });
+
                 alert(`Approved: ${match.event_home_team} vs ${match.event_away_team}`);
                 fetchBetHistory();
             } else if (action === 'reject') {
@@ -200,10 +215,22 @@ export default function AdminPanel({ user, handleLogout }) {
             });
 
             if (res.success) {
+                // Also record to AI Training Dataset with full stats
+                await trainingService.record({
+                    matchId: candidate.matchId || candidate.id,
+                    match: candidate.match || `${candidate.home_team || candidate.event_home_team} vs ${candidate.away_team || candidate.event_away_team}`,
+                    homeTeam: candidate.home_team || candidate.event_home_team,
+                    awayTeam: candidate.away_team || candidate.event_away_team,
+                    league: candidate.league,
+                    startTime: candidate.startTime,
+                    market: candidate.ai.market,
+                    prediction: candidate.ai.market,
+                    odds: candidate.ai.estimated_odds || 1.50,
+                    features: candidate.filterStats || {}
+                });
+
                 // Remove from list
                 setAiCandidates(prev => prev.filter(p => p.id !== candidate.id));
-                // Show feedback
-                // alert("✅ Maç geçmişe eklendi ve takibe alındı!"); 
             } else {
                 alert("Hata: " + res.error);
             }
