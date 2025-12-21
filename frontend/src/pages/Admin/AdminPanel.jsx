@@ -742,7 +742,10 @@ export default function AdminPanel({ user, handleLogout }) {
                                                         onClick={() => {
                                                             // Generate Bulk Prompt on Client Side
                                                             let bulkPrompt = `ROLE: Expert Football Analyst (Stats Only Mode)\n`;
-                                                            bulkPrompt += `TASK: Analyze these matches. Find the BEST VALUE.\n`;
+                                                            bulkPrompt += `TASK: Analyze these matches using the detailed statistics provided. DO NOT ask for odds. Use the stats to estimate probability.\n`;
+                                                            bulkPrompt += `CLASSIFICATION RULES (Strict):\n`;
+                                                            bulkPrompt += `1. BANKO: Very High Probability. If you think the "True Odds" would be between 1.15 - 1.50. Safe bet.\n`;
+                                                            bulkPrompt += `2. VALUE: Good Probability but moderate risk. If "True Odds" would be > 1.50. High reward.\n\n`;
                                                             bulkPrompt += `IMPORTANT: Output JSON ONLY with "classification": "BANKO" | "VALUE".\n\n`;
 
                                                             items.forEach((m, idx) => {
@@ -751,17 +754,30 @@ export default function AdminPanel({ user, handleLogout }) {
                                                                 const aAway = stats.awayAwayStats || {};
                                                                 const hForm = stats.homeForm || {};
                                                                 const aForm = stats.awayForm || {};
+                                                                const mutual = stats.mutual || [];
 
                                                                 bulkPrompt += `[MATCH ${idx + 1}] ${m.event_home_team} vs ${m.event_away_team}\n`;
                                                                 bulkPrompt += `LEAGUE: ${m.league_name}\n`;
+
                                                                 if (hForm.avgScored) {
-                                                                    bulkPrompt += `HOME: Form Scored ${hForm.avgScored.toFixed(1)}, Conceded ${hForm.avgConceded.toFixed(1)}. @Home Win ${hHome.winRate}%\n`;
-                                                                    bulkPrompt += `AWAY: Form Scored ${aForm.avgScored.toFixed(1)}, Conceded ${aForm.avgConceded.toFixed(1)}. @Away Win ${aAway.winRate}%\n`;
+                                                                    bulkPrompt += `HOME (${m.event_home_team}):\n`;
+                                                                    bulkPrompt += `  - Form (Last 5): Scored ${hForm.avgScored?.toFixed(2)}, Conceded ${hForm.avgConceded?.toFixed(2)}\n`;
+                                                                    bulkPrompt += `  - Trends: Over 2.5 ${hForm.over25Rate?.toFixed(0)}%, BTTS ${hForm.bttsRate?.toFixed(0)}%, CleanSheet ${hForm.cleanSheetRate?.toFixed(0)}%\n`;
+                                                                    bulkPrompt += `  - At Home: Win ${hHome.winRate?.toFixed(0)}%, Scored in ${hHome.scoringRate?.toFixed(0)}% of games\n`;
+
+                                                                    bulkPrompt += `AWAY (${m.event_away_team}):\n`;
+                                                                    bulkPrompt += `  - Form (Last 5): Scored ${aForm.avgScored?.toFixed(2)}, Conceded ${aForm.avgConceded?.toFixed(2)}\n`;
+                                                                    bulkPrompt += `  - Trends: Over 2.5 ${aForm.over25Rate?.toFixed(0)}%, BTTS ${aForm.bttsRate?.toFixed(0)}%, CleanSheet ${aForm.cleanSheetRate?.toFixed(0)}%\n`;
+                                                                    bulkPrompt += `  - At Away: Win ${aAway.winRate?.toFixed(0)}%, Conceded in ${aAway.lossCount} games (clean sheets: ${aAway.cleanSheetRate?.toFixed(0)}%)\n`;
+
+                                                                    if (mutual.length > 0) {
+                                                                        bulkPrompt += `HEAD-TO-HEAD (Last ${mutual.length}): ${mutual.map(g => `${g.home_team_score}-${g.away_team_score}`).join(', ')}\n`;
+                                                                    }
                                                                 }
                                                                 bulkPrompt += `----------------------------------------\n`;
                                                             });
 
-                                                            bulkPrompt += `\nOutput Format:\n{ "picks": [ { "home_team": "...", "classification": "BANKO", "confidence": 90, "reason": "..." } ] }`;
+                                                            bulkPrompt += `\nOutput Format:\n{ "picks": [ { "home_team": "...", "away_team": "...", "market": "Over 2.5 or Home Win etc", "classification": "BANKO", "confidence": 90, "reason": "Brief reason based on stats" } ] }`;
 
                                                             navigator.clipboard.writeText(bulkPrompt);
                                                             alert(`✅ ${items.length} maç için Gemini Prompt kopyalandı!`);
