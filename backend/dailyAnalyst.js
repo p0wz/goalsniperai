@@ -654,7 +654,7 @@ CLASSIFICATION RULES:
 - BANKO (Banker): Confidence 85%+, High Safety. Ideal for accumulators.
 - VALUE: Confidence 65-84%, High EV (Expected Value). Good for singles.
 
-OUTPUT JSON:
+OUTPUT JSON (Must be valid JSON, no markdown text outside the block):
 {
   "recommendations": [
     {
@@ -675,7 +675,7 @@ If no market offers good value/safety, return empty array.`;
                     model: 'meta-llama/llama-4-scout-17b-16e-instruct',
                     messages: [{ role: 'user', content: prompt }],
                     temperature: 0.1, // Lower temp for strict json
-                    max_tokens: 400
+                    max_tokens: 1000 // Increased from 400 to prevent truncation
                 },
                 { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 20000 }
             );
