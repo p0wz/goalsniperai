@@ -664,16 +664,25 @@ If NO market is safe, return empty array.`;
 
             let text = response.data?.choices?.[0]?.message?.content || '{}';
             console.log(`[Oracle Raw] Match: ${match.event_home_team} vs ${match.event_away_team}`);
-            console.log(`[Oracle Raw] Response: ${text.substring(0, 100)}...`); // Peek at response
+            console.log(`[Oracle Raw] Response: ${text.substring(0, 100)}...`);
 
-            text = text.replace(/```json|```/g, '').trim();
+            // Robust JSON Extraction
+            let jsonString = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+
+            if (jsonMatch) {
+                jsonString = jsonMatch[0];
+            }
+
             let json;
             try {
-                json = JSON.parse(text);
+                json = JSON.parse(jsonString);
             } catch (parseError) {
                 console.error(`[Oracle Error] JSON Parse Failed: ${parseError.message}`);
-                console.error(`[Oracle Error] Raw Text: ${text}`);
-                return { recommendations: [] }; // Fail gracefully but log
+                console.error(`[Oracle Error] Cleaned Text: ${jsonString}`);
+                // Retry with relaxed mode or just fail? 
+                // Let's fail for now but log clearly.
+                return { recommendations: [] };
             }
 
             if (!json.recommendations || json.recommendations.length === 0) {
@@ -684,7 +693,7 @@ If NO market is safe, return empty array.`;
                 recommendations: json.recommendations || [],
                 training_data: {
                     input: prompt,
-                    output: text,
+                    output: text, // Save full original text (with reasoning)
                     model: 'meta-llama/llama-4-scout-17b-16e-instruct'
                 }
             };
