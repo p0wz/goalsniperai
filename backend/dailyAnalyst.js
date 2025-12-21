@@ -322,22 +322,14 @@ function calculateAdvancedStats(history, teamName) {
 
 // 3. Process & Filter
 async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
+    // ----------------------------------------------------------------
+    // 🧠 STATS ONLY MODE (Clean)
+    // ----------------------------------------------------------------
     const candidates = {
-        over25: [],
-        doubleChance: [],
-        homeOver15: [],
-        under35: [],
-        under25: [],
-        btts: [],
-        firstHalfOver05: [],
-        ms1AndOver15: [],
-        awayOver05: [],
-        handicap: [],
-        oracle: []
+        all_stats: [] // Single bucket
     };
 
     let processed = 0;
-    let consecutiveErrors = 0;
     let skippedNoH2H = 0;
     let skippedNoStats = 0;
 
@@ -346,39 +338,29 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`═══════════════════════════════════════════════════════`);
 
     for (const m of matches) {
-        if (processed >= limit) {
-            log.info(`\n⏹️ Reached limit of ${limit} matches. Stopping.`);
-            break;
-        }
-        if (consecutiveErrors >= 3) {
-            log.error('[DailyAnalyst] Circuit Breaker: Too many consecutive errors. Aborting.');
-            break;
-        }
+        if (processed >= limit) break;
 
         const mid = m.event_key || m.match_id;
         if (!mid) continue;
 
+        // SKIP INVALID LEAGUES (if strict)
+        if (m.league_name.includes('Women') || m.league_name.includes('U19') || m.league_name.includes('Reserve')) continue;
+
         const matchNum = processed + 1;
         log.info(`\n───────────────────────────────────────────────────────`);
         log.info(`📌 [${matchNum}/${limit}] ${m.event_home_team} vs ${m.event_away_team}`);
-        log.info(`   📍 League: ${m.league_name}`);
 
-        await sleep(800);
+        await sleep(200); // Politeness
 
-        log.info(`   🔍 Fetching H2H data...`);
+        // Fetch H2H
         const h2hData = await fetchMatchH2H(mid);
         if (!h2hData) {
-            log.warn(`   ❌ H2H fetch failed - skipping`);
-            consecutiveErrors++;
             skippedNoH2H++;
             continue;
         }
 
         const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
-        log.info(`   ✅ H2H fetched: ${sections.length} historical matches`);
 
-        // Filter History
-        // Use full history for 1H Analysis
         const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
         const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
 
@@ -391,80 +373,31 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             (x.home_team?.name === m.event_away_team && x.away_team?.name === m.event_home_team)
         ).slice(0, 3);
 
-        log.info(`   📈 History: Home(${homeAllHistory.length}) Away(${awayAllHistory.length}) H@H(${homeAtHomeHistory.length}) A@A(${awayAtAwayHistory.length}) Mutual(${mutualH2H.length})`);
-
         const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
         const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
         const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
         const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
 
         if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
-            log.warn(`   ❌ Insufficient stats - skipping`);
-            consecutiveErrors = 0;
             skippedNoStats++;
             continue;
         }
 
-        consecutiveErrors = 0;
         processed++;
         const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
-        const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
 
+        log.info(`   ✅ Stats Calculated.`);
 
-        // Log calculated stats
-        log.info(`   📊 STATS:`);
-        log.info(`      • League Avg Goals: ${proxyLeagueAvg.toFixed(2)}`);
-        log.info(`      • Home Over1.5: ${homeForm.over15Rate.toFixed(0)}% | Away Over1.5: ${awayForm.over15Rate.toFixed(0)}%`);
-        log.info(`      • Home Scoring@Home: ${homeHomeStats.scoringRate.toFixed(0)}% | Away Scoring@Away: ${awayAwayStats.scoringRate.toFixed(0)}%`);
-        log.info(`      • Home AvgScored@Home: ${homeHomeStats.avgScored.toFixed(2)} | Away AvgConceded@Away: ${awayAwayStats.avgConceded.toFixed(2)}`);
-
-        // ----------------------------------------------------------------
-        // 🧠 PHASE 15: AI-FIRST ORACLE ANALYSIS (DISABLED - STATS ONLY MODE)
-        // ----------------------------------------------------------------
-
-        // log.info(`   🤖 Asking Oracle (Groq/Llama-17b)...`);
-        // const oddsData = await fetchMatchOdds(m.match_id || m.event_key);
-        // const oracleResult = await analyzeMatchOracle({ ...m, filterStats: stats, oddsData: oddsData });
-
-        // BYPASS: push all matches with stats to the list for manual review
-        candidates.oracle.push({
+        // PUSH TO SINGLE LIST
+        candidates.all_stats.push({
             ...m,
             filterStats: stats,
-            recommendations: [
-                {
-                    market: "Analyze Manually",
-                    classification: "STATS",
-                    confidence: 0,
-                    reasoning: "AI Disabled. Use Gemini Prompt."
-                }
-            ],
-            ai_analysis_raw: {}
+            recommendations: []
         });
-
-        // if (oracleResult.recommendations && oracleResult.recommendations.length > 0) {
-        // ... (lines commented out)
-        // } else { ... }
-
-        // Minimal delay to prevent CPU spiking if sync
-        // await sleep(10);
     }
 
-    // Summary
     log.info(`\n═══════════════════════════════════════════════════════`);
-    log.info(`📊 FILTER SUMMARY`);
-    log.info(`   • Processed: ${processed}/${limit}`);
-    log.info(`   • Skipped (No H2H): ${skippedNoH2H}`);
-    log.info(`   • Skipped (No Stats): ${skippedNoStats}`);
-    log.info(`   • Over 2.5 candidates: ${candidates.over25.length}`);
-    log.info(`   • BTTS candidates: ${candidates.btts.length}`);
-    log.info(`   • 1X DC candidates: ${candidates.doubleChance.length}`);
-    log.info(`   • Home O1.5 candidates: ${candidates.homeOver15.length}`);
-    log.info(`   • Under 3.5 candidates: ${candidates.under35.length}`);
-    log.info(`   • Under 2.5 candidates: ${candidates.under25.length}`);
-    log.info(`   • 1H Over 0.5 candidates: ${candidates.firstHalfOver05.length}`);
-    log.info(`   • MS1 & 1.5+ candidates: ${candidates.ms1AndOver15.length}`);
-    log.info(`   • Away 0.5+ candidates: ${candidates.awayOver05.length}`);
-    log.info(`   • Handicap candidates: ${candidates.handicap.length}`);
+    log.info(`📊 STATS SUMMARY: Found ${candidates.all_stats.length} matches.`);
     log.info(`═══════════════════════════════════════════════════════`);
 
     return candidates;
