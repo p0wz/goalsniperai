@@ -141,7 +141,7 @@ export const adminService = {
         return response.data;
     },
     getAIAnalysis: async (leagueFilter) => {
-        const response = await api.post('/api/daily-analysis/ai-auto', { leagueFilter }); // Fixed URL path
+        const response = await api.post('/daily-analysis/ai-auto', { leagueFilter }); // Corrected path
         return response.data;
     },
     // Picks
