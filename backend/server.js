@@ -2074,6 +2074,43 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 });
 
 // ============================================
+// 🧠 Import Gemini Response
+// ============================================
+app.post('/api/daily-analysis/import-gemini', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false });
+
+    try {
+        const { parseGeminiResponse } = require('./dailyAnalyst');
+        const picks = parseGeminiResponse(req.body.jsonText);
+
+        if (picks.length > 0) {
+            // Initialize cache if needed
+            if (!DAILY_ANALYSIS_CACHE) DAILY_ANALYSIS_CACHE = {};
+            if (!DAILY_ANALYSIS_CACHE.gemini) DAILY_ANALYSIS_CACHE.gemini = [];
+
+            // Add IDs and merge
+            const newPicks = picks.map(p => ({
+                ...p,
+                id: `gemini_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                event_home_team: p.home_team,
+                event_away_team: p.away_team,
+                analysis: p.reason,
+                confidence: p.confidence
+            }));
+
+            // Append to "Gemini" category
+            DAILY_ANALYSIS_CACHE.gemini = [...DAILY_ANALYSIS_CACHE.gemini, ...newPicks];
+
+            res.json({ success: true, count: newPicks.length, picks: newPicks });
+        } else {
+            res.status(400).json({ success: false, error: 'No valid picks found in JSON.' });
+        }
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ============================================
 // ✅ Approve Daily Candidate (Manual Approval)
 // ============================================
 app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {

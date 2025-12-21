@@ -18,6 +18,10 @@ export default function AdminPanel({ user, handleLogout }) {
     const [botRunning, setBotRunning] = useState(false);
     const [botStatusLoading, setBotStatusLoading] = useState(false);
 
+    // Gemini Import State
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importText, setImportText] = useState('');
+
     useEffect(() => {
         fetchLiveSignals();
         fetchBetHistory();
@@ -818,6 +822,36 @@ ${prompt}
                     match={selectedDailyMatch}
                     onClose={() => setSelectedDailyMatch(null)}
                 />
+            )}
+
+            {/* GEMINI IMPORT MODAL */}
+            {showImportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-2xl rounded-lg border bg-card p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            📥 Gemini/AI Yanıtını İçe Aktar
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            Gemini'nin verdiği JSON formatındaki yanıtı buraya yapıştırın.
+                        </p>
+
+                        <textarea
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            placeholder='{"picks": [...] }'
+                            className="w-full h-64 p-3 rounded border bg-background font-mono text-sm mb-4 focus:ring-2 focus:ring-primary"
+                        />
+
+                        <div className="flex justify-end gap-2">
+                            <NeuButton variant="secondary" onClick={() => setShowImportModal(false)}>
+                                İptal
+                            </NeuButton>
+                            <NeuButton variant="primary" onClick={handleImportGemini} disabled={!importText.trim() || refreshing}>
+                                {refreshing ? 'İşleniyor...' : 'İçe Aktar ve Kaydet'}
+                            </NeuButton>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
