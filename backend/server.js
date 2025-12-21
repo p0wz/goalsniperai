@@ -2132,6 +2132,33 @@ app.post('/api/daily-analysis/reject/:id', requireAuth, async (req, res) => {
     }
 });
 
+
+// ============================================
+// 🤖 AI Automated Analysis Endpoint (Admin)
+// ============================================
+app.post('/api/daily-analysis/ai-auto', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { leagueFilter } = req.body;
+
+    try {
+        log.info(`[API] Starting AI Auto Analysis (League Filter: ${leagueFilter})`);
+
+        // This takes time, so we send results immediately? No, frontend expects array.
+        // We will await it (assuming < 60s timeout). 
+        // If it takes longer, we should use streaming, but for 20 matches limit it should be fast (~30s).
+
+        const results = await dailyAnalyst.runAIAutomatedAnalysis(leagueFilter, log);
+
+        res.json({ success: true, count: results.length, candidates: results });
+    } catch (error) {
+        log.error(`AI Analysis Failed: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ============================================
 // 📡 SSE Streaming Endpoint for Live Analysis
 // ============================================

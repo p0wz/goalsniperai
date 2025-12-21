@@ -20,6 +20,10 @@ export default function AdminPanel({ user, handleLogout }) {
     const [optimizationReport, setOptimizationReport] = useState(null);
     const [isOptimizing, setIsOptimizing] = useState(false);
 
+    // AI Auto Analysis State
+    const [aiCandidates, setAiCandidates] = useState([]);
+    const [isAutoAnalysing, setIsAutoAnalysing] = useState(false);
+
     useEffect(() => {
         fetchLiveSignals();
         fetchBetHistory();
@@ -156,6 +160,48 @@ export default function AdminPanel({ user, handleLogout }) {
             else alert('Optimization failed: ' + res.error);
         } catch (err) { alert('Error: ' + err.message); }
         finally { setIsOptimizing(false); }
+    };
+
+    const handleAutoAI = async (leagueFilter) => {
+        try {
+            setIsAutoAnalysing(true);
+            setAiCandidates([]); // Reset previous
+            const res = await adminService.getAIAnalysis(leagueFilter);
+            if (res.success) {
+                setAiCandidates(res.candidates);
+                if (res.candidates.length === 0) alert("AI kriterlerine uygun maç bulunamadı.");
+            }
+            else alert('AI Analysis failed: ' + res.error);
+        } catch (err) { alert('Error: ' + err.message); }
+        finally { setIsAutoAnalysing(false); }
+    };
+
+    const handleApproveAICandidate = async (candidate) => {
+        // Add to Daily Picks/History
+        try {
+            // Use approveSignal to trigger betTracker.recordBet (Add to History JSON)
+            const res = await signalService.approveSignal(candidate.id, {
+                matchData: {
+                    matchId: candidate.id,
+                    home_team: candidate.event_home_team,
+                    away_team: candidate.event_away_team,
+                    startTime: candidate.startTime
+                },
+                market: candidate.ai.market,
+                category: 'AI_BANKER',
+                confidence: candidate.ai.confidence || 85
+            });
+
+            if (res.success) {
+                // Remove from list
+                setAiCandidates(prev => prev.filter(p => p.id !== candidate.id));
+                // Show feedback
+                alert("✅ Maç geçmişe eklendi ve takibe alındı!");
+            } else {
+                alert("Hata: " + res.error);
+            }
+
+        } catch (e) { alert(e.message); }
     };
 
     const handleAddToPicks = async (match, marketName, type = 'single') => {
@@ -530,11 +576,78 @@ Yukarıdaki maç havuzunu detaylı incele. Amacımız "BANKO" (Güvenilir) kupon
                                         navigator.clipboard.writeText(bulkPrompt);
                                         alert(`✅ ${allMatches.length} maçın detaylı istatistikleri kopyalandı!`);
                                     }}
-                                    className="px-4 py-2 rounded bg-purple-600 text-white font-bold hover:bg-purple-700 transition-colors shadow-sm flex items-center gap-2"
+                                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.01] transition-all font-bold text-lg flex flex-col items-center gap-1 mb-6"
                                 >
-                                    📑 Tün Maçları Kopyala (AI Prompt)
+                                    <div className="flex items-center gap-2">
+                                        {/* Assuming CopyIcon is defined or imported elsewhere */}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2" /></svg> 📑 Tüm Maçları Kopyala (AI Prompt)
+                                    </div>
+                                    <span className="text-xs font-normal opacity-80 font-mono">1.15 - 1.50 Banko Kupon Odaklı</span>
                                 </button>
                             )}
+
+                            {/* AI AUTO ANALYSIS SECTION */}
+                            <div className="my-8 p-6 bg-card border border-indigo-500/20 rounded-xl shadow-sm">
+                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    🤖 AI Oto-Analiz (Llama 4 Scout)
+                                    <span className="text-xs bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded">NEW</span>
+                                </h3>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    Yapay zeka tüm maçları tarar, istatistikleri inceler ve sadece <strong>1.50 oranın altındaki BANKO</strong> fırsatları bulur.
+                                </p>
+
+                                <div className="flex gap-4 justify-center">
+                                    <button
+                                        onClick={() => handleAutoAI(true)}
+                                        disabled={isAutoAnalysing}
+                                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {isAutoAnalysing ? 'Taranıyor...' : '🔍 Lig Filtreli Tara'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleAutoAI(false)}
+                                        disabled={isAutoAnalysing}
+                                        className="px-6 py-3 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-semibold shadow disabled:opacity-50"
+                                    >
+                                        {isAutoAnalysing ? 'Taranıyor...' : '🌍 Tümünü Tara'}
+                                    </button>
+                                </div>
+
+                                {/* Results Grid */}
+                                {aiCandidates.length > 0 && (
+                                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                                        {aiCandidates.map(c => (
+                                            <div key={c.id} className="p-4 rounded-lg bg-background border border-indigo-500/30 hover:border-indigo-500 transition-colors shadow-sm group">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <h4 className="font-bold text-base">{c.match}</h4>
+                                                        <span className="text-xs text-muted-foreground">{c.league}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="block font-bold text-lg text-indigo-400">{c.ai.estimated_odds}</span>
+                                                        <span className="text-xs text-muted-foreground">Est. Odds</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-3 p-2 bg-muted/40 rounded text-sm">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-foreground">{c.ai.market}</span>
+                                                        <span className="text-green-500 font-bold">%{c.ai.confidence} Güven</span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground leading-relaxed">{c.ai.reason}</p>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleApproveAICandidate(c)}
+                                                    className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm flex items-center justify-center gap-2 opacity-90 hover:opacity-100"
+                                                >
+                                                    ✅ Onayla & Takibe Al
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Analysis Content Grid */}

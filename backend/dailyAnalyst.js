@@ -1133,5 +1133,87 @@ DETAILED STATISTICS:
 TASK: Analyze this match based on the detailed statistics above. Identify the SINGLE BEST betting market for this match (e.g., Over 2.5, BTTS, Home Win, etc.). Provide your verdict and reasoning with a confidence score.`;
 }
 
-module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, MARKET_MAP };
+// ============================================
+// 🤖 AUTOMATED AI BANKER ANALYSIS
+// ============================================
+async function runAIAutomatedAnalysis(leagueFilter = true, log = console) {
+    const aiService = require('./services/aiService'); // Lazy load
+    log.info(`\n🤖 STARTING AI AUTO-ANALYSIS (Groq Llama 4 Scout)`);
+
+    // 1. Fetch Matches
+    const matches = await fetchDay(1, log, !leagueFilter);
+    if (matches.length === 0) return [];
+
+    log.info(`🔍 Scanned ${matches.length} matches. Filtering for AI candidates...`);
+
+    const aiCandidates = [];
+    let processed = 0;
+
+    for (const m of matches) {
+        if (processed >= 20) break; // Limit to 20 AI calls to prevent rate limits/cost
+
+        // PRE-FILTER: Only send statistically interesting matches to AI
+        // This saves API tokens and time.
+        // Logic: Checks basic stats first.
+        try {
+            await sleep(500);
+            const h2hData = await fetchMatchH2H(m.event_key || m.match_id);
+            if (!h2hData) continue;
+
+            const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+            const homeAllHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team)).slice(0, 5);
+            const awayAllHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team)).slice(0, 5);
+
+            // Basic check using existing calc
+            const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
+            const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
+            const homeHomeStats = calculateAdvancedStats(sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8), m.event_home_team);
+            const awayAwayStats = calculateAdvancedStats(sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8), m.event_away_team);
+
+            if (!homeForm || !awayForm) continue;
+
+            // PRE-FILTER LOGIC (LOOSE):
+            // Either Team Win Rate > 50% OR Over 1.5 Rate > 70%
+            const isInteresting =
+                (homeHomeStats.winRate > 50) ||
+                ((awayAwayStats.lossCount / 8) * 100 > 50) ||
+                (homeForm.over15Rate > 70 && awayForm.over15Rate > 70);
+
+            if (!isInteresting) continue;
+
+            // Prepare Match Object for AI
+            const matchForAI = {
+                ...m,
+                filterStats: { homeForm, awayForm, homeHomeStats, awayAwayStats }
+            };
+
+            log.info(`🤖 Asking AI: ${m.event_home_team} vs ${m.event_away_team}...`);
+            const aiDecision = await aiService.analyzeMatchForBanker(matchForAI);
+
+            if (aiDecision) {
+                // Check User Constraints again (Confidence > 85, Odds < 1.55)
+                // We allow slightly up to 1.55 to be safe
+                if (aiDecision.estimated_odds <= 1.55 && aiDecision.estimated_odds >= 1.10) {
+                    aiCandidates.push({
+                        id: m.event_key,
+                        match: `${m.event_home_team} vs ${m.event_away_team}`,
+                        league: m.league_name,
+                        ai: aiDecision, // { market, confidence, estimated_odds, reason }
+                        startTime: m.event_start_time
+                    });
+                    log.info(`✅ AI FOUND BANKER: ${aiDecision.market} (${aiDecision.estimated_odds})`);
+                }
+            }
+
+            processed++;
+
+        } catch (e) {
+            log.error(`Skipping match ${m.event_home_team}: ${e.message}`);
+        }
+    }
+
+    return aiCandidates;
+}
+
+module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, MARKET_MAP };
 

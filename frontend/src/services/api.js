@@ -140,6 +140,10 @@ export const adminService = {
         const response = await api.post('/admin/bot/stop');
         return response.data;
     },
+    getAIAnalysis: async (leagueFilter) => {
+        const response = await api.post('/api/daily-analysis/ai-auto', { leagueFilter }); // Fixed URL path
+        return response.data;
+    },
     // Picks
     createPick: async (data) => {
         const response = await api.post('/admin/picks', data);
