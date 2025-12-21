@@ -180,11 +180,12 @@ export default function AdminPanel({ user, handleLogout }) {
         // Add to Daily Picks/History
         try {
             // Use approveSignal to trigger betTracker.recordBet (Add to History JSON)
-            const res = await signalService.approveSignal(candidate.id, {
+            // Note: candidate.id is now composite (matchId_market), so we use candidate.matchId for the actual ID.
+            const res = await signalService.approveSignal(candidate.matchId || candidate.id, {
                 matchData: {
-                    matchId: candidate.id,
-                    home_team: candidate.event_home_team,
-                    away_team: candidate.event_away_team,
+                    matchId: candidate.matchId || candidate.id,
+                    home_team: candidate.home_team || candidate.event_home_team,
+                    away_team: candidate.away_team || candidate.event_away_team,
                     startTime: candidate.startTime
                 },
                 market: candidate.ai.market,
@@ -196,7 +197,7 @@ export default function AdminPanel({ user, handleLogout }) {
                 // Remove from list
                 setAiCandidates(prev => prev.filter(p => p.id !== candidate.id));
                 // Show feedback
-                alert("✅ Maç geçmişe eklendi ve takibe alındı!");
+                // alert("✅ Maç geçmişe eklendi ve takibe alındı!"); 
             } else {
                 alert("Hata: " + res.error);
             }

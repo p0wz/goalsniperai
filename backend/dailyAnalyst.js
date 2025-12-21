@@ -1188,20 +1188,26 @@ async function runAIAutomatedAnalysis(leagueFilter = true, log = console) {
             };
 
             log.info(`🤖 Asking AI: ${m.event_home_team} vs ${m.event_away_team}...`);
-            const aiDecision = await aiService.analyzeMatchForBanker(matchForAI);
+            log.info(`🤖 Asking AI: ${m.event_home_team} vs ${m.event_away_team}...`);
+            const aiDecisions = await aiService.analyzeMatchForBanker(matchForAI);
 
-            if (aiDecision) {
-                // Check User Constraints again (Confidence > 85, Odds < 1.55)
-                // We allow slightly up to 1.55 to be safe
-                if (aiDecision.estimated_odds <= 1.55 && aiDecision.estimated_odds >= 1.10) {
-                    aiCandidates.push({
-                        id: m.event_key,
-                        match: `${m.event_home_team} vs ${m.event_away_team}`,
-                        league: m.league_name,
-                        ai: aiDecision, // { market, confidence, estimated_odds, reason }
-                        startTime: m.event_start_time
-                    });
-                    log.info(`✅ AI FOUND BANKER: ${aiDecision.market} (${aiDecision.estimated_odds})`);
+            if (aiDecisions && Array.isArray(aiDecisions)) {
+                // Loop through all suggested markets
+                for (const decision of aiDecisions) {
+                    // Check User Constraints again (Confidence > 80, Odds < 1.60)
+                    if (decision.estimated_odds <= 1.60 && decision.estimated_odds >= 1.10) {
+                        aiCandidates.push({
+                            id: m.event_key + '_' + decision.market.replace(/\s+/g, ''), // Unique ID per market
+                            matchId: m.event_key,
+                            match: `${m.event_home_team} vs ${m.event_away_team}`,
+                            league: m.league_name,
+                            home_team: m.event_home_team,
+                            away_team: m.event_away_team,
+                            ai: decision, // { market, confidence, estimated_odds, reason }
+                            startTime: m.event_start_time
+                        });
+                        log.info(`✅ AI FOUND BANKER: ${decision.market} (${decision.estimated_odds})`);
+                    }
                 }
             }
 

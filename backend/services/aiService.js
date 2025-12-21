@@ -92,27 +92,51 @@ STATISTICS:
 - Over 1.5 Rate: Home ${match.filterStats.homeForm.over15Rate}%, Away ${match.filterStats.awayForm.over15Rate}%
 - BTTS Rate: Home ${match.filterStats.homeForm.bttsRate}%, Away ${match.filterStats.awayForm.bttsRate}%
 
-TASK:
-1. Analyze proper odds for "Banker" markets (< 1.50) based on these stats. If real odds are missing, ESTIMATE them mathematically.
-2. Select the SINGLE BEST "Banker" bet for this match.
-3. Criteria: Win Probability > 85%, Estimated Odds 1.15 - 1.50.
+ALLOWED MARKETS (Only select from this list):
+1. Over 2.5 Goals
+2. Under 3.5 Goals
+3. Match Winner (MS 1/2)
+4. Match Winner & Over 1.5 Goals (MS & 1.5)
+5. Both Teams to Score (BTTS / KG Var)
+6. Home Over 1.5 Goals
+7. Away Over 0.5 Goals
 
-OUTPUT JSON ONLY:
-{
-  "market": "Over 1.5 Goals", 
-  "confidence": 88,
-  "estimated_odds": 1.28,
-  "reason": "Brief explanation of why this is a banker."
-}`;
+TASK:
+1. Analyze ALL markets above for this match.
+2. Select ALL markets that qualify as "Banker Bets" (High Confidence, Low Risk).
+3. Constraint: Estimated Odds must be between 1.15 and 1.60 (slightly flexible). Confidence > 80%.
+4. If Real Odds are missing, ESTIMATE them.
+
+OUTPUT JSON ONLY (Array of Objects):
+[
+  {
+    "market": "Home Over 1.5 Goals", 
+    "confidence": 88,
+    "estimated_odds": 1.45,
+    "reason": "Home team scored 2+ in last 5 home games."
+  },
+  ...
+]
+If no markets qualify, return empty array [].`;
 
         try {
             const responseText = await this._callLLM(prompt, 'scout');
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+            // Clean markdown code blocks if present
+            const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+            // Regex to find the JSON array
+            const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
             if (jsonMatch) return JSON.parse(jsonMatch[0]);
-            return null;
+
+            // Fallback: If AI returns single object instead of array
+            const singleMatch = cleanText.match(/\{[\s\S]*\}/);
+            if (singleMatch) return [JSON.parse(singleMatch[0])];
+
+            return [];
         } catch (e) {
             console.error("AI Analysis Failed:", e);
-            return null;
+            return [];
         }
     },
 
