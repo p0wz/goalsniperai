@@ -2152,11 +2152,67 @@ app.post('/api/daily-analysis/ai-auto', requireAuth, async (req, res) => {
 
         const results = await runAIAutomatedAnalysis(leagueFilter, log);
 
-        res.json({ success: true, count: results.length, candidates: results });
+        // Results now contain { candidates, coupons }
+        res.json({
+            success: true,
+            count: results.candidates?.length || 0,
+            candidates: results.candidates || [],
+            coupons: results.coupons || null
+        });
     } catch (error) {
         log.error(`AI Analysis Failed: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
     }
+});
+
+// ============================================
+// 🧠 AI Training Data Routes
+// ============================================
+const localBetTracker = require('./betTracker'); // For training data (not Redis)
+
+// Get all training data
+app.get('/api/training-data', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    const data = localBetTracker.getTrainingData();
+    res.json({ success: true, data });
+});
+
+// Record new training entry (with full stats)
+app.post('/api/training-data/record', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    const { matchId, match, homeTeam, awayTeam, league, startTime, market, prediction, odds, features } = req.body;
+
+    const result = localBetTracker.recordTrainingBet({
+        matchId, match, homeTeam, awayTeam, league, startTime, market, prediction, odds, features
+    });
+
+    res.json(result);
+});
+
+// Settle training bet (WON/LOST)
+app.post('/api/training-data/settle/:id', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    const { id } = req.params;
+    const { result, actualScore } = req.body;
+
+    const outcome = localBetTracker.settleTrainingBet(id, result, actualScore);
+    res.json(outcome);
+});
+
+// Delete training entry
+app.delete('/api/training-data/:id', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    const { id } = req.params;
+    const outcome = localBetTracker.deleteTrainingEntry(id);
+    res.json(outcome);
 });
 
 // ============================================

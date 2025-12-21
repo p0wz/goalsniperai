@@ -306,11 +306,136 @@ function manualSettle(betId, status, resultScore = null) {
     return { success: true, bet };
 }
 
+// ============================================
+// 🧠 AI Training Dataset Functions
+// ============================================
+const TRAINING_DB_FILE = path.join(__dirname, 'data', 'trainingData.json');
+
+function loadTrainingDb() {
+    if (!fs.existsSync(TRAINING_DB_FILE)) {
+        fs.writeFileSync(TRAINING_DB_FILE, JSON.stringify([]));
+        return [];
+    }
+    try {
+        const data = fs.readFileSync(TRAINING_DB_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        console.error('[TrainingData] DB Read Error:', e);
+        return [];
+    }
+}
+
+function saveTrainingDb(data) {
+    try {
+        fs.writeFileSync(TRAINING_DB_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('[TrainingData] DB Write Error:', e);
+    }
+}
+
+/**
+ * Record a bet with full statistics for AI training.
+ * @param {Object} data - Full match data with stats
+ */
+function recordTrainingBet(data) {
+    const db = loadTrainingDb();
+
+    // Prevent duplicates
+    const exists = db.find(b => b.matchId === data.matchId && b.market === data.market);
+    if (exists) {
+        console.log(`[TrainingData] Duplicate skipped: ${data.match}`);
+        return { success: false, error: 'Duplicate' };
+    }
+
+    const newEntry = {
+        id: `train_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        matchId: data.matchId,
+        match: data.match,
+        homeTeam: data.homeTeam,
+        awayTeam: data.awayTeam,
+        league: data.league,
+        date: new Date().toISOString().split('T')[0],
+        startTime: data.startTime,
+        market: data.market,
+        prediction: data.prediction || data.market,
+        odds: data.odds || 1.50,
+        // AI Training Features (key stats at time of prediction)
+        features: {
+            homeWinRate: data.features?.homeWinRate || 0,
+            awayLossRate: data.features?.awayLossRate || 0,
+            homeAvgScored: data.features?.homeAvgScored || 0,
+            awayAvgConceded: data.features?.awayAvgConceded || 0,
+            over25Rate: data.features?.over25Rate || 0,
+            under25Rate: data.features?.under25Rate || 0,
+            bttsRate: data.features?.bttsRate || 0,
+            h2hGoals: data.features?.h2hGoals || 0,
+            leagueAvgGoals: data.features?.leagueAvgGoals || 0
+        },
+        result: 'PENDING', // PENDING, WON, LOST
+        actualScore: null,
+        settledAt: null,
+        createdAt: new Date().toISOString()
+    };
+
+    db.push(newEntry);
+    saveTrainingDb(db);
+    console.log(`[TrainingData] 📝 Recorded: ${newEntry.match} - ${newEntry.market}`);
+
+    return { success: true, entry: newEntry };
+}
+
+/**
+ * Get all training data entries
+ */
+function getTrainingData() {
+    return loadTrainingDb();
+}
+
+/**
+ * Settle a training bet (WON/LOST)
+ */
+function settleTrainingBet(id, result, actualScore = null) {
+    const db = loadTrainingDb();
+    const entry = db.find(e => e.id === id);
+
+    if (!entry) return { success: false, error: 'Not found' };
+
+    entry.result = result;
+    entry.actualScore = actualScore;
+    entry.settledAt = new Date().toISOString();
+
+    saveTrainingDb(db);
+    console.log(`[TrainingData] ✅ Settled: ${entry.match} -> ${result}`);
+
+    return { success: true, entry };
+}
+
+/**
+ * Delete a training entry
+ */
+function deleteTrainingEntry(id) {
+    let db = loadTrainingDb();
+    const initialLength = db.length;
+    db = db.filter(e => e.id !== id);
+
+    if (db.length === initialLength) {
+        return { success: false, error: 'Not found' };
+    }
+
+    saveTrainingDb(db);
+    return { success: true };
+}
+
 module.exports = {
     recordBet,
     settleBets,
     getPerformanceStats,
     startTracking,
     getAllBets,
-    manualSettle
+    manualSettle,
+    // Training Data exports
+    recordTrainingBet,
+    getTrainingData,
+    settleTrainingBet,
+    deleteTrainingEntry
 };

@@ -166,4 +166,24 @@ export const picksService = {
     }
 };
 
+// AI Training Dataset Service
+export const trainingService = {
+    getAll: async () => {
+        const response = await api.get('/training-data');
+        return response.data;
+    },
+    record: async (data) => {
+        const response = await api.post('/training-data/record', data);
+        return response.data;
+    },
+    settle: async (id, result, actualScore = null) => {
+        const response = await api.post(`/training-data/settle/${id}`, { result, actualScore });
+        return response.data;
+    },
+    delete: async (id) => {
+        const response = await api.delete(`/training-data/${id}`);
+        return response.data;
+    }
+};
+
 export default api;

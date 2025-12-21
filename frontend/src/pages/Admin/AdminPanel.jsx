@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { signalService, betService, adminService, picksService } from '../../services/api';
+import { signalService, betService, adminService, picksService, trainingService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import clsx from 'clsx';
 import NeuButton from '../../components/ui/NeuButton';
@@ -24,6 +24,10 @@ export default function AdminPanel({ user, handleLogout }) {
     const [aiCandidates, setAiCandidates] = useState([]);
     const [aiCoupons, setAiCoupons] = useState(null);
     const [isAutoAnalysing, setIsAutoAnalysing] = useState(false);
+
+    // AI Training Dataset State
+    const [trainingData, setTrainingData] = useState([]);
+    const [loadingTraining, setLoadingTraining] = useState(false);
 
     useEffect(() => {
         fetchLiveSignals();
@@ -434,7 +438,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'ai-analiz', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'ai-analiz', 'ai-dataset', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -449,6 +453,7 @@ export default function AdminPanel({ user, handleLogout }) {
                             {tab === 'ai-analiz' && '🤖 AI Analiz'}
                             {tab === 'analiz' && '🎯 Analiz'}
                             {tab === 'history' && '📜 Geçmiş'}
+                            {tab === 'ai-dataset' && '📊 AI Dataset'}
                             {tab === 'picks' && '⭐ Yönetin'}
                             {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
                         </button>
@@ -647,6 +652,112 @@ export default function AdminPanel({ user, handleLogout }) {
                             {aiCandidates.length === 0 && !isAutoAnalysing && (
                                 <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
                                     Sonuçlar burada görünecek.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab Content: AI DATASET */}
+                {activeTab === 'ai-dataset' && (
+                    <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
+                        <div className="bg-card border border-violet-500/20 rounded-xl shadow-sm p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold flex items-center gap-2">📊 AI Eğitim Veri Seti</h2>
+                                <button
+                                    onClick={async () => {
+                                        setLoadingTraining(true);
+                                        try {
+                                            const res = await trainingService.getAll();
+                                            if (res.success) setTrainingData(res.data);
+                                        } catch (e) {
+                                            alert('Veri çekilemedi: ' + e.message);
+                                        }
+                                        setLoadingTraining(false);
+                                    }}
+                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-bold"
+                                >
+                                    {loadingTraining ? 'Yükleniyor...' : '🔄 Yenile'}
+                                </button>
+                            </div>
+                            <p className="text-muted-foreground mb-6 text-sm">
+                                Bu veriler Llama 4 / GPT modellerini fine-tune etmek için kullanılacak.<br />
+                                <strong>Toplam:</strong> {trainingData.length} kayıt |
+                                <span className="text-green-500 ml-2">✅ {trainingData.filter(d => d.result === 'WON').length} Kazandı</span> |
+                                <span className="text-red-500 ml-2">❌ {trainingData.filter(d => d.result === 'LOST').length} Kaybetti</span> |
+                                <span className="text-yellow-500 ml-2">⏳ {trainingData.filter(d => d.result === 'PENDING').length} Bekliyor</span>
+                            </p>
+
+                            {trainingData.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                                    Henüz eğitim verisi yok. "Analiz" sekmesinden maç onaylayın.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-muted text-left">
+                                            <tr>
+                                                <th className="px-3 py-2">Tarih</th>
+                                                <th className="px-3 py-2">Maç</th>
+                                                <th className="px-3 py-2">Lig</th>
+                                                <th className="px-3 py-2">Market</th>
+                                                <th className="px-3 py-2">Oran</th>
+                                                <th className="px-3 py-2">Durum</th>
+                                                <th className="px-3 py-2">Aksiyon</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {trainingData.slice().reverse().map((entry) => (
+                                                <tr key={entry.id} className="border-b hover:bg-muted/50">
+                                                    <td className="px-3 py-2 font-mono text-xs">{entry.date}</td>
+                                                    <td className="px-3 py-2 font-bold">{entry.match}</td>
+                                                    <td className="px-3 py-2 text-muted-foreground text-xs">{entry.league}</td>
+                                                    <td className="px-3 py-2">{entry.market}</td>
+                                                    <td className="px-3 py-2 font-mono">{entry.odds?.toFixed(2)}</td>
+                                                    <td className="px-3 py-2">
+                                                        {entry.result === 'WON' && <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold">✅ WON</span>}
+                                                        {entry.result === 'LOST' && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">❌ LOST</span>}
+                                                        {entry.result === 'PENDING' && <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">⏳ PENDING</span>}
+                                                    </td>
+                                                    <td className="px-3 py-2 flex gap-1">
+                                                        {entry.result === 'PENDING' && (
+                                                            <>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        await trainingService.settle(entry.id, 'WON');
+                                                                        setTrainingData(prev => prev.map(e => e.id === entry.id ? { ...e, result: 'WON' } : e));
+                                                                    }}
+                                                                    className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs"
+                                                                >
+                                                                    ✅
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        await trainingService.settle(entry.id, 'LOST');
+                                                                        setTrainingData(prev => prev.map(e => e.id === entry.id ? { ...e, result: 'LOST' } : e));
+                                                                    }}
+                                                                    className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs"
+                                                                >
+                                                                    ❌
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (confirm('Bu kaydı silmek istediğinize emin misiniz?')) {
+                                                                    await trainingService.delete(entry.id);
+                                                                    setTrainingData(prev => prev.filter(e => e.id !== entry.id));
+                                                                }
+                                                            }}
+                                                            className="px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-xs"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
                         </div>
