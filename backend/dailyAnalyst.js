@@ -1110,24 +1110,21 @@ League: ${match.league_name}
 
 
 DETAILED STATISTICS:
-1. LEAGUE CONTEXT
-   - League Average Goals: ${((homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2).toFixed(2)}
-
-2. HOME TEAM (${match.event_home_team})
+1. HOME TEAM (${match.event_home_team})
    - General Form (Last 5): Scored ${homeForm.avgScored.toFixed(2)}/game, Conceded ${homeForm.avgConceded.toFixed(2)}/game.
    - Over 2.5 Rate: ${homeForm.over25Rate.toFixed(0)}%
    - Under 2.5 Rate: ${homeForm.under25Rate.toFixed(0)}%
    - BTTS Rate: ${homeForm.bttsRate.toFixed(0)}%
    - AT HOME (Last 8): Scored in ${homeHomeStats.scoringRate.toFixed(0)}% of games, Win Rate ${homeHomeStats.winRate.toFixed(0)}%. Avg Scored ${homeHomeStats.avgScored.toFixed(2)}.
 
-3. AWAY TEAM (${match.event_away_team})
+2. AWAY TEAM (${match.event_away_team})
    - General Form (Last 5): Scored ${awayForm.avgScored.toFixed(2)}/game, Conceded ${awayForm.avgConceded.toFixed(2)}/game.
    - Over 2.5 Rate: ${awayForm.over25Rate.toFixed(0)}%
    - Under 2.5 Rate: ${awayForm.under25Rate.toFixed(0)}%
    - BTTS Rate: ${awayForm.bttsRate.toFixed(0)}%
    - AWAY FROM HOME (Last 8): Conceded in ${Math.max(0, 100 - (awayAwayStats.cleanSheetRate || 0)).toFixed(0)}% of games. Avg Conceded ${awayAwayStats.avgConceded.toFixed(2)}.
 
-4. HEAD-TO-HEAD (Last ${mutual.length})
+3. HEAD-TO-HEAD (Last ${mutual.length})
    ${mutual.map(g => `- ${g.home_team.name} ${g.home_team.score}-${g.away_team.score} ${g.away_team.name}`).join('\n   ')}
 
 TASK: Analyze this match based on the detailed statistics above. Identify the SINGLE BEST betting market for this match (e.g., Over 2.5, BTTS, Home Win, etc.). Provide your verdict and reasoning with a confidence score.`;
