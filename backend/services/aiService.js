@@ -82,7 +82,7 @@ OUTPUT FORMAT (Markdown):
      */
     async analyzeMatchForBanker(match) {
         const prompt = `Act as a professional high-stakes betting consultant.
-Model: Google Gemini 3 Flash
+Model: Google Gemini 3 Flash Preview
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
 
@@ -144,8 +144,8 @@ If no markets qualify, return empty array [].`;
      * Internal helper to call LLM
      */
     async _callLLM(prompt, mode = 'fast') {
-        // User explicitly requested "gemini-3-flash"
-        const GEMINI_MODEL = 'gemini-3-flash';
+        // User explicitly requested "gemini-3-flash-preview"
+        const GEMINI_MODEL = 'gemini-3-flash-preview';
 
         if (GEMINI_API_KEY) {
             try {
