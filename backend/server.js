@@ -2011,7 +2011,7 @@ app.get('/api/daily-analysis', optionalAuth, async (req, res) => {
 
     // Helper to filter results based on role & approval
     const filterResults = (results) => {
-        const categories = ['over15', 'over25', 'btts', 'doubleChance', 'homeOver15', 'under35', 'under25', 'firstHalfOver05', 'ms1AndOver15', 'awayOver05', 'handicap', 'oracle'];
+        const categories = ['over15', 'over25', 'btts', 'doubleChance', 'homeOver15', 'under35', 'under25', 'firstHalfOver05', 'ms1AndOver15', 'awayOver05', 'handicap', 'oracle', 'all_stats', 'gemini'];
         const filtered = {};
 
         categories.forEach(cat => {
