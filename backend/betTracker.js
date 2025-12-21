@@ -50,8 +50,10 @@ function saveDb(data) {
  * @param {String} market - 'Over 1.5 Goals', 'BTTS', etc.
  * @param {String} strategyCode - Code for the strategy used
  * @param {Number} confidence - Confidence score
+ * @param {String} source - 'live' or 'daily'
+ * @param {Object} trainingData - Optional {input, analyst_output, critic_output}
  */
-function recordBet(matchData, market, strategyCode, confidence, source = 'live') {
+function recordBet(matchData, market, strategyCode, confidence, source = 'live', trainingData = null) {
     const db = loadDb();
 
     // Prevent Duplicates: Check if we already have a bet for this match & market
@@ -74,7 +76,8 @@ function recordBet(matchData, market, strategyCode, confidence, source = 'live')
         source: source, // 'live' or 'daily'
         status: 'PENDING', // PENDING, WON, LOST, VOID
         result_score: null,
-        settled_at: null
+        settled_at: null,
+        training_data: trainingData
     };
 
     db.push(newBet);
@@ -203,6 +206,40 @@ async function settleBets() {
                     bet.settled_at = new Date().toISOString();
                     settledCount++;
                     console.log(`[BetTracker] 🏁 Settled: ${bet.match} [${bet.market}] -> ${bet.status} (${bet.result_score})`);
+
+                    // 🧠 Data Flywheel: Log to Training Dataset
+                    if (bet.training_data) {
+                        try {
+                            const datasetPath = path.join(__dirname, 'data', 'training_dataset.jsonl');
+                            const trainingEntry = {
+                                messages: [
+                                    { role: "system", content: "You are a professional football betting analyst." },
+                                    { role: "user", content: bet.training_data.input },
+                                    {
+                                        role: "assistant",
+                                        content: bet.status === 'WON'
+                                            ? bet.training_data.analyst_output // If WON, the analysis was GOOD.
+                                            : `[CORRECTION] The previous analysis was wrong. The result was ${bet.result_score} (LOST). I should have been more skeptical.`
+                                    }
+                                ],
+                                meta: {
+                                    match: bet.match,
+                                    market: bet.market,
+                                    result: bet.status,
+                                    score: bet.result_score
+                                }
+                            };
+
+                            // Ensure directory exists
+                            const dataDir = path.join(__dirname, 'data');
+                            if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+
+                            fs.appendFileSync(datasetPath, JSON.stringify(trainingEntry) + '\n');
+                            console.log(`[Flywheel] 🧠 Saved training example for ${bet.match}`);
+                        } catch (err) {
+                            console.error(`[Flywheel] Error saving dataset: ${err.message}`);
+                        }
+                    }
                 }
             }
         }

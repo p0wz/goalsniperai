@@ -2095,7 +2095,7 @@ app.post('/api/daily-analysis/approve/:id', requireAuth, async (req, res) => {
                 match_id: matchData.matchId,
                 home_team: matchData.home_team,
                 away_team: matchData.away_team
-            }, market, category, confidence || 85, 'daily');
+            }, market, category, confidence || 85, 'daily', matchData.training_data);
         }
 
         log.success(`Daily candidate approved: ${id}`);
@@ -2133,7 +2133,7 @@ app.post('/api/daily-analysis/approve-all', requireAuth, async (req, res) => {
                         match_id: c.matchData.matchId,
                         home_team: c.matchData.home_team,
                         away_team: c.matchData.away_team
-                    }, market, category, 85, 'daily');
+                    }, market, category, 85, 'daily', c.matchData.training_data);
                 } else if (c.event_key) {
                     // Fallback if matchData not explicitly structured
                     betTracker.recordBet({
