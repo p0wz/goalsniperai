@@ -2127,35 +2127,36 @@ app.post('/api/daily-analysis/approve-all', requireAuth, async (req, res) => {
             if (!APPROVED_IDS.has(mid) && !REJECTED_IDS.has(mid)) {
                 APPROVED_IDS.add(mid);
 
-                // Record Bet
-                betTracker.recordBet({
-                    match_id: c.matchData.matchId,
-                    home_team: c.matchData.home_team,
-                    away_team: c.matchData.away_team
-                }, c.market || market, category, 85, 'daily', c.matchData.training_data);
-            } else if (c.event_key) {
-                // Fallback if matchData not explicitly structured
-                betTracker.recordBet({
-                    match_id: c.event_key,
-                    home_team: c.event_home_team,
-                    away_team: c.event_away_team
-                }, market, c.market || category, 85, 'daily');
-            }
+                // Record Bet logic
+                if (c.matchData) {
+                    betTracker.recordBet({
+                        match_id: c.matchData.matchId,
+                        home_team: c.matchData.home_team,
+                        away_team: c.matchData.away_team
+                    }, c.market || market, category, 85, 'daily', c.matchData.training_data);
+                } else if (c.event_key) {
+                    // Fallback if matchData not explicitly structured
+                    betTracker.recordBet({
+                        match_id: c.event_key,
+                        home_team: c.event_home_team,
+                        away_team: c.event_away_team
+                    }, market, c.market || category, 85, 'daily');
+                }
 
-            approvedCount++;
-        }
+                approvedCount++;
+            }
         });
 
-if (approvedCount > 0) {
-    saveApprovals();
-    log.success(`Bulk approved ${approvedCount} candidates for ${market}`);
-}
+        if (approvedCount > 0) {
+            saveApprovals();
+            log.success(`Bulk approved ${approvedCount} candidates for ${market}`);
+        }
 
-res.json({ success: true, count: approvedCount });
+        res.json({ success: true, count: approvedCount });
     } catch (error) {
-    log.error(`Bulk Approval Error: ${error.message}`);
-    res.status(500).json({ success: false, error: error.message });
-}
+        log.error(`Bulk Approval Error: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // ============================================
