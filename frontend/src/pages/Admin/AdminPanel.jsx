@@ -455,9 +455,74 @@ export default function AdminPanel({ user, handleLogout }) {
                     <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
                         <div className="text-center mb-6">
                             <h2 className="text-3xl font-bold mb-2">🎯 Analiz Merkezi</h2>
-                            <p className="text-muted-foreground">Tüm marketler için toplu analiz</p>
+                            {isAnalysing && <span className="text-sm animate-pulse text-indigo-500 font-bold">Analiz yapılıyor... (Bu işlem 1-2 dk sürebilir)</span>}
+
+                            {/* New Bulk Prompt Button */}
+                            {dailyAnalysis && (
+                                <button
+                                    onClick={() => {
+                                        // 1. Collect all unique matches from all categories
+                                        const uniqueMatches = new Map();
+                                        Object.values(dailyAnalysis).forEach(categoryList => {
+                                            if (Array.isArray(categoryList)) {
+                                                categoryList.forEach(m => {
+                                                    if (!uniqueMatches.has(m.id)) {
+                                                        uniqueMatches.set(m.id, m);
+                                                    }
+                                                });
+                                            }
+                                        });
+
+                                        const allMatches = Array.from(uniqueMatches.values());
+                                        if (allMatches.length === 0) return alert('Kopyalanacak maç yok!');
+
+                                        // 2. Format the Bulk Prompt
+                                        const bulkPrompt = `📊 GÜNLÜK MAÇ HAVUZU (${allMatches.length} Maç)
+Tarih: ${new Date().toLocaleDateString('tr-TR')}
+════════════════════════════════════════
+
+${allMatches.map((m, idx) => {
+                                            // Extract base prompt content (remove Market line and Task line to act as "raw stats")
+                                            let promptContent = m.aiPrompt || m.ai_prompts?.[0] || '';
+
+                                            // Cleaning specifically for Bulk Context
+                                            // 1. Remove "Act as..." header
+                                            promptContent = promptContent.replace(/^Act as a professional.*$/zm, '');
+                                            // 2. Remove "Market: ..." line completely
+                                            promptContent = promptContent.replace(/^Market:.*$/zm, '');
+                                            // 3. Remove "TASK: ..." footer
+                                            promptContent = promptContent.replace(/^TASK:.*$/zm, '');
+                                            // 4. Trim whitespace
+                                            promptContent = promptContent.trim();
+
+                                            // 5. Add specific header
+                                            return `📌 MAÇ ${idx + 1}: ${m.event_home_team} vs ${m.event_away_team}
+Lig: ${m.league_name}
+${promptContent}
+----------------------------------------`;
+                                        }).join('\n\n')}
+
+════════════════════════════════════════
+GÖREV:
+Yukarıdaki maç havuzunu detaylı incele. Sadece istatistiksel olarak EN GÜÇLÜ fırsatları (Value Bets) seç.
+Her maç için bir "Market" zorunluluğu yok, istatistikler neyi işaret ediyorsa onu bul (Örn: MS1, Üst, KG Var, vb.).
+Eğer maç riskliyse veya veri yetersizse PAS geç.
+
+ÇIKTI FORMATI:
+1. [Maç Adı] - [Tahmin] (Güven: %XX) - [Kısa Gerekçe]
+...
+`;
+                                        navigator.clipboard.writeText(bulkPrompt);
+                                        alert(`✅ ${allMatches.length} maçın detaylı istatistikleri kopyalandı!`);
+                                    }}
+                                    className="px-4 py-2 rounded bg-purple-600 text-white font-bold hover:bg-purple-700 transition-colors shadow-sm flex items-center gap-2"
+                                >
+                                    📑 Tün Maçları Kopyala (AI Prompt)
+                                </button>
+                            )}
                         </div>
 
+                        {/* Analysis Content Grid */}
                         <div className="flex justify-center gap-4 mb-8 flex-wrap">
                             <button
                                 onClick={() => handleRunDaily(true)}
