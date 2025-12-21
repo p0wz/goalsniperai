@@ -212,18 +212,19 @@ OUTPUT JSON ONLY:
                 });
 
                 const text = response.data?.choices?.[0]?.message?.content;
+                console.log("🐳 DeepSeek Raw Response:", text ? text.substring(0, 500) + "..." : "EMPTY"); // Log first 500 chars
+
                 if (!text) throw new Error("Empty response from DeepSeek");
                 return text;
 
             } catch (e) {
                 console.error(`DeepSeek API Error:`, e.response?.data || e.message);
+                throw e; // Rethrow to let caller handle
             }
         } else {
             console.error("DEEPSEEK_API_KEY is missing! Please add it to .env file.");
+            throw new Error("DEEPSEEK_API_KEY Missing");
         }
-
-        // Fallback or Error
-        return "AI Service Unavailable (Check DEEPSEEK_API_KEY)";
     }
 };
 
