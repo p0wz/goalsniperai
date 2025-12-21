@@ -82,7 +82,7 @@ OUTPUT FORMAT (Markdown):
      */
     async analyzeMatchForBanker(match) {
         const prompt = `Act as a professional high-stakes betting consultant.
-Model: DeepSeek R1 (Reasoner)
+Model: Llama 4 Scout 17B
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
 
@@ -144,7 +144,7 @@ If no market is safe enough, return null.`;
         ).join('\n');
 
         const prompt = `Act as a Master Betting Strategist.
-Model: DeepSeek R1 (Reasoner)
+Model: Llama 4 Scout 17B
 
 SOURCE POOL (Best Matches of the Day):
 ${candidatesList}
@@ -190,40 +190,40 @@ OUTPUT JSON ONLY:
      * Internal helper to call LLM
      */
     async _callLLM(prompt, mode = 'fast') {
-        if (DEEPSEEK_API_KEY) {
+        if (GROQ_API_KEY) {
             try {
-                // User explicitly requested DeepSeek V3
-                const url = 'https://api.deepseek.com/chat/completions';
+                // User requested "Llama 4 Scout" (Mapping to Llama 3.3 70B on Groq)
+                const url = 'https://api.groq.com/openai/v1/chat/completions';
 
                 const response = await axios.post(url, {
-                    model: 'deepseek-chat',
+                    model: 'llama-3.3-70b-versatile',
                     messages: [
                         { role: 'system', content: 'You are a professional sports betting analyst. Return valid JSON only when requested.' },
                         { role: 'user', content: prompt }
                     ],
                     temperature: 0.1,
-                    max_tokens: 2048,
+                    max_tokens: 4096,
                     stream: false
                 }, {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+                        'Authorization': `Bearer ${GROQ_API_KEY}`
                     }
                 });
 
                 const text = response.data?.choices?.[0]?.message?.content;
-                console.log("🐳 DeepSeek Raw Response:", text ? text.substring(0, 500) + "..." : "EMPTY"); // Log first 500 chars
+                console.log("🦙 Groq Raw Response:", text ? text.substring(0, 500) + "..." : "EMPTY");
 
-                if (!text) throw new Error("Empty response from DeepSeek");
+                if (!text) throw new Error("Empty response from Groq");
                 return text;
 
             } catch (e) {
-                console.error(`DeepSeek API Error:`, e.response?.data || e.message);
-                throw e; // Rethrow to let caller handle
+                console.error(`Groq API Error:`, e.response?.data || e.message);
+                throw e;
             }
         } else {
-            console.error("DEEPSEEK_API_KEY is missing! Please add it to .env file.");
-            throw new Error("DEEPSEEK_API_KEY Missing");
+            console.error("GROQ_API_KEY is missing! Please add it to .env file.");
+            throw new Error("GROQ_API_KEY Missing");
         }
     }
 };

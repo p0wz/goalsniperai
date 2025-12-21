@@ -517,7 +517,7 @@ export default function AdminPanel({ user, handleLogout }) {
                     <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-300">
                         <div className="bg-card border border-indigo-500/20 rounded-xl shadow-sm p-6 text-center">
                             <h2 className="text-3xl font-bold mb-4 flex items-center justify-center gap-2">
-                                🤖 AI Oto-Analiz (DeepSeek R1)
+                                🤖 AI Oto-Analiz (Llama 4 Scout 17B)
                             </h2>
                             <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
                                 Yapay zeka tüm maçları tarar, istatistikleri inceler ve sadece <strong>1.50 oranın altındaki BANKO</strong> fırsatları bulur.
