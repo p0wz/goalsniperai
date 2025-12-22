@@ -12,9 +12,9 @@ export default function Profile({ user, onLogout }) {
 
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-white">Profilim</h1>
+                    <h1 className="text-2xl font-bold text-text-main">My Profile</h1>
                     <NeuButton onClick={onLogout} variant="secondary" className="px-4 py-2 text-sm">
-                        Çıkış Yap
+                        Log Out
                     </NeuButton>
                 </div>
 
@@ -33,11 +33,11 @@ export default function Profile({ user, onLogout }) {
                         </div>
 
                         <div className="flex-1 text-center sm:text-left">
-                            <h2 className="text-xl font-bold text-white mb-1">{user?.name || 'Kullanıcı'}</h2>
-                            <p className="text-white/50 text-sm mb-3">{user?.email}</p>
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-sm">
+                            <h2 className="text-xl font-bold text-text-main mb-1">{user?.name || 'User'}</h2>
+                            <p className="text-text-muted text-sm mb-3">{user?.email}</p>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-base shadow-neu-inset text-sm">
                                 <div className={`w-2 h-2 rounded-full ${isPro ? 'bg-cyan-400' : 'bg-gray-400'}`}></div>
-                                <span className="text-white/70">{isPro ? 'PRO Üye' : 'Ücretsiz Üye'}</span>
+                                <span className="text-text-muted">{isPro ? 'PRO Member' : 'Free Member'}</span>
                             </div>
                         </div>
                     </div>
@@ -48,15 +48,15 @@ export default function Profile({ user, onLogout }) {
                     <NeuCard className="border border-cyan-500/20" padding="p-6">
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div>
-                                <h3 className="font-bold text-white mb-1">PRO'ya Yükselt</h3>
-                                <p className="text-white/50 text-sm">Sınırsız SENTIO AI Chat ve özel kupon önerileri</p>
+                                <h3 className="font-bold text-text-main mb-1">Upgrade to PRO</h3>
+                                <p className="text-text-muted text-sm">Unlimited SENTIO AI Chat and custom coupon suggestions</p>
                             </div>
                             <NeuButton
                                 onClick={() => navigate('/pricing')}
                                 variant="primary"
                                 className="bg-gradient-to-r from-cyan-500 to-blue-600 border-0 px-6"
                             >
-                                Planları İncele
+                                View Plans
                             </NeuButton>
                         </div>
                     </NeuCard>
@@ -67,8 +67,8 @@ export default function Profile({ user, onLogout }) {
                                 ✓
                             </div>
                             <div>
-                                <h3 className="font-bold text-white">PRO Üyelik Aktif</h3>
-                                <p className="text-white/50 text-sm">Tüm özelliklere erişebilirsiniz</p>
+                                <h3 className="font-bold text-text-main">PRO Membership Active</h3>
+                                <p className="text-text-muted text-sm">You have access to all features</p>
                             </div>
                         </div>
                     </NeuCard>
@@ -77,12 +77,12 @@ export default function Profile({ user, onLogout }) {
                 {/* Quick Links */}
                 <div className="grid grid-cols-2 gap-4">
                     <NeuCard
-                        className="cursor-pointer hover:bg-white/5 transition-colors text-center"
+                        className="cursor-pointer hover:shadow-neu-pressed transition-all text-center"
                         padding="p-4"
                         onClick={() => navigate('/dashboard')}
                     >
                         <div className="text-2xl mb-2">🤖</div>
-                        <div className="text-sm font-medium text-white">Dashboard</div>
+                        <div className="text-sm font-medium text-text-main">Dashboard</div>
                     </NeuCard>
                     <a
                         href="https://t.me/goalsniperai"
@@ -90,26 +90,26 @@ export default function Profile({ user, onLogout }) {
                         rel="noopener noreferrer"
                         className="block"
                     >
-                        <NeuCard className="cursor-pointer hover:bg-white/5 transition-colors text-center h-full" padding="p-4">
+                        <NeuCard className="cursor-pointer hover:shadow-neu-pressed transition-all text-center h-full" padding="p-4">
                             <div className="text-2xl mb-2">📢</div>
-                            <div className="text-sm font-medium text-white">Telegram</div>
+                            <div className="text-sm font-medium text-text-main">Telegram</div>
                         </NeuCard>
                     </a>
                 </div>
 
                 {/* Account Info */}
                 <NeuCard padding="p-6">
-                    <h3 className="font-bold text-white mb-4">Hesap Bilgileri</h3>
+                    <h3 className="font-bold text-text-main mb-4">Account Info</h3>
                     <div className="space-y-3 text-sm">
                         <div className="flex justify-between">
-                            <span className="text-white/50">Kayıt Tarihi</span>
-                            <span className="text-white/70">
-                                {user?.created_at ? new Date(user.created_at).toLocaleDateString('tr-TR') : '-'}
+                            <span className="text-text-muted">Joined</span>
+                            <span className="text-text-main">
+                                {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US') : '-'}
                             </span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-white/50">Plan</span>
-                            <span className="text-white/70">{isPro ? 'PRO' : 'Ücretsiz'}</span>
+                            <span className="text-text-muted">Plan</span>
+                            <span className="text-text-main">{isPro ? 'PRO' : 'Free'}</span>
                         </div>
                     </div>
                 </NeuCard>

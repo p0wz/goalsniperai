@@ -17,17 +17,17 @@ export default function RegisterView({ onRegister, error }) {
         setLocalError(null);
 
         if (!name || !email || !password) {
-            setLocalError('Tüm alanları doldurun');
+            setLocalError('Please fill in all fields');
             return;
         }
 
         if (password !== confirmPassword) {
-            setLocalError('Şifreler eşleşmiyor');
+            setLocalError('Passwords do not match');
             return;
         }
 
         if (password.length < 6) {
-            setLocalError('Şifre en az 6 karakter olmalı');
+            setLocalError('Password must be at least 6 characters');
             return;
         }
 
@@ -48,8 +48,8 @@ export default function RegisterView({ onRegister, error }) {
             <NeuCard className="w-full max-w-md bg-base z-10" padding="p-10">
                 <div className="text-center mb-8">
                     <div className="text-5xl mb-4">🚀</div>
-                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Kayıt Ol</h1>
-                    <p className="text-text-muted">SENTIO AI ile tanışmaya hazır mısın?</p>
+                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Sign Up</h1>
+                    <p className="text-text-muted">Ready to meet SENTIO AI?</p>
                 </div>
 
                 {(error || localError) && (
@@ -60,8 +60,8 @@ export default function RegisterView({ onRegister, error }) {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <NeuInput
-                        label="Ad Soyad"
-                        placeholder="Ahmet Yılmaz"
+                        label="Full Name"
+                        placeholder="John Doe"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         type="text"
@@ -69,8 +69,8 @@ export default function RegisterView({ onRegister, error }) {
                     />
 
                     <NeuInput
-                        label="E-posta Adresi"
-                        placeholder="ornek@email.com"
+                        label="Email Address"
+                        placeholder="you@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         type="email"
@@ -78,8 +78,8 @@ export default function RegisterView({ onRegister, error }) {
                     />
 
                     <NeuInput
-                        label="Şifre"
-                        placeholder="En az 6 karakter"
+                        label="Password"
+                        placeholder="At least 6 characters"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         type="password"
@@ -87,8 +87,8 @@ export default function RegisterView({ onRegister, error }) {
                     />
 
                     <NeuInput
-                        label="Şifre Tekrar"
-                        placeholder="Şifrenizi tekrar girin"
+                        label="Confirm Password"
+                        placeholder="Re-enter your password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         type="password"
@@ -102,18 +102,18 @@ export default function RegisterView({ onRegister, error }) {
                             className="w-full py-4 text-lg"
                             disabled={loading}
                         >
-                            {loading ? 'Hesap Oluşturuluyor...' : 'Hesap Oluştur'}
+                            {loading ? 'Creating Account...' : 'Create Account'}
                         </NeuButton>
                     </div>
                 </form>
 
                 <div className="mt-6 text-center text-xs text-text-muted">
-                    Kayıt olarak <a href="#" className="text-accent hover:underline">Kullanım Şartları</a> ve <a href="#" className="text-accent hover:underline">Gizlilik Politikası</a>'nı kabul etmiş olursun.
+                    By signing up you agree to our <a href="#" className="text-accent hover:underline">Terms of Service</a> and <a href="#" className="text-accent hover:underline">Privacy Policy</a>.
                 </div>
             </NeuCard>
 
             <div className="mt-8 text-text-muted text-sm font-medium">
-                Zaten hesabın var mı? <Link to="/login" className="text-accent font-bold cursor-pointer hover:underline">Giriş Yap</Link>
+                Already have an account? <Link to="/login" className="text-accent font-bold cursor-pointer hover:underline">Sign In</Link>
             </div>
         </div>
     );

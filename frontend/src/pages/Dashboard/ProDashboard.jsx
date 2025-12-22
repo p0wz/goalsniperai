@@ -10,7 +10,7 @@ export default function ProDashboard({ user }) {
                     🤖 SENTIO AI
                 </h1>
                 <p className="text-text-muted">
-                    Merhaba {user?.name?.split(' ')[0] || 'champion'}! Günün bahis önerileri için benimle sohbet et.
+                    Hey {user?.name?.split(' ')[0] || 'champion'}! Chat with me for today's betting insights.
                 </p>
             </header>
 
@@ -22,24 +22,24 @@ export default function ProDashboard({ user }) {
             {/* Tips/Info Section */}
             <div className="max-w-3xl mx-auto mt-8 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
                 <h3 className="font-medium text-cyan-400 mb-3 flex items-center gap-2">
-                    💡 SENTIO ile Neler Yapabilirsin?
+                    💡 What can you ask SENTIO?
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-white/70">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-text-muted">
                     <div className="flex items-start gap-2">
                         <span className="text-cyan-400">•</span>
-                        <span>"Günün en güvenli maçları neler?"</span>
+                        <span>"Which are the safest matches today?"</span>
                     </div>
                     <div className="flex items-start gap-2">
                         <span className="text-cyan-400">•</span>
-                        <span>"Over 2.5 için önerin var mı?"</span>
+                        <span>"Any Over 2.5 recommendations?"</span>
                     </div>
                     <div className="flex items-start gap-2">
                         <span className="text-cyan-400">•</span>
-                        <span>"Düşük riskli kupon hazırla"</span>
+                        <span>"Build me a low-risk coupon"</span>
                     </div>
                     <div className="flex items-start gap-2">
                         <span className="text-cyan-400">•</span>
-                        <span>"3+ oran için bahis öner"</span>
+                        <span>"Suggest a bet with 3+ odds"</span>
                     </div>
                 </div>
             </div>

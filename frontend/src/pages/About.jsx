@@ -10,8 +10,8 @@ export default function About() {
             <div className="max-w-3xl mx-auto space-y-12">
 
                 <div className="text-center space-y-4">
-                    <h1 className="text-3xl md:text-4xl font-bold text-white">Hakkımızda</h1>
-                    <p className="text-white/60">SENTIO AI ve GoalSniper hakkında</p>
+                    <h1 className="text-3xl md:text-4xl font-bold text-text-main">About Us</h1>
+                    <p className="text-text-muted">Learn about SENTIO AI and GoalSniper</p>
                 </div>
 
                 <NeuCard padding="p-8" className="space-y-6">
@@ -20,52 +20,51 @@ export default function About() {
                             🤖
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">SENTIO AI</h2>
-                            <p className="text-white/50 text-sm">Yapay Zeka Bahis Danışmanı</p>
+                            <h2 className="text-xl font-bold text-text-main">SENTIO AI</h2>
+                            <p className="text-text-muted text-sm">AI Betting Advisor</p>
                         </div>
                     </div>
 
-                    <div className="space-y-4 text-white/70 leading-relaxed">
+                    <div className="space-y-4 text-text-muted leading-relaxed">
                         <p>
-                            <strong className="text-white">GoalSniper</strong>, futbol bahislerinde daha bilinçli kararlar
-                            almanıza yardımcı olmak için geliştirilmiş bir yapay zeka platformudur.
+                            <strong className="text-text-main">GoalSniper</strong> is an AI-powered platform
+                            designed to help you make more informed betting decisions.
                         </p>
                         <p>
-                            <strong className="text-cyan-400">SENTIO</strong>, günlük maç istatistiklerini analiz eden ve
-                            kullanıcıların sorularına detaylı yanıtlar veren AI asistanımızdır. Form durumu,
-                            H2H geçmişi ve ev/deplasman performansları gibi verileri değerlendirir.
+                            <strong className="text-cyan-400">SENTIO</strong> is our AI assistant that analyzes
+                            daily match statistics and provides detailed answers to user questions. It evaluates
+                            form, H2H history, and home/away performance data.
                         </p>
                         <p>
-                            Amacımız, bahis yaparken duygusal kararlar yerine veri odaklı düşünmenizi sağlamaktır.
-                            SENTIO size kesin sonuç garantisi vermez - ancak daha bilinçli seçimler yapmanıza
-                            yardımcı olur.
+                            Our goal is to help you make data-driven decisions instead of emotional ones.
+                            SENTIO doesn't guarantee results - it helps you make smarter choices.
                         </p>
                     </div>
                 </NeuCard>
 
                 <div className="grid md:grid-cols-2 gap-6">
                     <NeuCard padding="p-6">
-                        <h3 className="font-bold text-lg text-white mb-3">📊 Veri Odaklı</h3>
-                        <p className="text-white/60 text-sm">
-                            Tahminlerimiz gerçek maç istatistiklerine dayanır.
-                            İçgüdü değil, somut veriler konuşur.
+                        <h3 className="font-bold text-lg text-text-main mb-3">📊 Data-Driven</h3>
+                        <p className="text-text-muted text-sm">
+                            Our predictions are based on real match statistics.
+                            No gut feelings - just solid data.
                         </p>
                     </NeuCard>
                     <NeuCard padding="p-6">
-                        <h3 className="font-bold text-lg text-white mb-3">💬 Kolay Kullanım</h3>
-                        <p className="text-white/60 text-sm">
-                            SENTIO ile doğal dilde sohbet edin.
-                            Karmaşık istatistikleri anlamanıza gerek yok.
+                        <h3 className="font-bold text-lg text-text-main mb-3">💬 Easy to Use</h3>
+                        <p className="text-text-muted text-sm">
+                            Chat with SENTIO in natural language.
+                            No need to understand complex statistics.
                         </p>
                     </NeuCard>
                 </div>
 
                 <div className="text-center space-y-4">
-                    <p className="text-white/40 text-sm">
-                        ⚠️ Bahis finansal risk içerir. Sadece kaybetmeyi göze alabileceğiniz miktarları kullanın.
+                    <p className="text-text-muted/60 text-sm">
+                        ⚠️ Betting involves financial risk. Only wager amounts you can afford to lose.
                     </p>
                     <NeuButton onClick={() => navigate('/')} variant="secondary">
-                        Ana Sayfaya Dön
+                        Back to Home
                     </NeuButton>
                 </div>
 

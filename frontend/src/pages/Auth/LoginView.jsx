@@ -28,8 +28,8 @@ export default function LoginView({ onLogin, error }) {
             <NeuCard className="w-full max-w-md bg-base z-10" padding="p-10">
                 <div className="text-center mb-8">
                     <div className="text-5xl mb-4">🤖</div>
-                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Giriş Yap</h1>
-                    <p className="text-text-muted">SENTIO AI'ya erişmek için giriş yap.</p>
+                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Sign In</h1>
+                    <p className="text-text-muted">Login to access SENTIO AI.</p>
                 </div>
 
                 {error && (
@@ -40,8 +40,8 @@ export default function LoginView({ onLogin, error }) {
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <NeuInput
-                        label="E-posta Adresi"
-                        placeholder="ornek@email.com"
+                        label="Email Address"
+                        placeholder="you@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         type="email"
@@ -49,7 +49,7 @@ export default function LoginView({ onLogin, error }) {
                     />
 
                     <NeuInput
-                        label="Şifre"
+                        label="Password"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -64,18 +64,18 @@ export default function LoginView({ onLogin, error }) {
                             className="w-full py-4 text-lg"
                             disabled={loading}
                         >
-                            {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
+                            {loading ? 'Signing in...' : 'Sign In'}
                         </NeuButton>
                     </div>
                 </form>
 
                 <div className="mt-8 text-center">
-                    <a href="#" className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Şifremi Unuttum</a>
+                    <a href="#" className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Forgot Password?</a>
                 </div>
             </NeuCard>
 
             <div className="mt-8 text-text-muted text-sm font-medium">
-                Hesabın yok mu? <Link to="/register" className="text-accent font-bold cursor-pointer hover:underline">Kayıt Ol</Link>
+                Don't have an account? <Link to="/register" className="text-accent font-bold cursor-pointer hover:underline">Sign Up</Link>
             </div>
         </div>
     );
