@@ -2727,6 +2727,196 @@ setInterval(runAutoSettlement, 20 * 60 * 1000);
 // ============================================
 // 🚀 Server Startup
 // ============================================
+// ============================================
+// 💰 Crypto Payment System
+// ============================================
+
+const PAYMENTS_FILE = path.join(__dirname, 'data', 'payments.json');
+
+// Crypto wallet addresses (configure in .env)
+const CRYPTO_WALLETS = {
+    USDT_TRC20: process.env.WALLET_USDT_TRC20 || 'TYourUSDTWalletAddress',
+    BTC: process.env.WALLET_BTC || 'bc1yourbccaddress',
+    ETH: process.env.WALLET_ETH || '0xYourETHAddress'
+};
+
+// Payment prices in USD
+const PAYMENT_PRICES = {
+    monthly: { amount: 15, currency: 'USD', plan: 'pro', days: 30 },
+    yearly: { amount: 120, currency: 'USD', plan: 'pro', days: 365 }
+};
+
+function loadPayments() {
+    try {
+        if (fs.existsSync(PAYMENTS_FILE)) {
+            return JSON.parse(fs.readFileSync(PAYMENTS_FILE, 'utf-8'));
+        }
+    } catch (e) { console.error('[Payments] Load error:', e); }
+    return [];
+}
+
+function savePayments(payments) {
+    try {
+        fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(payments, null, 2));
+    } catch (e) { console.error('[Payments] Save error:', e); }
+}
+
+// Get wallet addresses
+app.get('/api/payments/wallets', requireAuth, (req, res) => {
+    res.json({
+        success: true,
+        wallets: CRYPTO_WALLETS,
+        prices: PAYMENT_PRICES
+    });
+});
+
+// Create payment request
+app.post('/api/payments/create', requireAuth, (req, res) => {
+    const { planType, cryptoType, txHash } = req.body; // planType: 'monthly' | 'yearly'
+
+    if (!planType || !PAYMENT_PRICES[planType]) {
+        return res.status(400).json({ success: false, error: 'Invalid plan type' });
+    }
+
+    const payments = loadPayments();
+    const price = PAYMENT_PRICES[planType];
+
+    const payment = {
+        id: Date.now().toString(),
+        userId: req.user.id,
+        userEmail: req.user.email,
+        userName: req.user.name,
+        planType,
+        amount: price.amount,
+        currency: price.currency,
+        cryptoType: cryptoType || 'USDT_TRC20',
+        txHash: txHash || null,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        confirmedAt: null,
+        confirmedBy: null
+    };
+
+    payments.push(payment);
+    savePayments(payments);
+
+    log.info(`[Payment] New payment request: ${req.user.email} - ${planType}`);
+
+    res.json({ success: true, payment });
+});
+
+// Update transaction hash
+app.post('/api/payments/update-tx/:id', requireAuth, (req, res) => {
+    const { txHash } = req.body;
+    const payments = loadPayments();
+    const payment = payments.find(p => p.id === req.params.id && p.userId === req.user.id);
+
+    if (!payment) {
+        return res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+
+    payment.txHash = txHash;
+    savePayments(payments);
+
+    res.json({ success: true, payment });
+});
+
+// Get user's payments
+app.get('/api/payments/my', requireAuth, (req, res) => {
+    const payments = loadPayments();
+    const userPayments = payments.filter(p => p.userId === req.user.id);
+    res.json({ success: true, payments: userPayments });
+});
+
+// Admin: Get pending payments
+app.get('/api/payments/pending', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const payments = loadPayments();
+    const pending = payments.filter(p => p.status === 'pending');
+    res.json({ success: true, payments: pending });
+});
+
+// Admin: Get all payments
+app.get('/api/payments/all', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const payments = loadPayments();
+    res.json({ success: true, payments });
+});
+
+// Admin: Confirm payment
+app.post('/api/payments/confirm/:id', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const payments = loadPayments();
+    const payment = payments.find(p => p.id === req.params.id);
+
+    if (!payment) {
+        return res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+
+    if (payment.status !== 'pending') {
+        return res.status(400).json({ success: false, error: 'Payment already processed' });
+    }
+
+    // Calculate expiry date
+    const price = PAYMENT_PRICES[payment.planType];
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + price.days);
+
+    // Update user plan
+    try {
+        await database.updateUserPlan(payment.userId, price.plan, expiresAt.toISOString());
+
+        payment.status = 'confirmed';
+        payment.confirmedAt = new Date().toISOString();
+        payment.confirmedBy = req.user.email;
+        savePayments(payments);
+
+        log.success(`[Payment] Confirmed: ${payment.userEmail} -> PRO until ${expiresAt.toLocaleDateString()}`);
+
+        res.json({ success: true, payment, message: 'Ödeme onaylandı, kullanıcı PRO yapıldı' });
+    } catch (e) {
+        log.error('[Payment] Confirm error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Admin: Reject payment
+app.post('/api/payments/reject/:id', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { reason } = req.body;
+    const payments = loadPayments();
+    const payment = payments.find(p => p.id === req.params.id);
+
+    if (!payment) {
+        return res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+
+    payment.status = 'rejected';
+    payment.rejectedAt = new Date().toISOString();
+    payment.rejectedBy = req.user.email;
+    payment.rejectReason = reason || 'Ödeme doğrulanamadı';
+    savePayments(payments);
+
+    log.warn(`[Payment] Rejected: ${payment.userEmail} - ${reason}`);
+
+    res.json({ success: true, payment });
+});
+
+// ============================================
+// 🚀 Server Startup
+// ============================================
 function startBanner() {
     console.log(`
 \x1b[1m\x1b[32m+==========================================+\x1b[0m

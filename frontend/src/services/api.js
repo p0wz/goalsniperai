@@ -222,4 +222,41 @@ export const sentioService = {
     }
 };
 
+// Payment Service
+export const paymentService = {
+    getWallets: async () => {
+        const response = await api.get('/payments/wallets');
+        return response.data;
+    },
+    create: async (planType, cryptoType) => {
+        const response = await api.post('/payments/create', { planType, cryptoType });
+        return response.data;
+    },
+    updateTxHash: async (paymentId, txHash) => {
+        const response = await api.post(`/payments/update-tx/${paymentId}`, { txHash });
+        return response.data;
+    },
+    getMyPayments: async () => {
+        const response = await api.get('/payments/my');
+        return response.data;
+    },
+    // Admin
+    getPending: async () => {
+        const response = await api.get('/payments/pending');
+        return response.data;
+    },
+    getAll: async () => {
+        const response = await api.get('/payments/all');
+        return response.data;
+    },
+    confirm: async (paymentId) => {
+        const response = await api.post(`/payments/confirm/${paymentId}`);
+        return response.data;
+    },
+    reject: async (paymentId, reason) => {
+        const response = await api.post(`/payments/reject/${paymentId}`, { reason });
+        return response.data;
+    }
+};
+
 export default api;
