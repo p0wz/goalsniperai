@@ -3051,6 +3051,53 @@ app.post('/api/payments/reject/:id', requireAuth, (req, res) => {
 });
 
 // ============================================
+// 🎓 Training Pool Endpoints
+// ============================================
+const trainingPool = require('./trainingPool');
+
+// Get training pool entries
+app.get('/api/training-pool', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const entries = trainingPool.getAllEntries();
+    const stats = trainingPool.getStats();
+    res.json({ success: true, entries, stats });
+});
+
+// Get training pool stats only
+app.get('/api/training-pool/stats', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const stats = trainingPool.getStats();
+    res.json({ success: true, stats });
+});
+
+// Clear training pool
+app.delete('/api/training-pool', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const result = trainingPool.clearPool();
+    res.json(result);
+});
+
+// Manual trigger auto-settlement
+app.post('/api/settlement/run', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const autoSettlement = require('./autoSettlement');
+    await autoSettlement.manualRun();
+    res.json({ success: true, message: 'Settlement run triggered' });
+});
+
+// ============================================
 // 🚀 Server Startup
 // ============================================
 function startBanner() {
@@ -3073,8 +3120,7 @@ app.listen(PORT, async () => {
     log.success(`Server running on http://localhost:${PORT}`);
 
     // Start Services
-    // Start Services
-    // startAutoPolling(); // DISABLED - Manual Control Only
-    betTracker.startTracking();
-    betTracker.startTracking();
+    const autoSettlement = require('./autoSettlement');
+    autoSettlement.startScheduler();
+    log.info(`Auto-Settlement: Scheduler started (every 15 min)`);
 });
