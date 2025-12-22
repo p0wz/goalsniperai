@@ -5,7 +5,7 @@ export default function SentioChat() {
     const [messages, setMessages] = useState([
         {
             role: 'assistant',
-            content: 'Merhaba! Ben SENTIO, yapay zeka destekli bahis danışmanınız. 🎯\n\nBugünün maçları hakkında sorularını yanıtlayabilirim:\n\n• "Günün en güvenli maçları neler?"\n• "Hangi maçlarda gol beklentisi yüksek?"\n• "Over 2.5 için öneriler var mı?"'
+            content: "Hey there! I'm SENTIO, your AI betting advisor. 🎯\n\nAsk me anything about today's matches:\n\n• \"What are the safest matches today?\"\n• \"Any Over 2.5 recommendations?\"\n• \"Build me a low-risk coupon\""
         }
     ]);
     const [input, setInput] = useState('');
@@ -33,69 +33,82 @@ export default function SentioChat() {
             if (res.success) {
                 setMessages(prev => [...prev, { role: 'assistant', content: res.response }]);
             } else {
-                setMessages(prev => [...prev, { role: 'assistant', content: '❌ ' + (res.error || 'Bir hata oluştu.') }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: '❌ ' + (res.error || 'An error occurred.') }]);
             }
         } catch (e) {
-            setMessages(prev => [...prev, { role: 'assistant', content: '❌ Bağlantı hatası: ' + e.message }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: '❌ Connection error: ' + e.message }]);
         }
 
         setLoading(false);
     };
 
     const quickQuestions = [
-        "Günün banko maçları",
-        "Over 2.5 önerileri",
-        "En güvenli bahisler"
+        "Safe banker picks",
+        "Over 2.5 tips",
+        "Build me a coupon"
     ];
 
     return (
-        <div className="relative rounded-2xl overflow-hidden h-[550px] flex flex-col shadow-2xl">
-            {/* Animated Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-cyan-900/50 to-slate-900 z-0" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent z-0" />
+        <div className="relative rounded-2xl overflow-hidden h-[600px] flex flex-col border border-gray-800/50">
+            {/* Dark Background */}
+            <div className="absolute inset-0 bg-[#0a0a0f] z-0" />
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 via-transparent to-purple-950/10 z-0" />
+
+            {/* Subtle Grid Pattern */}
+            <div
+                className="absolute inset-0 z-0 opacity-[0.03]"
+                style={{
+                    backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                    backgroundSize: '24px 24px'
+                }}
+            />
 
             {/* Header */}
-            <div className="relative z-10 px-5 py-4 border-b border-white/10 backdrop-blur-sm">
+            <div className="relative z-10 px-5 py-4 border-b border-gray-800/80 bg-[#0d0d14]/80 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
                     {/* Avatar */}
                     <div className="relative">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-                            <span className="text-2xl">🤖</span>
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                            <span className="text-xl">🤖</span>
                         </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-slate-900 animate-pulse" />
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#0d0d14]" />
                     </div>
-                    <div>
-                        <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                            SENTIO AI
-                            <span className="text-xs px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full font-normal">
-                                Online
+                    <div className="flex-1">
+                        <h3 className="font-bold text-base text-gray-100 flex items-center gap-2">
+                            SENTIO
+                            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded font-medium tracking-wide">
+                                ONLINE
                             </span>
                         </h3>
-                        <p className="text-xs text-white/50">Llama 4 Scout • Bahis Analisti</p>
+                        <p className="text-xs text-gray-500">AI Betting Advisor</p>
+                    </div>
+                    <div className="text-xs text-gray-600 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse" />
+                        Gemini Pro
                     </div>
                 </div>
             </div>
 
             {/* Messages */}
-            <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+            <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
                 {messages.map((msg, i) => (
                     <div
                         key={i}
                         className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} animate-in slide-in-from-bottom-2 duration-300`}
                     >
                         {/* Avatar */}
-                        <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm ${msg.role === 'user'
-                                ? 'bg-gradient-to-br from-violet-500 to-purple-600'
-                                : 'bg-gradient-to-br from-cyan-500 to-blue-600'
+                        <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm ${msg.role === 'user'
+                                ? 'bg-gradient-to-br from-violet-600 to-purple-700'
+                                : 'bg-gradient-to-br from-cyan-600 to-blue-700'
                             }`}>
                             {msg.role === 'user' ? '👤' : '🤖'}
                         </div>
 
                         {/* Message Bubble */}
                         <div
-                            className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-tr-sm'
-                                    : 'bg-white/10 backdrop-blur-md text-white/90 border border-white/10 rounded-tl-sm'
+                            className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                                    ? 'bg-gradient-to-r from-violet-600/90 to-purple-600/90 text-gray-100 rounded-tr-sm'
+                                    : 'bg-gray-900/80 text-gray-200 border border-gray-800/80 rounded-tl-sm'
                                 }`}
                         >
                             <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -106,14 +119,14 @@ export default function SentioChat() {
                 {/* Typing Indicator */}
                 {loading && (
                     <div className="flex gap-3 animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm bg-gradient-to-br from-cyan-500 to-blue-600">
+                        <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm bg-gradient-to-br from-cyan-600 to-blue-700">
                             🤖
                         </div>
-                        <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl rounded-tl-sm px-4 py-3">
+                        <div className="bg-gray-900/80 border border-gray-800/80 rounded-xl rounded-tl-sm px-4 py-3">
                             <div className="flex gap-1.5">
-                                <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                             </div>
                         </div>
                     </div>
@@ -127,10 +140,8 @@ export default function SentioChat() {
                     {quickQuestions.map((q, i) => (
                         <button
                             key={i}
-                            onClick={() => {
-                                setInput(q);
-                            }}
-                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-white/70 hover:text-white transition-all"
+                            onClick={() => setInput(q)}
+                            className="px-3 py-1.5 bg-gray-900/60 hover:bg-gray-800/80 border border-gray-800 rounded-lg text-xs text-gray-400 hover:text-gray-200 transition-all"
                         >
                             {q}
                         </button>
@@ -139,7 +150,7 @@ export default function SentioChat() {
             )}
 
             {/* Input Area */}
-            <div className="relative z-10 p-4 border-t border-white/10 backdrop-blur-sm">
+            <div className="relative z-10 p-4 border-t border-gray-800/80 bg-[#0d0d14]/80 backdrop-blur-sm">
                 <div className="flex gap-3 items-center">
                     <div className="flex-1 relative">
                         <input
@@ -147,15 +158,15 @@ export default function SentioChat() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                            placeholder="Maçlar hakkında bir soru sor..."
-                            className="w-full px-5 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
+                            placeholder="Ask about today's matches..."
+                            className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-800 text-gray-200 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all text-sm"
                             disabled={loading}
                         />
                     </div>
                     <button
                         onClick={handleSend}
                         disabled={loading || !input.trim()}
-                        className="w-12 h-12 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-105 active:scale-95"
+                        className="w-11 h-11 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 hover:scale-105 active:scale-95"
                     >
                         {loading ? (
                             <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">

@@ -262,47 +262,47 @@ OUTPUT JSON ONLY:
      */
     async chatWithSentio(userMessage, memory) {
         if (!memory || !memory.matches || memory.matches.length === 0) {
-            return "Henüz analiz yapılmamış. Admin tarafından maçlar onaylandığında size yardımcı olabilirim.";
+            return "No matches have been analyzed yet. I'll be able to help once the admin approves today's matches.";
         }
 
         // Build context from all matches with their stats
         const matchContext = memory.matches.map((m, i) => {
             // Use the pre-generated aiPrompt if available
             if (m.aiPrompt) {
-                return `--- MAÇ ${i + 1} ---\n${m.aiPrompt}`;
+                return `--- MATCH ${i + 1} ---\n${m.aiPrompt}`;
             }
             // Fallback to basic info
             return `${i + 1}. ${m.homeTeam || m.home} vs ${m.awayTeam || m.away} (${m.league})`;
         }).join('\n\n');
 
-        const prompt = `Sen SENTIO'sun - profesyonel bir futbol analisti ve bahis danışmanı.
-Karakterin: Samimi, güvenilir ve analitik. Kullanıcıyla Türkçe konuş.
+        const prompt = `You are SENTIO - a professional football analyst and betting advisor.
+Personality: Friendly, trustworthy, and analytical. Respond in English.
 
-📅 BUGÜNÜN MAÇLARI VE İSTATİSTİKLERİ (${memory.date || new Date().toLocaleDateString('tr-TR')}):
+📅 TODAY'S MATCHES AND STATISTICS (${memory.date || new Date().toLocaleDateString('en-US')}):
 ${matchContext}
 
-💬 KULLANICI SORUSU: "${userMessage}"
+💬 USER QUESTION: "${userMessage}"
 
-🎯 GÖREV:
-1. Yukarıdaki maç verilerine dayanarak kullanıcının sorusunu cevapla.
-2. Somut maç önerileri ver - takım isimlerini belirt.
-3. Neden bu maçları önerdiğini kısaca açıkla (istatistiklere referans ver).
-4. "Banko" veya "güvenli" soruluyorsa, istatistikleri analiz edip en güçlü 2-3 seçeneği sun.
-5. Kupon isterse, maçları ve tahminleri listele.
+🎯 YOUR TASK:
+1. Answer the user's question based on the match data above.
+2. Give concrete match recommendations - mention team names.
+3. Briefly explain why you recommend these matches (reference the statistics).
+4. If asked about "banker" or "safe" picks, analyze the stats and present the 2-3 strongest options.
+5. If asked for a coupon, list the matches and predictions clearly.
 
-⚠️ KURALLAR:
-- Kesin sonuç garantisi verme, sadece analiz yap.
-- Yanıtın özlü ve net olsun (max 300 kelime).
-- Emoji kullanarak okunabilirliği artır.
+⚠️ RULES:
+- Never guarantee results, only provide analysis.
+- Keep your response concise and clear (max 300 words).
+- Use emojis to improve readability.
 
-CEVAP:`;
+RESPONSE:`;
 
         try {
             const response = await this._callLLM(prompt, 'sentio');
             return response;
         } catch (e) {
             console.error("SENTIO Chat Error:", e);
-            return "Üzgünüm, şu anda bir teknik sorun yaşanıyor. Lütfen birkaç dakika sonra tekrar deneyin. 🔧";
+            return "Sorry, I'm experiencing a technical issue right now. Please try again in a few minutes. 🔧";
         }
     }
 };
