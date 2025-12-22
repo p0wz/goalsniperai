@@ -30,12 +30,14 @@ let isRunning = false;
 // 🎯 Prediction Evaluation Logic
 // ============================================
 
-function evaluatePrediction(market, prediction, homeGoals, awayGoals) {
+function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHome = null, halfTimeAway = null) {
     const totalGoals = homeGoals + awayGoals;
     const marketLower = (market || '').toLowerCase().trim();
     const predLower = (prediction || '').toLowerCase().trim();
 
-    // Over/Under Goals
+    // ============================================
+    // OVER/UNDER TOTAL GOALS
+    // ============================================
     if (marketLower.includes('over 0.5') || predLower.includes('over 0.5')) {
         return totalGoals >= 1;
     }
@@ -68,9 +70,12 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals) {
         return totalGoals <= 4;
     }
 
+    // ============================================
     // BTTS (Both Teams To Score)
+    // ============================================
     if (marketLower.includes('btts yes') || predLower.includes('btts yes') ||
-        marketLower.includes('btts: yes') || predLower === 'gg') {
+        marketLower.includes('btts: yes') || predLower === 'gg' ||
+        marketLower.includes('btts (both')) {
         return homeGoals >= 1 && awayGoals >= 1;
     }
     if (marketLower.includes('btts no') || predLower.includes('btts no') ||
@@ -78,7 +83,9 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals) {
         return homeGoals === 0 || awayGoals === 0;
     }
 
+    // ============================================
     // 1X2 (Match Result)
+    // ============================================
     if (marketLower.includes('home win') || predLower === '1' || predLower === 'home') {
         return homeGoals > awayGoals;
     }
@@ -89,9 +96,12 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals) {
         return homeGoals === awayGoals;
     }
 
-    // Double Chance
+    // ============================================
+    // DOUBLE CHANCE
+    // ============================================
     if (marketLower.includes('1x') || predLower.includes('1x') ||
-        marketLower.includes('home or draw') || predLower.includes('home or draw')) {
+        marketLower.includes('home or draw') || predLower.includes('home or draw') ||
+        marketLower.includes('1x double')) {
         return homeGoals >= awayGoals; // Home win OR Draw
     }
     if (marketLower.includes('x2') || predLower.includes('x2') ||
@@ -101,6 +111,104 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals) {
     if (marketLower.includes('12') || predLower.includes('12') ||
         marketLower.includes('home or away') || predLower.includes('home or away')) {
         return homeGoals !== awayGoals; // No draw
+    }
+
+    // ============================================
+    // HOME TEAM GOALS (Ev Sahibi Gol)
+    // ============================================
+    if (marketLower.includes('home team over 1.5') || marketLower.includes('ev 1.5') ||
+        marketLower.includes('home over 1.5') || predLower.includes('home over 1.5')) {
+        return homeGoals >= 2;
+    }
+    if (marketLower.includes('home team over 0.5') || marketLower.includes('ev 0.5') ||
+        marketLower.includes('home over 0.5') || predLower.includes('home over 0.5')) {
+        return homeGoals >= 1;
+    }
+    if (marketLower.includes('home team over 2.5') ||
+        marketLower.includes('home over 2.5') || predLower.includes('home over 2.5')) {
+        return homeGoals >= 3;
+    }
+
+    // ============================================
+    // AWAY TEAM GOALS (Deplasman Gol)
+    // ============================================
+    if (marketLower.includes('dep 0.5') || marketLower.includes('away over 0.5') ||
+        marketLower.includes('away team over 0.5') || predLower.includes('away over 0.5')) {
+        return awayGoals >= 1;
+    }
+    if (marketLower.includes('dep 1.5') || marketLower.includes('away over 1.5') ||
+        marketLower.includes('away team over 1.5') || predLower.includes('away over 1.5')) {
+        return awayGoals >= 2;
+    }
+
+    // ============================================
+    // FIRST HALF GOALS (İlk Yarı)
+    // ============================================
+    if (marketLower.includes('first half over 0.5') || marketLower.includes('1y 0.5') ||
+        marketLower.includes('ht over 0.5') || predLower.includes('first half over')) {
+        // If we have HT data, use it; otherwise assume FT has some goals
+        if (halfTimeHome !== null && halfTimeAway !== null) {
+            return (halfTimeHome + halfTimeAway) >= 1;
+        }
+        // Fallback: if match has goals, likely had HT goal too (conservative)
+        return totalGoals >= 1;
+    }
+    if (marketLower.includes('first half over 1.5') || marketLower.includes('1y 1.5') ||
+        marketLower.includes('ht over 1.5')) {
+        if (halfTimeHome !== null && halfTimeAway !== null) {
+            return (halfTimeHome + halfTimeAway) >= 2;
+        }
+        return totalGoals >= 2;
+    }
+
+    // ============================================
+    // COMBO: MS1 & 1.5 Üst (Home Win + Over 1.5)
+    // ============================================
+    if (marketLower.includes('ms1 & 1.5') || marketLower.includes('ms1 and 1.5') ||
+        marketLower.includes('home win and over 1.5') || predLower.includes('ms1 & 1.5')) {
+        return homeGoals > awayGoals && totalGoals >= 2;
+    }
+    if (marketLower.includes('ms2 & 1.5') || marketLower.includes('ms2 and 1.5') ||
+        marketLower.includes('away win and over 1.5') || predLower.includes('ms2 & 1.5')) {
+        return awayGoals > homeGoals && totalGoals >= 2;
+    }
+
+    // ============================================
+    // HANDICAP Markets (-1.5)
+    // ============================================
+    if (marketLower.includes('hnd. ms1 (-1.5)') || marketLower.includes('handicap home -1.5') ||
+        marketLower.includes('home -1.5') || predLower.includes('home -1.5')) {
+        // Home team wins by 2+ goals
+        return (homeGoals - awayGoals) >= 2;
+    }
+    if (marketLower.includes('hnd. ms2 (-1.5)') || marketLower.includes('handicap away -1.5') ||
+        marketLower.includes('away -1.5') || predLower.includes('away -1.5')) {
+        // Away team wins by 2+ goals
+        return (awayGoals - homeGoals) >= 2;
+    }
+
+    // Other handicap variations
+    if (marketLower.includes('home -2.5') || predLower.includes('home -2.5')) {
+        return (homeGoals - awayGoals) >= 3;
+    }
+    if (marketLower.includes('away -2.5') || predLower.includes('away -2.5')) {
+        return (awayGoals - homeGoals) >= 3;
+    }
+
+    // ============================================
+    // EXACT GOALS
+    // ============================================
+    if (marketLower.includes('exact 0') || predLower.includes('exact 0')) {
+        return totalGoals === 0;
+    }
+    if (marketLower.includes('exact 1') || predLower.includes('exact 1')) {
+        return totalGoals === 1;
+    }
+    if (marketLower.includes('exact 2') || predLower.includes('exact 2')) {
+        return totalGoals === 2;
+    }
+    if (marketLower.includes('exact 3') || predLower.includes('exact 3')) {
+        return totalGoals === 3;
     }
 
     // Unknown market - log and skip
