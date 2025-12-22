@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { signalService, betService, adminService, picksService, trainingService, sentioService } from '../../services/api';
+import { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import { RawStatsTab } from '../../RawStatsTab';
 import clsx from 'clsx';
@@ -33,6 +33,10 @@ export default function AdminPanel({ user, handleLogout }) {
     // SENTIO Chat State
     const [sentioMemory, setSentioMemory] = useState({ date: null, matchCount: 0 });
     const [sentioPopulating, setSentioPopulating] = useState(false);
+
+    // Payments State
+    const [pendingPayments, setPendingPayments] = useState([]);
+    const [loadingPayments, setLoadingPayments] = useState(false);
 
     useEffect(() => {
         fetchLiveSignals();
@@ -470,7 +474,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'ai-analiz', 'sentio', 'ai-dataset', 'raw-stats', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'ai-analiz', 'sentio', 'payments', 'ai-dataset', 'raw-stats', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -487,6 +491,7 @@ export default function AdminPanel({ user, handleLogout }) {
                             {tab === 'history' && '📜 Geçmiş'}
                             {tab === 'ai-dataset' && '📊 AI Dataset'}
                             {tab === 'sentio' && '💬 SENTIO'}
+                            {tab === 'payments' && '💰 Ödemeler'}
                             {tab === 'raw-stats' && '📊 Ham Data'}
                             {tab === 'picks' && '⭐ Yönetin'}
                             {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
@@ -1295,6 +1300,90 @@ ${prompt}
                 {/* Raw Stats Tab */}
                 {activeTab === 'raw-stats' && (
                     <RawStatsTab />
+                )}
+
+                {/* Payments Tab */}
+                {activeTab === 'payments' && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold">💰 Ödeme Yönetimi</h2>
+                            <button
+                                onClick={async () => {
+                                    setLoadingPayments(true);
+                                    try {
+                                        const res = await paymentService.getPending();
+                                        if (res.success) setPendingPayments(res.payments);
+                                    } catch (e) { console.error(e); }
+                                    finally { setLoadingPayments(false); }
+                                }}
+                                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
+                            >
+                                {loadingPayments ? '...' : '🔄 Yenile'}
+                            </button>
+                        </div>
+
+                        {pendingPayments.length > 0 ? (
+                            <div className="space-y-4">
+                                {pendingPayments.map(payment => (
+                                    <div key={payment.id} className="border rounded-lg p-4 bg-card">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <div className="font-bold text-lg">{payment.userName}</div>
+                                                <div className="text-sm text-muted-foreground">{payment.userEmail}</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-2xl font-bold text-green-500">${payment.amount}</div>
+                                                <div className="text-xs text-muted-foreground">{payment.planType === 'monthly' ? 'Aylık' : 'Yıllık'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                                            <div><span className="text-muted-foreground">Kripto:</span> {payment.cryptoType}</div>
+                                            <div><span className="text-muted-foreground">Tarih:</span> {new Date(payment.createdAt).toLocaleString('tr-TR')}</div>
+                                            <div className="col-span-2"><span className="text-muted-foreground">ID:</span> <code className="text-xs">{payment.id}</code></div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={async () => {
+                                                    if (!confirm(`${payment.userName} kullanıcısını PRO yapmak istediğinize emin misiniz?`)) return;
+                                                    try {
+                                                        const res = await paymentService.confirm(payment.id);
+                                                        if (res.success) {
+                                                            alert('✅ Ödeme onaylandı, kullanıcı PRO yapıldı!');
+                                                            setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
+                                                        }
+                                                    } catch (e) { alert('Hata: ' + e.message); }
+                                                }}
+                                                className="flex-1 py-2 bg-green-500 text-white rounded font-bold hover:bg-green-600"
+                                            >
+                                                ✅ Onayla
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    const reason = prompt('Red sebebi (opsiyonel):');
+                                                    try {
+                                                        const res = await paymentService.reject(payment.id, reason);
+                                                        if (res.success) {
+                                                            alert('❌ Ödeme reddedildi');
+                                                            setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
+                                                        }
+                                                    } catch (e) { alert('Hata: ' + e.message); }
+                                                }}
+                                                className="flex-1 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600"
+                                            >
+                                                ❌ Reddet
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 border rounded-lg">
+                                <div className="text-4xl mb-2">💸</div>
+                                <p className="text-muted-foreground">Bekleyen ödeme yok</p>
+                                <p className="text-xs text-muted-foreground mt-1">Yenilemek için butona tıklayın</p>
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* Market Tabs (Legacy/Other) */}
