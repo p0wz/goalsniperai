@@ -2530,6 +2530,95 @@ app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// 🎯 Approved Bets System (Daily Analysis Only)
+// ============================================
+const approvedBets = require('./approvedBets');
+
+// Admin: Approve a bet from Daily Analysis
+app.post('/api/bets/approve', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const betData = req.body;
+    if (!betData.match || !betData.market) {
+        return res.status(400).json({ success: false, error: 'match and market required' });
+    }
+
+    const result = approvedBets.approveBet(betData);
+    res.json(result);
+});
+
+// Get all approved bets
+app.get('/api/bets', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const bets = approvedBets.getAllBets();
+    const stats = approvedBets.getStats();
+    res.json({ success: true, bets, stats });
+});
+
+// Get pending bets (for auto-settlement)
+app.get('/api/bets/pending', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const bets = approvedBets.getPendingBets();
+    res.json({ success: true, bets });
+});
+
+// Get stats only
+app.get('/api/bets/stats', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const stats = approvedBets.getStats();
+    res.json({ success: true, stats });
+});
+
+// Manual settle a bet (WON/LOST)
+app.post('/api/bets/:id/settle', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+    const { status, resultScore } = req.body;
+
+    if (!status || !['WON', 'LOST'].includes(status)) {
+        return res.status(400).json({ success: false, error: 'status must be WON or LOST' });
+    }
+
+    const result = approvedBets.settleBet(id, status, resultScore);
+    res.json(result);
+});
+
+// Delete a single bet
+app.delete('/api/bets/:id', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+    const result = approvedBets.deleteBet(id);
+    res.json(result);
+});
+
+// Clear all bets
+app.delete('/api/bets', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const result = approvedBets.clearAllBets();
+    res.json(result);
+});
+
+// ============================================
 // 📡 SSE Streaming Endpoint for Live Analysis
 // ============================================
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {

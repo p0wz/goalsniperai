@@ -259,4 +259,44 @@ export const paymentService = {
     }
 };
 
+// Approved Bets Service (Daily Analysis)
+export const betsService = {
+    // Approve a bet from Daily Analysis
+    approve: async (betData) => {
+        const response = await api.post('/bets/approve', betData);
+        return response.data;
+    },
+    // Get all approved bets
+    getAll: async () => {
+        const response = await api.get('/bets');
+        return response.data;
+    },
+    // Get pending bets only
+    getPending: async () => {
+        const response = await api.get('/bets/pending');
+        return response.data;
+    },
+    // Get stats only
+    getStats: async () => {
+        const response = await api.get('/bets/stats');
+        return response.data;
+    },
+    // Settle a bet (WON/LOST)
+    settle: async (betId, status, resultScore = null) => {
+        const response = await api.post(`/bets/${betId}/settle`, { status, resultScore });
+        return response.data;
+    },
+    // Delete a bet
+    delete: async (betId) => {
+        const response = await api.delete(`/bets/${betId}`);
+        return response.data;
+    },
+    // Clear all bets
+    clearAll: async () => {
+        const response = await api.delete('/bets');
+        return response.data;
+    }
+};
+
 export default api;
+
