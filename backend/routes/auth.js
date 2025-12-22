@@ -36,11 +36,11 @@ router.post('/register', authLimiter, async (req, res) => {
             });
         }
 
-        // Strong password validation
-        if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        // Password validation (min 6 chars)
+        if (password.length < 6) {
             return res.status(400).json({
                 success: false,
-                error: 'Şifre en az 8 karakter, 1 büyük harf ve 1 rakam içermelidir'
+                error: 'Şifre en az 6 karakter olmalıdır'
             });
         }
 

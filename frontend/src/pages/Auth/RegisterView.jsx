@@ -8,10 +8,35 @@ export default function RegisterView({ onRegister, error }) {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [localError, setLocalError] = useState(null);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onRegister(name, email, password);
+        setLocalError(null);
+
+        if (!name || !email || !password) {
+            setLocalError('Tüm alanları doldurun');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setLocalError('Şifreler eşleşmiyor');
+            return;
+        }
+
+        if (password.length < 6) {
+            setLocalError('Şifre en az 6 karakter olmalı');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await onRegister(name, email, password);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -22,75 +47,74 @@ export default function RegisterView({ onRegister, error }) {
 
             <NeuCard className="w-full max-w-md bg-base z-10" padding="p-10">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Join the Elite</h1>
-                    <p className="text-text-muted">Create your account to start sniping.</p>
+                    <div className="text-5xl mb-4">🚀</div>
+                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Kayıt Ol</h1>
+                    <p className="text-text-muted">SENTIO AI ile tanışmaya hazır mısın?</p>
                 </div>
 
-                {error && (
-                    <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-500 text-sm font-bold text-center border border-red-100">
-                        {error}
+                {(error || localError) && (
+                    <div className="mb-6 p-4 rounded-xl bg-red-500/10 text-red-400 text-sm font-bold text-center border border-red-500/30">
+                        {localError || error}
                     </div>
                 )}
 
-                <div className="flex gap-4 mb-6">
-                    <button
-                        onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/google`}
-                        className="flex-1 py-3 px-4 rounded-xl bg-base shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center justify-center gap-2 font-bold text-text-main"
-                        type="button"
-                    >
-                        <span className="text-red-500">G</span> Google
-                    </button>
-                    <button
-                        onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/twitter`}
-                        className="flex-1 py-3 px-4 rounded-xl bg-base shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center justify-center gap-2 font-bold text-text-main"
-                        type="button"
-                    >
-                        <span className="text-black dark:text-white">𝕏</span> Twitter
-                    </button>
-                </div>
-
-                <div className="relative flex items-center mb-6">
-                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                    <span className="flex-shrink-0 mx-4 text-sm text-text-muted">Or join with email</span>
-                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     <NeuInput
-                        label="Full Name"
-                        placeholder="Maverick"
+                        label="Ad Soyad"
+                        placeholder="Ahmet Yılmaz"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         type="text"
+                        required
                     />
 
                     <NeuInput
-                        label="Email Address"
-                        placeholder="maverick@topgun.com"
+                        label="E-posta Adresi"
+                        placeholder="ornek@email.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         type="email"
+                        required
                     />
 
                     <NeuInput
-                        label="Password"
-                        placeholder="••••••••"
+                        label="Şifre"
+                        placeholder="En az 6 karakter"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         type="password"
+                        required
+                    />
+
+                    <NeuInput
+                        label="Şifre Tekrar"
+                        placeholder="Şifrenizi tekrar girin"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        type="password"
+                        required
                     />
 
                     <div className="pt-4">
-                        <NeuButton type="submit" variant="primary" className="w-full py-4 text-lg">
-                            Request Access
+                        <NeuButton
+                            type="submit"
+                            variant="primary"
+                            className="w-full py-4 text-lg"
+                            disabled={loading}
+                        >
+                            {loading ? 'Hesap Oluşturuluyor...' : 'Hesap Oluştur'}
                         </NeuButton>
                     </div>
                 </form>
 
-                <div className="mt-8 text-center text-text-muted text-sm font-medium">
-                    Already an agent? <Link to="/login" className="text-accent font-bold cursor-pointer hover:underline">Sign In</Link>
+                <div className="mt-6 text-center text-xs text-text-muted">
+                    Kayıt olarak <a href="#" className="text-accent hover:underline">Kullanım Şartları</a> ve <a href="#" className="text-accent hover:underline">Gizlilik Politikası</a>'nı kabul etmiş olursun.
                 </div>
             </NeuCard>
+
+            <div className="mt-8 text-text-muted text-sm font-medium">
+                Zaten hesabın var mı? <Link to="/login" className="text-accent font-bold cursor-pointer hover:underline">Giriş Yap</Link>
+            </div>
         </div>
     );
 }

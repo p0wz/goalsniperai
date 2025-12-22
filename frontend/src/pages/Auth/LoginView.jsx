@@ -7,10 +7,17 @@ import NeuCard from '../../components/ui/NeuCard';
 export default function LoginView({ onLogin, error }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onLogin(email, password);
+        if (!email || !password) return;
+        setLoading(true);
+        try {
+            await onLogin(email, password);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -20,70 +27,55 @@ export default function LoginView({ onLogin, error }) {
 
             <NeuCard className="w-full max-w-md bg-base z-10" padding="p-10">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Welcome Back</h1>
-                    <p className="text-text-muted">Enter your credentials to access the terminal.</p>
+                    <div className="text-5xl mb-4">🤖</div>
+                    <h1 className="text-3xl font-extrabold text-text-main mb-2">Giriş Yap</h1>
+                    <p className="text-text-muted">SENTIO AI'ya erişmek için giriş yap.</p>
                 </div>
 
                 {error && (
-                    <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-500 text-sm font-bold text-center border border-red-100">
+                    <div className="mb-6 p-4 rounded-xl bg-red-500/10 text-red-400 text-sm font-bold text-center border border-red-500/30">
                         {error}
                     </div>
                 )}
 
-                <div className="flex gap-4 mb-6">
-                    <button
-                        onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/google`}
-                        className="flex-1 py-3 px-4 rounded-xl bg-base shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center justify-center gap-2 font-bold text-text-main"
-                        type="button"
-                    >
-                        <span className="text-red-500">G</span> Google
-                    </button>
-                    <button
-                        onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/twitter`}
-                        className="flex-1 py-3 px-4 rounded-xl bg-base shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center justify-center gap-2 font-bold text-text-main"
-                        type="button"
-                    >
-                        <span className="text-black dark:text-white">𝕏</span> Twitter
-                    </button>
-                </div>
-
-                <div className="relative flex items-center mb-6">
-                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                    <span className="flex-shrink-0 mx-4 text-sm text-text-muted">Or continue with email</span>
-                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                </div>
-
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <NeuInput
-                        label="Email Address"
-                        placeholder="john@example.com"
+                        label="E-posta Adresi"
+                        placeholder="ornek@email.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         type="email"
+                        required
                     />
 
                     <NeuInput
-                        label="Password"
+                        label="Şifre"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         type="password"
+                        required
                     />
 
                     <div className="pt-4">
-                        <NeuButton type="submit" variant="primary" className="w-full py-4 text-lg">
-                            Sign In
+                        <NeuButton
+                            type="submit"
+                            variant="primary"
+                            className="w-full py-4 text-lg"
+                            disabled={loading}
+                        >
+                            {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
                         </NeuButton>
                     </div>
                 </form>
 
                 <div className="mt-8 text-center">
-                    <a href="#" className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Forgot Password?</a>
+                    <a href="#" className="text-sm font-bold text-text-muted hover:text-accent transition-colors">Şifremi Unuttum</a>
                 </div>
             </NeuCard>
 
             <div className="mt-8 text-text-muted text-sm font-medium">
-                Don't have an account? <Link to="/register" className="text-accent font-bold cursor-pointer hover:underline">Request Access</Link>
+                Hesabın yok mu? <Link to="/register" className="text-accent font-bold cursor-pointer hover:underline">Kayıt Ol</Link>
             </div>
         </div>
     );
