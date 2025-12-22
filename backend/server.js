@@ -3058,7 +3058,6 @@ app.post('/api/payments/reject/:id', requireAuth, (req, res) => {
 // ============================================
 // 🎯 Approved Bets Endpoints (New System)
 // ============================================
-const approvedBets = require('./approvedBets');
 
 // Approve a bet from daily analysis
 app.post('/api/bets/approve', requireAuth, (req, res) => {
@@ -3139,7 +3138,6 @@ app.delete('/api/bets', requireAuth, (req, res) => {
 // ============================================
 // 🎓 Training Pool Endpoints
 // ============================================
-const trainingPool = require('./trainingPool');
 
 // Get training pool entries
 app.get('/api/training-pool', requireAuth, (req, res) => {
@@ -3178,7 +3176,6 @@ app.post('/api/settlement/run', requireAuth, async (req, res) => {
         return res.status(403).json({ success: false, error: 'Admin only' });
     }
 
-    const autoSettlement = require('./autoSettlement');
     await autoSettlement.manualRun();
     res.json({ success: true, message: 'Settlement run triggered' });
 });
@@ -3206,7 +3203,6 @@ app.listen(PORT, async () => {
     log.success(`Server running on http://localhost:${PORT}`);
 
     // Start Services
-    const autoSettlement = require('./autoSettlement');
     autoSettlement.startScheduler();
     log.info(`Auto-Settlement: Scheduler started (every 15 min)`);
 });
