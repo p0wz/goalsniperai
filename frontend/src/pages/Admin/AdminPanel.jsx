@@ -814,19 +814,42 @@ export default function AdminPanel({ user, handleLogout }) {
                             </div>
                         )}
 
-                        {/* By Market */}
+                        {/* Win Rate by Market - Enhanced */}
                         {trainingPoolStats?.byMarket && Object.keys(trainingPoolStats.byMarket).length > 0 && (
                             <div className="bg-card border rounded-lg p-4">
-                                <h3 className="font-semibold mb-3">Performance by Market</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    {Object.entries(trainingPoolStats.byMarket).map(([market, stats]) => (
-                                        <div key={market} className="bg-muted/30 p-3 rounded">
-                                            <div className="font-medium text-sm">{market}</div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {stats.won}/{stats.total} ({((stats.won / stats.total) * 100).toFixed(0)}%)
-                                            </div>
-                                        </div>
-                                    ))}
+                                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                                    📊 Win Rate by Market
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {Object.entries(trainingPoolStats.byMarket)
+                                        .sort((a, b) => (b[1].won / b[1].total) - (a[1].won / a[1].total))
+                                        .map(([market, stats]) => {
+                                            const winRate = stats.total > 0 ? ((stats.won / stats.total) * 100) : 0;
+                                            const colorClass = winRate >= 70 ? 'text-green-500 bg-green-500' :
+                                                winRate >= 50 ? 'text-yellow-500 bg-yellow-500' :
+                                                    'text-red-500 bg-red-500';
+                                            return (
+                                                <div key={market} className="bg-muted/30 p-4 rounded-lg border">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="font-medium">{market}</span>
+                                                        <span className={`font-bold ${colorClass.split(' ')[0]}`}>
+                                                            {winRate.toFixed(0)}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-muted rounded-full h-2 mb-2">
+                                                        <div
+                                                            className={`h-2 rounded-full ${colorClass.split(' ')[1]}`}
+                                                            style={{ width: `${winRate}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                                        <span>✅ {stats.won} Won</span>
+                                                        <span>❌ {stats.lost} Lost</span>
+                                                        <span>📊 {stats.total} Total</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             </div>
                         )}
