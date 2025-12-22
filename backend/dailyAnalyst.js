@@ -4,7 +4,7 @@
  */
 const axios = require('axios');
 const betTracker = require('./betTracker');
-const { analyzeFirstHalfPreMatch } = require('./analysis/firstHalfAnalyzer');
+const { analyzeFirstHalfPreMatch, validateWithRealHTScores } = require('./analysis/firstHalfAnalyzer');
 require('dotenv').config();
 
 // Config
@@ -472,13 +472,58 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             }
         }
 
-        // Logic G: First Half Over 0.5 (NEW)
-        // Uses separate pure form analysis
+        // Logic G: First Half Over 0.5 (ENHANCED with Real HT Validation)
+        // Uses separate pure form analysis + secondary validation with match details
         const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
         if (fhAnalysis.signal) {
-            // Attach the specific analysis to the match object for later use
-            candidates.firstHalfOver05.push({ ...m, filterStats: stats, fhStats: fhAnalysis, market: 'First Half Over 0.5' });
-            passedFilters.push('1H Over 0.5');
+            // Secondary validation: Fetch real HT scores from match details
+            log.info(`   🔬 1Y 0.5+ passed heuristic, fetching real HT scores...`);
+
+            // Get last 3 match IDs for each team
+            const homeLast3 = homeRawHistory.slice(0, 3);
+            const awayLast3 = awayRawHistory.slice(0, 3);
+
+            // Fetch match details for each (with rate limiting)
+            const homeMatchDetails = [];
+            for (const hm of homeLast3) {
+                const mid = hm.match_id || hm.id;
+                if (mid) {
+                    await sleep(300);
+                    const details = await fetchMatchDetails(mid);
+                    homeMatchDetails.push(details);
+                }
+            }
+
+            const awayMatchDetails = [];
+            for (const am of awayLast3) {
+                const mid = am.match_id || am.id;
+                if (mid) {
+                    await sleep(300);
+                    const details = await fetchMatchDetails(mid);
+                    awayMatchDetails.push(details);
+                }
+            }
+
+            // Run secondary validation
+            const htValidation = validateWithRealHTScores(
+                homeMatchDetails,
+                awayMatchDetails,
+                m.event_home_team,
+                m.event_away_team
+            );
+
+            if (htValidation.passed) {
+                candidates.firstHalfOver05.push({
+                    ...m,
+                    filterStats: stats,
+                    fhStats: { ...fhAnalysis, htValidation },
+                    market: 'First Half Over 0.5'
+                });
+                passedFilters.push('1H Over 0.5');
+                log.info(`   ✅ ${htValidation.reason}`);
+            } else {
+                log.info(`   ❌ ${htValidation.reason}`);
+            }
         }
 
         // Logic H: MS1 & 1.5 Üst (IMPROVED - STRICTER)
@@ -1040,8 +1085,54 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
                 break;
             case 'firstHalfOver05':
                 const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
-                passes = fhAnalysis.signal;
-                matchData.fhStats = fhAnalysis;
+                if (fhAnalysis.signal) {
+                    // Secondary validation: Fetch real HT scores from match details
+                    log.info(`   🔬 1Y 0.5+ passed heuristic, fetching real HT scores...`);
+
+                    // Get last 3 match IDs for each team
+                    const homeLast3 = homeRawHistory.slice(0, 3);
+                    const awayLast3 = awayRawHistory.slice(0, 3);
+
+                    // Fetch match details for each (with rate limiting)
+                    const homeMatchDetails = [];
+                    for (const hm of homeLast3) {
+                        const mid = hm.match_id || hm.id;
+                        if (mid) {
+                            await sleep(300);
+                            const details = await fetchMatchDetails(mid);
+                            homeMatchDetails.push(details);
+                        }
+                    }
+
+                    const awayMatchDetails = [];
+                    for (const am of awayLast3) {
+                        const mid = am.match_id || am.id;
+                        if (mid) {
+                            await sleep(300);
+                            const details = await fetchMatchDetails(mid);
+                            awayMatchDetails.push(details);
+                        }
+                    }
+
+                    // Run secondary validation
+                    const htValidation = validateWithRealHTScores(
+                        homeMatchDetails,
+                        awayMatchDetails,
+                        m.event_home_team,
+                        m.event_away_team
+                    );
+
+                    if (htValidation.passed) {
+                        passes = true;
+                        matchData.fhStats = { ...fhAnalysis, htValidation };
+                        log.info(`   ✅ ${htValidation.reason}`);
+                    } else {
+                        passes = false;
+                        log.info(`   ❌ ${htValidation.reason}`);
+                    }
+                } else {
+                    passes = false;
+                }
                 matchData.market = 'First Half Over 0.5';
                 break;
             case 'ms1AndOver15':

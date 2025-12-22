@@ -121,4 +121,115 @@ function analyzeFirstHalfPreMatch(match, homeHistory, awayHistory, h2hHistory) {
     };
 }
 
-module.exports = { analyzeFirstHalfPreMatch };
+/**
+ * Secondary Validation: Check REAL First Half Scores from Match Details
+ * 
+ * @param {Array} homeMatchDetails - Last 3 match details for home team
+ * @param {Array} awayMatchDetails - Last 3 match details for away team  
+ * @param {string} homeTeamName - Home team name
+ * @param {string} awayTeamName - Away team name
+ * @returns {Object} { passed: boolean, htGoalRate: number, reason: string }
+ */
+function validateWithRealHTScores(homeMatchDetails, awayMatchDetails, homeTeamName, awayTeamName) {
+    // Extract HT scores from match details
+    const extractHTGoals = (details) => {
+        if (!details) return null;
+
+        // Match details structure varies, try common patterns
+        // Pattern 1: details.score contains period scores
+        if (details.home_team?.score_1st_half !== undefined && details.away_team?.score_1st_half !== undefined) {
+            const htHome = parseInt(details.home_team.score_1st_half) || 0;
+            const htAway = parseInt(details.away_team.score_1st_half) || 0;
+            return htHome + htAway;
+        }
+
+        // Pattern 2: Scoreboard or periods array
+        if (details.scoreboard) {
+            const sb = details.scoreboard;
+            if (sb.period_1) {
+                const h = parseInt(sb.period_1.home) || 0;
+                const a = parseInt(sb.period_1.away) || 0;
+                return h + a;
+            }
+        }
+
+        // Pattern 3: Periods array
+        if (details.periods && Array.isArray(details.periods)) {
+            const p1 = details.periods.find(p => p.period === 1 || p.name === '1st Half');
+            if (p1) {
+                const h = parseInt(p1.home_score || p1.home) || 0;
+                const a = parseInt(p1.away_score || p1.away) || 0;
+                return h + a;
+            }
+        }
+
+        // Pattern 4: Check if result contains HT info (e.g., "2-1 (1-0)")
+        if (details.result && details.result.includes('(')) {
+            const htMatch = details.result.match(/\((\d+)-(\d+)\)/);
+            if (htMatch) {
+                return parseInt(htMatch[1]) + parseInt(htMatch[2]);
+            }
+        }
+
+        return null; // Could not extract HT score
+    };
+
+    let homeHTGoalCount = 0;
+    let homeValidMatches = 0;
+    let awayHTGoalCount = 0;
+    let awayValidMatches = 0;
+
+    // Process home team's last 3 matches
+    for (const details of homeMatchDetails) {
+        if (!details) continue;
+        const htGoals = extractHTGoals(details);
+        if (htGoals !== null) {
+            homeValidMatches++;
+            if (htGoals >= 1) homeHTGoalCount++;
+        }
+    }
+
+    // Process away team's last 3 matches
+    for (const details of awayMatchDetails) {
+        if (!details) continue;
+        const htGoals = extractHTGoals(details);
+        if (htGoals !== null) {
+            awayValidMatches++;
+            if (htGoals >= 1) awayHTGoalCount++;
+        }
+    }
+
+    // Calculate rates
+    const homeHTRate = homeValidMatches > 0 ? (homeHTGoalCount / homeValidMatches) * 100 : 0;
+    const awayHTRate = awayValidMatches > 0 ? (awayHTGoalCount / awayValidMatches) * 100 : 0;
+    const combinedRate = (homeHTRate + awayHTRate) / 2;
+
+    // Validation criteria:
+    // - At least 2 valid matches per team
+    // - Combined HT goal rate >= 60%
+    const hasEnoughData = homeValidMatches >= 2 && awayValidMatches >= 2;
+    const passesThreshold = combinedRate >= 60;
+
+    const passed = hasEnoughData && passesThreshold;
+
+    let reason = '';
+    if (!hasEnoughData) {
+        reason = `Yetersiz veri: Ev(${homeValidMatches}/3), Dep(${awayValidMatches}/3)`;
+    } else if (!passesThreshold) {
+        reason = `Düşük 1Y gol oranı: Ev ${homeHTRate.toFixed(0)}%, Dep ${awayHTRate.toFixed(0)}% (Ort: ${combinedRate.toFixed(0)}%)`;
+    } else {
+        reason = `✅ 1Y Doğrulama: Ev ${homeHTRate.toFixed(0)}%, Dep ${awayHTRate.toFixed(0)}% (Ort: ${combinedRate.toFixed(0)}%)`;
+    }
+
+    return {
+        passed,
+        homeHTRate: parseFloat(homeHTRate.toFixed(1)),
+        awayHTRate: parseFloat(awayHTRate.toFixed(1)),
+        combinedRate: parseFloat(combinedRate.toFixed(1)),
+        homeValidMatches,
+        awayValidMatches,
+        reason
+    };
+}
+
+module.exports = { analyzeFirstHalfPreMatch, validateWithRealHTScores };
