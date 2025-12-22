@@ -6,10 +6,12 @@ function RawStatsTab() {
     const [matches, setMatches] = useState([]);
     const [loading, setLoading] = useState(false);
     const [copiedId, setCopiedId] = useState(null);
+    const [allCopied, setAllCopied] = useState(false);
 
     const runAnalysis = async (leagueFilter) => {
         setLoading(true);
         setMatches([]);
+        setAllCopied(false);
         try {
             const res = await signalService.getRawStats(leagueFilter, 50);
             if (res.success) {
@@ -28,6 +30,20 @@ function RawStatsTab() {
             setCopiedId(match.id);
             setTimeout(() => setCopiedId(null), 2000);
         }
+    };
+
+    const copyAllPrompts = () => {
+        if (matches.length === 0) return;
+
+        const allPrompts = matches.map((m, i) => {
+            return `\n${'='.repeat(80)}\n📌 MAÇ ${i + 1}/${matches.length}\n${'='.repeat(80)}\n${m.aiPrompt}`;
+        }).join('\n\n');
+
+        const header = `🎯 TOPLU MAÇ ANALİZİ - ${matches.length} MAÇ\n📅 Tarih: ${new Date().toLocaleDateString('tr-TR')}\n${'═'.repeat(80)}`;
+
+        navigator.clipboard.writeText(header + allPrompts);
+        setAllCopied(true);
+        setTimeout(() => setAllCopied(false), 3000);
     };
 
     return (
@@ -61,6 +77,26 @@ function RawStatsTab() {
                     {loading ? '⏳ Taranıyor...' : '🌍 Tüm Maçlar'}
                 </button>
             </div>
+
+            {/* Copy All Button */}
+            {matches.length > 0 && (
+                <div className="flex justify-center">
+                    <button
+                        onClick={copyAllPrompts}
+                        className={clsx(
+                            "px-6 py-3 rounded-lg text-lg font-bold transition-all shadow-lg",
+                            allCopied
+                                ? "bg-green-500 text-white"
+                                : "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-xl hover:scale-105"
+                        )}
+                    >
+                        {allCopied
+                            ? `✅ ${matches.length} Maç Kopyalandı!`
+                            : `📋 Tümünü Kopyala (${matches.length} Maç)`
+                        }
+                    </button>
+                </div>
+            )}
 
             {/* Results Table */}
             {matches.length > 0 ? (
@@ -139,9 +175,9 @@ function RawStatsTab() {
                 <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
                     <h3 className="font-medium text-purple-400 mb-2">💡 Kullanım</h3>
                     <p className="text-sm text-muted-foreground">
-                        <strong>"📋 Kopyala"</strong> butonuna tıklayarak maçın tüm istatistiklerini içeren
-                        AI prompt'unu panoya kopyalayın. Bu prompt'u ChatGPT, Claude veya başka bir
-                        AI ile kullanarak maç analizi yaptırabilirsiniz.
+                        <strong>"📋 Tümünü Kopyala"</strong> butonuyla tüm maçların istatistiklerini tek seferde kopyalayın.
+                        <strong>"📋 Kopyala"</strong> butonuyla tek bir maçın prompt'unu kopyalayın.
+                        Bu prompt'ları ChatGPT, Claude veya başka bir AI ile kullanarak maç analizi yaptırabilirsiniz.
                     </p>
                 </div>
             )}
@@ -150,3 +186,4 @@ function RawStatsTab() {
 }
 
 export { RawStatsTab };
+
