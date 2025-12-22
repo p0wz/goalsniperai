@@ -2483,6 +2483,52 @@ app.post('/api/sentio/chat', requireAuth, async (req, res) => {
     }
 });
 
+// All Users: Streaming Chat with SENTIO (SSE) - Supports conversation history
+app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
+    const { message, history } = req.body; // history: [{role, content}]
+
+    if (!message || message.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'Message required' });
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    try {
+        const memory = loadSentioMemory();
+
+        // Check if memory has matches
+        if (!memory.matches || memory.matches.length === 0) {
+            const noDataMsg = "⚠️ No matches have been analyzed yet. I'll be able to help once the admin approves today's matches! 🕐";
+            res.write(`data: ${JSON.stringify({ chunk: noDataMsg })}\n\n`);
+            res.write(`data: ${JSON.stringify({ done: true, fullText: noDataMsg })}\n\n`);
+            res.end();
+            return;
+        }
+
+        await aiService.streamChatWithSentio(
+            message,
+            memory,
+            history || [],
+            (chunk) => {
+                res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+            },
+            (fullText) => {
+                res.write(`data: ${JSON.stringify({ done: true, fullText })}\n\n`);
+                res.end();
+            }
+        );
+    } catch (error) {
+        log.error('[SENTIO] Stream chat error:', error);
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        res.end();
+    }
+});
+
 // ============================================
 // 📡 SSE Streaming Endpoint for Live Analysis
 // ============================================
@@ -2727,6 +2773,7 @@ setInterval(runAutoSettlement, 20 * 60 * 1000);
 // ============================================
 // 🚀 Server Startup
 // ============================================
+
 // ============================================
 // 💰 Crypto Payment System
 // ============================================

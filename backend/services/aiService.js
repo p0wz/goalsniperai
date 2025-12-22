@@ -227,6 +227,89 @@ OUTPUT JSON ONLY:
         }
     },
 
+    /**
+     * Streaming LLM call for SENTIO Chat
+     * @param {string} prompt - The prompt to send
+     * @param {function} onChunk - Callback for each chunk (chunk: string)
+     * @param {function} onDone - Callback when complete
+     */
+    async _streamLLM(prompt, onChunk, onDone) {
+        if (!GROQ_API_KEY) {
+            throw new Error("GROQ_API_KEY Missing");
+        }
+
+        const https = require('https');
+        const url = 'https://api.groq.com/openai/v1/chat/completions';
+
+        const postData = JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+                { role: 'system', content: 'You are SENTIO, a professional sports betting analyst. Be helpful, concise, and use emojis.' },
+                { role: 'user', content: prompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 2048,
+            stream: true
+        });
+
+        return new Promise((resolve, reject) => {
+            const req = https.request(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GROQ_API_KEY}`,
+                    'Content-Length': Buffer.byteLength(postData)
+                }
+            }, (res) => {
+                let fullText = '';
+                let buffer = '';
+
+                res.on('data', (chunk) => {
+                    buffer += chunk.toString();
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                onDone(fullText);
+                                resolve(fullText);
+                                return;
+                            }
+                            try {
+                                const parsed = JSON.parse(data);
+                                const content = parsed.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    fullText += content;
+                                    onChunk(content);
+                                }
+                            } catch (e) {
+                                // Skip invalid JSON lines
+                            }
+                        }
+                    }
+                });
+
+                res.on('end', () => {
+                    onDone(fullText);
+                    resolve(fullText);
+                });
+
+                res.on('error', (e) => {
+                    reject(e);
+                });
+            });
+
+            req.on('error', (e) => {
+                reject(e);
+            });
+
+            req.write(postData);
+            req.end();
+        });
+    },
+
     // ============================================
     // 💬 SENTIO Chat System
     // ============================================
@@ -304,7 +387,71 @@ RESPONSE:`;
             console.error("SENTIO Chat Error:", e);
             return "Sorry, I'm experiencing a technical issue right now. Please try again in a few minutes. 🔧";
         }
+    },
+
+    /**
+     * SENTIO Chat with Streaming - Supports conversation history
+     * @param {string} userMessage - User's question
+     * @param {Object} memory - SENTIO memory containing matches
+     * @param {Array} history - Conversation history [{role, content}]
+     * @param {function} onChunk - Callback for each chunk
+     * @param {function} onDone - Callback when complete
+     */
+    async streamChatWithSentio(userMessage, memory, history = [], onChunk, onDone) {
+        if (!memory || !memory.matches || memory.matches.length === 0) {
+            const noDataMsg = "No matches have been analyzed yet. I'll be able to help once the admin approves today's matches.";
+            onChunk(noDataMsg);
+            onDone(noDataMsg);
+            return;
+        }
+
+        // Build context from matches
+        const matchContext = memory.matches.map((m, i) => {
+            if (m.aiPrompt) {
+                return `--- MATCH ${i + 1} ---\n${m.aiPrompt}`;
+            }
+            return `${i + 1}. ${m.homeTeam || m.home} vs ${m.awayTeam || m.away} (${m.league})`;
+        }).join('\n\n');
+
+        // Build conversation history context (last 5 exchanges)
+        const historyContext = history.slice(-10).map(h =>
+            h.role === 'user' ? `User: ${h.content}` : `SENTIO: ${h.content}`
+        ).join('\n');
+
+        const prompt = `You are SENTIO - a professional football analyst and betting advisor.
+Personality: Friendly, trustworthy, and analytical. Respond in English.
+
+📅 TODAY'S MATCHES AND STATISTICS (${memory.date || new Date().toLocaleDateString('en-US')}):
+${matchContext}
+
+${historyContext ? `📜 CONVERSATION HISTORY:\n${historyContext}\n` : ''}
+💬 CURRENT USER QUESTION: "${userMessage}"
+
+🎯 YOUR TASK:
+1. Answer based on the match data and conversation context above.
+2. Give concrete match recommendations with team names.
+3. Briefly reference statistics when relevant.
+4. For "banker"/"safe" picks, present 2-3 strongest options.
+5. For coupon requests, list matches and predictions clearly.
+
+⚠️ RULES:
+- Never guarantee results, only provide analysis.
+- Keep response concise (max 300 words).
+- Use emojis for readability.
+- Remember the conversation context for follow-up questions.
+
+RESPONSE:`;
+
+        try {
+            await this._streamLLM(prompt, onChunk, onDone);
+        } catch (e) {
+            console.error("SENTIO Stream Error:", e);
+            const errorMsg = "Sorry, I'm experiencing a technical issue. Please try again. 🔧";
+            onChunk(errorMsg);
+            onDone(errorMsg);
+        }
     }
 };
 
 module.exports = aiService;
+

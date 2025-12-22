@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { sentioService } from '../services/api';
+import { Heart, Trash2, X } from 'lucide-react';
+import api from '../services/api';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export default function SentioChat() {
     const [messages, setMessages] = useState([
@@ -10,7 +13,27 @@ export default function SentioChat() {
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [favorites, setFavorites] = useState([]);
+    const [showFavorites, setShowFavorites] = useState(false);
+    const [streamingText, setStreamingText] = useState('');
     const messagesEndRef = useRef(null);
+
+    // Load favorites from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('sentio_favorites');
+        if (saved) {
+            try {
+                setFavorites(JSON.parse(saved));
+            } catch (e) {
+                console.error('Failed to load favorites:', e);
+            }
+        }
+    }, []);
+
+    // Save favorites to localStorage
+    useEffect(() => {
+        localStorage.setItem('sentio_favorites', JSON.stringify(favorites));
+    }, [favorites]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -18,7 +41,7 @@ export default function SentioChat() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, streamingText]);
 
     const handleSend = async () => {
         if (!input.trim() || loading) return;
@@ -27,19 +50,93 @@ export default function SentioChat() {
         setInput('');
         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setLoading(true);
+        setStreamingText('');
 
         try {
-            const res = await sentioService.chat(userMessage);
-            if (res.success) {
-                setMessages(prev => [...prev, { role: 'assistant', content: res.response }]);
-            } else {
-                setMessages(prev => [...prev, { role: 'assistant', content: '❌ ' + (res.error || 'An error occurred.') }]);
+            // Get conversation history for context (last 5 exchanges)
+            const history = messages.slice(-10).map(m => ({
+                role: m.role,
+                content: m.content
+            }));
+
+            // Use streaming endpoint
+            const response = await fetch(`${API_URL}/sentio/chat-stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({ message: userMessage, history })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to connect to SENTIO');
             }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.chunk) {
+                                fullText += data.chunk;
+                                setStreamingText(fullText);
+                            }
+                            if (data.done) {
+                                setMessages(prev => [...prev, { role: 'assistant', content: data.fullText || fullText }]);
+                                setStreamingText('');
+                            }
+                            if (data.error) {
+                                setMessages(prev => [...prev, { role: 'assistant', content: '❌ ' + data.error }]);
+                                setStreamingText('');
+                            }
+                        } catch (e) {
+                            // Skip invalid JSON
+                        }
+                    }
+                }
+            }
+
+            // If stream ended without done signal
+            if (fullText && !messages.find(m => m.content === fullText)) {
+                setMessages(prev => [...prev, { role: 'assistant', content: fullText }]);
+                setStreamingText('');
+            }
+
         } catch (e) {
+            console.error('SENTIO Error:', e);
             setMessages(prev => [...prev, { role: 'assistant', content: '❌ Connection error: ' + e.message }]);
+            setStreamingText('');
         }
 
         setLoading(false);
+    };
+
+    const addToFavorites = (content) => {
+        const newFav = {
+            id: Date.now(),
+            content: content,
+            timestamp: new Date().toISOString()
+        };
+        setFavorites(prev => [newFav, ...prev]);
+    };
+
+    const removeFromFavorites = (id) => {
+        setFavorites(prev => prev.filter(f => f.id !== id));
+    };
+
+    const isFavorited = (content) => {
+        return favorites.some(f => f.content === content);
     };
 
     const quickQuestions = [
@@ -82,12 +179,50 @@ export default function SentioChat() {
                         </h3>
                         <p className="text-xs text-gray-500">AI Betting Advisor</p>
                     </div>
-                    <div className="text-xs text-gray-600 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse" />
-                        Gemini Pro
-                    </div>
+                    <button
+                        onClick={() => setShowFavorites(!showFavorites)}
+                        className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all ${showFavorites ? 'bg-pink-500/20 text-pink-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                            }`}
+                    >
+                        <Heart size={14} fill={showFavorites ? 'currentColor' : 'none'} />
+                        {favorites.length}
+                    </button>
                 </div>
             </div>
+
+            {/* Favorites Panel */}
+            {showFavorites && (
+                <div className="relative z-20 bg-[#0d0d14] border-b border-gray-800/80 max-h-60 overflow-y-auto">
+                    <div className="p-3 border-b border-gray-800/50 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-300">Saved Predictions ({favorites.length})</span>
+                        <button onClick={() => setShowFavorites(false)} className="text-gray-500 hover:text-gray-300">
+                            <X size={18} />
+                        </button>
+                    </div>
+                    {favorites.length === 0 ? (
+                        <div className="p-6 text-center text-gray-500 text-sm">
+                            No saved predictions yet. Click the ❤️ on any prediction to save it.
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-gray-800/50">
+                            {favorites.map(fav => (
+                                <div key={fav.id} className="p-3 hover:bg-gray-900/50">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <p className="text-sm text-gray-300 leading-relaxed line-clamp-3">{fav.content}</p>
+                                        <button
+                                            onClick={() => removeFromFavorites(fav.id)}
+                                            className="text-gray-600 hover:text-red-400 shrink-0"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-1">{new Date(fav.timestamp).toLocaleString()}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Messages */}
             <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
@@ -112,12 +247,38 @@ export default function SentioChat() {
                                 }`}
                         >
                             <div className="whitespace-pre-wrap">{msg.content}</div>
+                            {/* Favorite button for assistant messages */}
+                            {msg.role === 'assistant' && i > 0 && (
+                                <button
+                                    onClick={() => isFavorited(msg.content) ? null : addToFavorites(msg.content)}
+                                    className={`mt-2 flex items-center gap-1 text-xs transition-all ${isFavorited(msg.content)
+                                            ? 'text-pink-400'
+                                            : 'text-gray-500 hover:text-pink-400'
+                                        }`}
+                                >
+                                    <Heart size={12} fill={isFavorited(msg.content) ? 'currentColor' : 'none'} />
+                                    {isFavorited(msg.content) ? 'Saved' : 'Save'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
 
-                {/* Typing Indicator */}
-                {loading && (
+                {/* Streaming Message */}
+                {streamingText && (
+                    <div className="flex gap-3 animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm bg-gradient-to-br from-cyan-600 to-blue-700">
+                            🤖
+                        </div>
+                        <div className="max-w-[80%] rounded-xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed bg-gray-900/80 text-gray-200 border border-gray-800/80">
+                            <div className="whitespace-pre-wrap">{streamingText}</div>
+                            <span className="inline-block w-2 h-4 bg-cyan-400 animate-pulse ml-0.5" />
+                        </div>
+                    </div>
+                )}
+
+                {/* Typing Indicator (when loading but no streaming text yet) */}
+                {loading && !streamingText && (
                     <div className="flex gap-3 animate-in slide-in-from-bottom-2 duration-300">
                         <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm bg-gradient-to-br from-cyan-600 to-blue-700">
                             🤖
