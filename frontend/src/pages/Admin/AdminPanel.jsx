@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService } from '../../services/api';
+import { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService, betsService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import { RawStatsTab } from '../../RawStatsTab';
 import clsx from 'clsx';
@@ -37,6 +37,16 @@ export default function AdminPanel({ user, handleLogout }) {
     // Payments State
     const [pendingPayments, setPendingPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
+
+    // Approved Bets State (new system)
+    const [approvedBets, setApprovedBets] = useState([]);
+    const [approvedBetsStats, setApprovedBetsStats] = useState(null);
+    const [loadingApprovedBets, setLoadingApprovedBets] = useState(false);
+
+    // Training Pool State
+    const [trainingPool, setTrainingPool] = useState([]);
+    const [trainingPoolStats, setTrainingPoolStats] = useState(null);
+    const [loadingTrainingPool, setLoadingTrainingPool] = useState(false);
 
     useEffect(() => {
         fetchLiveSignals();
@@ -90,6 +100,107 @@ export default function AdminPanel({ user, handleLogout }) {
             console.error("Failed to load history", err);
         }
     };
+
+    // Fetch approved bets (new system)
+    const fetchApprovedBets = async () => {
+        setLoadingApprovedBets(true);
+        try {
+            const res = await betsService.getAll();
+            if (res.success) {
+                setApprovedBets(res.bets || []);
+                setApprovedBetsStats(res.stats || null);
+            }
+        } catch (err) {
+            console.error("Failed to load approved bets", err);
+        } finally {
+            setLoadingApprovedBets(false);
+        }
+    };
+
+    // Fetch training pool
+    const fetchTrainingPool = async () => {
+        setLoadingTrainingPool(true);
+        try {
+            const res = await fetch('/api/training-pool', { credentials: 'include' });
+            const data = await res.json();
+            if (data.success) {
+                setTrainingPool(data.entries || []);
+                setTrainingPoolStats(data.stats || null);
+            }
+        } catch (err) {
+            console.error("Failed to load training pool", err);
+        } finally {
+            setLoadingTrainingPool(false);
+        }
+    };
+
+    // Approve a bet from daily analysis
+    const handleApproveBet = async (match, market, prediction) => {
+        try {
+            const betData = {
+                match: `${match.event_home_team} vs ${match.event_away_team}`,
+                homeTeam: match.event_home_team,
+                awayTeam: match.event_away_team,
+                league: match.league_name,
+                matchDate: match.event_date || new Date().toISOString().split('T')[0],
+                matchTime: match.event_time || '15:00',
+                eventId: match.event_key || match.match_id,
+                market: market,
+                prediction: prediction,
+                odds: match.ai?.estimated_odds || null,
+                confidence: match.ai?.confidence || match.filterStats?.score || null,
+                stats: match.filterStats || null,
+                aiPrompt: match.aiPrompt || null
+            };
+            const res = await betsService.approve(betData);
+            if (res.success) {
+                alert(`✅ Bet approved: ${betData.match} - ${market}`);
+                fetchApprovedBets();
+            } else {
+                alert(`⚠️ ${res.error || 'Failed to approve'}`);
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // Settle approved bet
+    const handleSettleApprovedBet = async (betId, status) => {
+        const score = prompt('Enter final score (e.g. 2-1):');
+        try {
+            const res = await betsService.settle(betId, status, score);
+            if (res.success) {
+                fetchApprovedBets();
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // Delete approved bet
+    const handleDeleteApprovedBet = async (betId) => {
+        if (!confirm('Delete this bet?')) return;
+        try {
+            await betsService.delete(betId);
+            fetchApprovedBets();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // Trigger manual settlement run
+    const handleManualSettlement = async () => {
+        try {
+            const res = await fetch('/api/settlement/run', { method: 'POST', credentials: 'include' });
+            const data = await res.json();
+            alert(data.message || 'Settlement triggered');
+            fetchApprovedBets();
+            fetchTrainingPool();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
 
     const handleRunDaily = async (leagueFilter = true) => {
         try {
@@ -474,7 +585,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'ai-analiz', 'sentio', 'payments', 'ai-dataset', 'raw-stats', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'ai-analiz', 'bets', 'training', 'sentio', 'payments', 'ai-dataset', 'raw-stats', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -487,6 +598,8 @@ export default function AdminPanel({ user, handleLogout }) {
                         >
                             {tab === 'live' && '📡 Live'}
                             {tab === 'ai-analiz' && '🤖 AI Analiz'}
+                            {tab === 'bets' && '🎯 Approved Bets'}
+                            {tab === 'training' && '🧠 Training Pool'}
                             {tab === 'analiz' && '🎯 Analiz'}
                             {tab === 'history' && '📜 Geçmiş'}
                             {tab === 'ai-dataset' && '📊 AI Dataset'}
@@ -552,6 +665,197 @@ export default function AdminPanel({ user, handleLogout }) {
                                 </div>
                             ))}
                             {liveSignals.length === 0 && <div className="text-muted-foreground text-center col-span-3 py-8">No live signals matching criteria right now.</div>}
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab Content: APPROVED BETS */}
+                {activeTab === 'bets' && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold">🎯 Approved Bets</h2>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleManualSettlement}
+                                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                                >
+                                    ⚡ Run Settlement
+                                </button>
+                                <button
+                                    onClick={fetchApprovedBets}
+                                    disabled={loadingApprovedBets}
+                                    className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
+                                >
+                                    {loadingApprovedBets ? '...' : '↻ Refresh'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Stats */}
+                        {approvedBetsStats && (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold">{approvedBetsStats.total}</div>
+                                    <div className="text-sm text-muted-foreground">Total</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-yellow-500">{approvedBetsStats.pending}</div>
+                                    <div className="text-sm text-muted-foreground">Pending</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-green-500">{approvedBetsStats.won}</div>
+                                    <div className="text-sm text-muted-foreground">Won</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-red-500">{approvedBetsStats.lost}</div>
+                                    <div className="text-sm text-muted-foreground">Lost</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-blue-500">{approvedBetsStats.winRate}%</div>
+                                    <div className="text-sm text-muted-foreground">Win Rate</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Bets Table */}
+                        <div className="bg-card border rounded-lg overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted/50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left">Match</th>
+                                        <th className="px-4 py-3 text-left">Market</th>
+                                        <th className="px-4 py-3 text-center">Status</th>
+                                        <th className="px-4 py-3 text-center">Score</th>
+                                        <th className="px-4 py-3 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {approvedBets.map(bet => (
+                                        <tr key={bet.id} className="hover:bg-muted/20">
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium">{bet.match}</div>
+                                                <div className="text-xs text-muted-foreground">{bet.league} | {bet.matchTime}</div>
+                                            </td>
+                                            <td className="px-4 py-3">{bet.market}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${bet.status === 'WON' ? 'bg-green-500/20 text-green-500' :
+                                                        bet.status === 'LOST' ? 'bg-red-500/20 text-red-500' :
+                                                            'bg-yellow-500/20 text-yellow-500'
+                                                    }`}>
+                                                    {bet.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center font-mono">{bet.resultScore || '-'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                {bet.status === 'PENDING' && (
+                                                    <div className="flex gap-1 justify-center">
+                                                        <button onClick={() => handleSettleApprovedBet(bet.id, 'WON')} className="px-2 py-1 bg-green-600 text-white rounded text-xs">✓</button>
+                                                        <button onClick={() => handleSettleApprovedBet(bet.id, 'LOST')} className="px-2 py-1 bg-red-600 text-white rounded text-xs">✗</button>
+                                                    </div>
+                                                )}
+                                                <button onClick={() => handleDeleteApprovedBet(bet.id)} className="px-2 py-1 text-red-400 hover:text-red-300 text-xs">🗑</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {approvedBets.length === 0 && (
+                                        <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No approved bets yet</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab Content: TRAINING POOL */}
+                {activeTab === 'training' && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold">🧠 AI Training Pool</h2>
+                            <button
+                                onClick={fetchTrainingPool}
+                                disabled={loadingTrainingPool}
+                                className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
+                            >
+                                {loadingTrainingPool ? '...' : '↻ Refresh'}
+                            </button>
+                        </div>
+
+                        {/* Stats */}
+                        {trainingPoolStats && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold">{trainingPoolStats.total}</div>
+                                    <div className="text-sm text-muted-foreground">Total Entries</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-green-500">{trainingPoolStats.won}</div>
+                                    <div className="text-sm text-muted-foreground">Won</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-red-500">{trainingPoolStats.lost}</div>
+                                    <div className="text-sm text-muted-foreground">Lost</div>
+                                </div>
+                                <div className="bg-card p-4 rounded-lg border text-center">
+                                    <div className="text-2xl font-bold text-blue-500">{trainingPoolStats.winRate}%</div>
+                                    <div className="text-sm text-muted-foreground">Win Rate</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* By Market */}
+                        {trainingPoolStats?.byMarket && Object.keys(trainingPoolStats.byMarket).length > 0 && (
+                            <div className="bg-card border rounded-lg p-4">
+                                <h3 className="font-semibold mb-3">Performance by Market</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {Object.entries(trainingPoolStats.byMarket).map(([market, stats]) => (
+                                        <div key={market} className="bg-muted/30 p-3 rounded">
+                                            <div className="font-medium text-sm">{market}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {stats.won}/{stats.total} ({((stats.won / stats.total) * 100).toFixed(0)}%)
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Pool Table */}
+                        <div className="bg-card border rounded-lg overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted/50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left">Match</th>
+                                        <th className="px-4 py-3 text-left">Market</th>
+                                        <th className="px-4 py-3 text-center">Result</th>
+                                        <th className="px-4 py-3 text-center">Score</th>
+                                        <th className="px-4 py-3 text-center">Settled</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {trainingPool.map(entry => (
+                                        <tr key={entry.id} className="hover:bg-muted/20">
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium">{entry.match}</div>
+                                                <div className="text-xs text-muted-foreground">{entry.league}</div>
+                                            </td>
+                                            <td className="px-4 py-3">{entry.market}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${entry.result === 'WON' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
+                                                    }`}>
+                                                    {entry.result}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center font-mono">{entry.finalScore}</td>
+                                            <td className="px-4 py-3 text-center text-xs text-muted-foreground">
+                                                {new Date(entry.settledAt).toLocaleDateString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {trainingPool.length === 0 && (
+                                        <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No training data yet. Bets will appear here after settlement.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
