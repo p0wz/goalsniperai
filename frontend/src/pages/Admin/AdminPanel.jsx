@@ -52,6 +52,8 @@ export default function AdminPanel({ user, handleLogout }) {
         fetchLiveSignals();
         fetchBetHistory();
         fetchBotStatus();
+        fetchApprovedBets();
+        fetchTrainingPool();
     }, []);
 
     const fetchBotStatus = async () => {
