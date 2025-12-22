@@ -2308,24 +2308,157 @@ app.post('/api/sentio/populate', requireAuth, async (req, res) => {
     }
 });
 
-// Get SENTIO memory status
+// Get SENTIO memory status (Admin only)
 app.get('/api/sentio/memory', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
     const memory = loadSentioMemory();
     res.json({
         success: true,
         date: memory.date,
         matchCount: memory.matches?.length || 0,
+        matches: memory.matches || [],
         populatedAt: memory.populatedAt
     });
 });
 
-// PRO User: Chat with SENTIO
-app.post('/api/sentio/chat', requireAuth, async (req, res) => {
-    // Allow PRO and Admin
-    if (req.user.role === 'free') {
-        return res.status(403).json({ success: false, error: 'PRO subscription required' });
+// Admin: Approve single match for SENTIO
+app.post('/api/sentio/approve-match', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
     }
 
+    const { matchId, homeTeam, awayTeam, league, stats, aiPrompt } = req.body;
+
+    if (!matchId || !homeTeam || !awayTeam) {
+        return res.status(400).json({ success: false, error: 'matchId, homeTeam, awayTeam required' });
+    }
+
+    try {
+        const memory = loadSentioMemory();
+        const today = new Date().toISOString().split('T')[0];
+
+        // Reset if different day
+        if (memory.date !== today) {
+            memory.date = today;
+            memory.matches = [];
+        }
+
+        // Check for duplicate
+        const exists = memory.matches.some(m => m.matchId === matchId);
+        if (exists) {
+            return res.json({ success: true, message: 'Maç zaten SENTIO hafızasında', duplicate: true });
+        }
+
+        // Add match
+        memory.matches.push({
+            matchId,
+            homeTeam,
+            awayTeam,
+            league,
+            stats,
+            aiPrompt,
+            approvedAt: new Date().toISOString()
+        });
+        memory.populatedAt = new Date().toISOString();
+
+        saveSentioMemory(memory);
+        log.success(`[SENTIO] Match approved: ${homeTeam} vs ${awayTeam}`);
+
+        res.json({ success: true, message: 'Maç SENTIO hafızasına eklendi', matchCount: memory.matches.length });
+    } catch (error) {
+        log.error('[SENTIO] Approve match error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Admin: Bulk approve matches for SENTIO
+app.post('/api/sentio/approve-bulk', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { matches } = req.body;
+
+    if (!matches || !Array.isArray(matches) || matches.length === 0) {
+        return res.status(400).json({ success: false, error: 'matches array required' });
+    }
+
+    try {
+        const memory = loadSentioMemory();
+        const today = new Date().toISOString().split('T')[0];
+
+        // Reset if different day
+        if (memory.date !== today) {
+            memory.date = today;
+            memory.matches = [];
+        }
+
+        let added = 0;
+        let skipped = 0;
+
+        for (const match of matches) {
+            const exists = memory.matches.some(m => m.matchId === match.matchId);
+            if (exists) {
+                skipped++;
+                continue;
+            }
+
+            memory.matches.push({
+                matchId: match.matchId,
+                homeTeam: match.homeTeam || match.event_home_team,
+                awayTeam: match.awayTeam || match.event_away_team,
+                league: match.league || match.league_name,
+                stats: match.stats,
+                aiPrompt: match.aiPrompt,
+                approvedAt: new Date().toISOString()
+            });
+            added++;
+        }
+
+        memory.populatedAt = new Date().toISOString();
+        saveSentioMemory(memory);
+
+        log.success(`[SENTIO] Bulk approve: ${added} added, ${skipped} skipped`);
+
+        res.json({
+            success: true,
+            message: `${added} maç eklendi, ${skipped} maç zaten mevcuttu`,
+            added,
+            skipped,
+            matchCount: memory.matches.length
+        });
+    } catch (error) {
+        log.error('[SENTIO] Bulk approve error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Admin: Clear SENTIO memory
+app.delete('/api/sentio/memory', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    try {
+        const emptyMemory = {
+            date: new Date().toISOString().split('T')[0],
+            matches: [],
+            populatedAt: null
+        };
+        saveSentioMemory(emptyMemory);
+        log.info('[SENTIO] Memory cleared by admin');
+
+        res.json({ success: true, message: 'SENTIO hafızası temizlendi' });
+    } catch (error) {
+        log.error('[SENTIO] Clear memory error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// All Users: Chat with SENTIO (Free, PRO, Admin)
+app.post('/api/sentio/chat', requireAuth, async (req, res) => {
     const { message } = req.body;
     if (!message || message.trim().length === 0) {
         return res.status(400).json({ success: false, error: 'Message required' });
@@ -2333,6 +2466,15 @@ app.post('/api/sentio/chat', requireAuth, async (req, res) => {
 
     try {
         const memory = loadSentioMemory();
+
+        // Check if memory has matches
+        if (!memory.matches || memory.matches.length === 0) {
+            return res.json({
+                success: true,
+                response: '⚠️ Henüz analiz edilmiş maç bulunmuyor. Admin tarafından maçlar onaylandığında size yardımcı olabilirim!\n\nŞu anda günün maçlarını bekliyorum... 🕐'
+            });
+        }
+
         const response = await aiService.chatWithSentio(message, memory);
         res.json({ success: true, response });
     } catch (error) {

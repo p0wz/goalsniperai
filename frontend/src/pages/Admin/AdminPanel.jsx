@@ -1176,6 +1176,122 @@ ${prompt}
                     )
                 }
 
+                {/* SENTIO Management Tab */}
+                {activeTab === 'sentio' && (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold flex items-center gap-2">
+                                    🤖 SENTIO Chat Yönetimi
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Kullanıcıların sohbet edebileceği maçları yönetin
+                                </p>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const res = await sentioService.getMemoryStatus();
+                                        if (res.success) {
+                                            setSentioMemory({
+                                                date: res.date,
+                                                matchCount: res.matchCount,
+                                                matches: res.matches || [],
+                                                populatedAt: res.populatedAt
+                                            });
+                                        }
+                                    } catch (e) {
+                                        alert('Hafıza durumu alınamadı: ' + e.message);
+                                    }
+                                }}
+                                className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-500 font-medium hover:bg-cyan-500/30"
+                            >
+                                🔄 Yenile
+                            </button>
+                        </div>
+
+                        {/* Memory Status Card */}
+                        <div className="rounded-xl p-6 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-3xl shadow-lg">
+                                        🧠
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">SENTIO Hafızası</h3>
+                                        <p className="text-sm text-white/60">
+                                            {sentioMemory.date || 'Henüz yüklenmedi'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <div className="text-center">
+                                        <div className="text-3xl font-bold text-cyan-400">{sentioMemory.matchCount || 0}</div>
+                                        <div className="text-xs text-white/50">Maç Sayısı</div>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            if (!confirm('SENTIO hafızasını temizlemek istediğinizden emin misiniz?')) return;
+                                            try {
+                                                const res = await sentioService.clearMemory();
+                                                if (res.success) {
+                                                    setSentioMemory({ date: null, matchCount: 0, matches: [] });
+                                                    alert('✅ SENTIO hafızası temizlendi');
+                                                }
+                                            } catch (e) {
+                                                alert('Hata: ' + e.message);
+                                            }
+                                        }}
+                                        className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 border border-red-500/30"
+                                    >
+                                        🗑️ Hafızayı Temizle
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Match List */}
+                        {sentioMemory.matches && sentioMemory.matches.length > 0 ? (
+                            <div className="rounded-lg border bg-card overflow-hidden">
+                                <div className="p-3 bg-muted border-b">
+                                    <h3 className="font-medium">📋 Hafızadaki Maçlar</h3>
+                                </div>
+                                <div className="divide-y max-h-96 overflow-y-auto">
+                                    {sentioMemory.matches.map((m, i) => (
+                                        <div key={i} className="p-3 flex items-center justify-between hover:bg-muted/50">
+                                            <div>
+                                                <div className="font-medium">{m.homeTeam} vs {m.awayTeam}</div>
+                                                <div className="text-xs text-muted-foreground">{m.league}</div>
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {m.approvedAt ? new Date(m.approvedAt).toLocaleTimeString('tr-TR') : ''}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                                <p className="text-lg text-muted-foreground">📭 SENTIO hafızası boş</p>
+                                <p className="text-sm text-muted-foreground mt-2">
+                                    "📊 Ham Data" sekmesinden maçları SENTIO'ya gönderin.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Usage Info */}
+                        <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                            <h3 className="font-medium text-cyan-400 mb-2">💡 Nasıl Çalışır?</h3>
+                            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                                <li><strong>"📊 Ham Data"</strong> sekmesine gidin</li>
+                                <li>Maçları tarayın (Lig Filtreli veya Tüm Maçlar)</li>
+                                <li><strong>"🤖 Tümünü SENTIO'ya Gönder"</strong> butonuna tıklayın</li>
+                                <li>Kullanıcılar dashboard'da SENTIO Chat üzerinden bu maçlar hakkında sohbet edebilir</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
                 {/* Raw Stats Tab */}
                 {activeTab === 'raw-stats' && (
                     <RawStatsTab />

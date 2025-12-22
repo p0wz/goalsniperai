@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { signalService } from './services/api';
+import { signalService, sentioService } from './services/api';
 import clsx from 'clsx';
 
 function RawStatsTab() {
@@ -7,11 +7,15 @@ function RawStatsTab() {
     const [loading, setLoading] = useState(false);
     const [copiedId, setCopiedId] = useState(null);
     const [allCopied, setAllCopied] = useState(false);
+    const [sentioApprovedId, setSentioApprovedId] = useState(null);
+    const [sentioAllApproved, setSentioAllApproved] = useState(false);
+    const [sentioLoading, setSentioLoading] = useState(false);
 
     const runAnalysis = async (leagueFilter) => {
         setLoading(true);
         setMatches([]);
         setAllCopied(false);
+        setSentioAllApproved(false);
         try {
             const res = await signalService.getRawStats(leagueFilter, 50);
             if (res.success) {
@@ -46,6 +50,53 @@ function RawStatsTab() {
         setTimeout(() => setAllCopied(false), 3000);
     };
 
+    // SENTIO: Approve single match
+    const approveForSentio = async (match) => {
+        try {
+            const res = await sentioService.approveMatch({
+                matchId: match.matchId || match.id,
+                homeTeam: match.event_home_team,
+                awayTeam: match.event_away_team,
+                league: match.league_name,
+                stats: match.stats,
+                aiPrompt: match.aiPrompt
+            });
+            if (res.success) {
+                setSentioApprovedId(match.id);
+                setTimeout(() => setSentioApprovedId(null), 2000);
+            }
+        } catch (err) {
+            alert(`SENTIO onay hatası: ${err.message}`);
+        }
+    };
+
+    // SENTIO: Approve all matches
+    const approveAllForSentio = async () => {
+        if (matches.length === 0) return;
+        setSentioLoading(true);
+
+        try {
+            const formattedMatches = matches.map(m => ({
+                matchId: m.matchId || m.id,
+                homeTeam: m.event_home_team,
+                awayTeam: m.event_away_team,
+                league: m.league_name,
+                stats: m.stats,
+                aiPrompt: m.aiPrompt
+            }));
+
+            const res = await sentioService.approveBulk(formattedMatches);
+            if (res.success) {
+                setSentioAllApproved(true);
+                alert(`✅ ${res.added} maç SENTIO'ya eklendi${res.skipped > 0 ? `, ${res.skipped} zaten mevcuttu` : ''}`);
+            }
+        } catch (err) {
+            alert(`SENTIO toplu onay hatası: ${err.message}`);
+        } finally {
+            setSentioLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -78,9 +129,10 @@ function RawStatsTab() {
                 </button>
             </div>
 
-            {/* Copy All Button */}
+            {/* Action Buttons Row */}
             {matches.length > 0 && (
-                <div className="flex justify-center">
+                <div className="flex justify-center gap-4 flex-wrap">
+                    {/* Copy All */}
                     <button
                         onClick={copyAllPrompts}
                         className={clsx(
@@ -93,6 +145,25 @@ function RawStatsTab() {
                         {allCopied
                             ? `✅ ${matches.length} Maç Kopyalandı!`
                             : `📋 Tümünü Kopyala (${matches.length} Maç)`
+                        }
+                    </button>
+
+                    {/* SENTIO Approve All */}
+                    <button
+                        onClick={approveAllForSentio}
+                        disabled={sentioLoading || sentioAllApproved}
+                        className={clsx(
+                            "px-6 py-3 rounded-lg text-lg font-bold transition-all shadow-lg",
+                            sentioAllApproved
+                                ? "bg-green-500 text-white"
+                                : "bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-xl hover:scale-105 disabled:opacity-50"
+                        )}
+                    >
+                        {sentioLoading
+                            ? '⏳ Gönderiliyor...'
+                            : sentioAllApproved
+                                ? `✅ SENTIO'ya Gönderildi!`
+                                : `🤖 Tümünü SENTIO'ya Gönder`
                         }
                     </button>
                 </div>
@@ -108,7 +179,7 @@ function RawStatsTab() {
                                 <th className="p-3 text-left">Lig</th>
                                 <th className="p-3 text-center">Ev Formu</th>
                                 <th className="p-3 text-center">Dep Formu</th>
-                                <th className="p-3 text-center">AI Prompt</th>
+                                <th className="p-3 text-center">İşlemler</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -141,17 +212,30 @@ function RawStatsTab() {
                                         </div>
                                     </td>
                                     <td className="p-3 text-center">
-                                        <button
-                                            onClick={() => copyPrompt(m)}
-                                            className={clsx(
-                                                "px-4 py-2 rounded text-sm font-medium transition-all",
-                                                copiedId === m.id
-                                                    ? "bg-green-500 text-white"
-                                                    : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg"
-                                            )}
-                                        >
-                                            {copiedId === m.id ? '✓ Kopyalandı!' : '📋 Kopyala'}
-                                        </button>
+                                        <div className="flex gap-2 justify-center flex-wrap">
+                                            <button
+                                                onClick={() => copyPrompt(m)}
+                                                className={clsx(
+                                                    "px-3 py-1.5 rounded text-xs font-medium transition-all",
+                                                    copiedId === m.id
+                                                        ? "bg-green-500 text-white"
+                                                        : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg"
+                                                )}
+                                            >
+                                                {copiedId === m.id ? '✓' : '📋'}
+                                            </button>
+                                            <button
+                                                onClick={() => approveForSentio(m)}
+                                                className={clsx(
+                                                    "px-3 py-1.5 rounded text-xs font-medium transition-all",
+                                                    sentioApprovedId === m.id
+                                                        ? "bg-green-500 text-white"
+                                                        : "bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-lg"
+                                                )}
+                                            >
+                                                {sentioApprovedId === m.id ? '✓' : '🤖'}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -172,12 +256,12 @@ function RawStatsTab() {
 
             {/* Info Card */}
             {matches.length > 0 && (
-                <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                    <h3 className="font-medium text-purple-400 mb-2">💡 Kullanım</h3>
+                <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                    <h3 className="font-medium text-cyan-400 mb-2">💡 SENTIO Kullanımı</h3>
                     <p className="text-sm text-muted-foreground">
-                        <strong>"📋 Tümünü Kopyala"</strong> butonuyla tüm maçların istatistiklerini tek seferde kopyalayın.
-                        <strong>"📋 Kopyala"</strong> butonuyla tek bir maçın prompt'unu kopyalayın.
-                        Bu prompt'ları ChatGPT, Claude veya başka bir AI ile kullanarak maç analizi yaptırabilirsiniz.
+                        <strong>"🤖 Tümünü SENTIO'ya Gönder"</strong> butonuyla tüm maçları SENTIO hafızasına ekleyin.<br />
+                        Kullanıcılar dashboard'da SENTIO Chat ile bu maçlar hakkında sohbet edebilir,
+                        tahmin ve kupon önerileri alabilir.
                     </p>
                 </div>
             )}
@@ -186,4 +270,3 @@ function RawStatsTab() {
 }
 
 export { RawStatsTab };
-

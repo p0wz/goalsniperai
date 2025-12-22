@@ -204,6 +204,21 @@ export const sentioService = {
     chat: async (message) => {
         const response = await api.post('/sentio/chat', { message });
         return response.data;
+    },
+    // Admin: Approve single match
+    approveMatch: async (matchData) => {
+        const response = await api.post('/sentio/approve-match', matchData);
+        return response.data;
+    },
+    // Admin: Approve multiple matches
+    approveBulk: async (matches) => {
+        const response = await api.post('/sentio/approve-bulk', { matches });
+        return response.data;
+    },
+    // Admin: Clear memory
+    clearMemory: async () => {
+        const response = await api.delete('/sentio/memory');
+        return response.data;
     }
 };
 
