@@ -1311,5 +1311,190 @@ async function runAIAutomatedAnalysis(leagueFilter = true, log = console) {
     return { candidates: aiCandidates, coupons };
 }
 
-module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, MARKET_MAP };
+// ============================================
+// 📊 RAW STATS COLLECTION (No Market Filtering)
+// ============================================
+async function runRawStatsCollection(leagueFilter = true, log = console, customLimit = 50) {
+    const startTime = Date.now();
+
+    log.info(`\n╔═══════════════════════════════════════════════════════╗`);
+    log.info(`║      📊 RAW STATS COLLECTION                         ║`);
+    log.info(`║      League Filter: ${leagueFilter ? 'ON' : 'OFF'}                              ║`);
+    log.info(`╚═══════════════════════════════════════════════════════╝`);
+
+    // 1. Fetch Matches
+    log.info('[RawStats] Fetching matches...');
+    const ignoreLeagues = !leagueFilter;
+    let matches = await fetchDay(1, log, ignoreLeagues);
+
+    if (matches.length === 0) {
+        log.warn('[RawStats] No matches found.');
+        return { matches: [] };
+    }
+
+    log.info(`✅ Found ${matches.length} matches. Processing top ${customLimit}...`);
+
+    const results = [];
+    let processed = 0;
+    let consecutiveErrors = 0;
+
+    for (const m of matches) {
+        if (processed >= customLimit) break;
+        if (consecutiveErrors >= 3) break;
+
+        const mid = m.event_key || m.match_id;
+        if (!mid) continue;
+
+        log.info(`\n[${processed + 1}/${customLimit}] ${m.event_home_team} vs ${m.event_away_team}`);
+
+        await sleep(800);
+
+        const h2hData = await fetchMatchH2H(mid);
+        if (!h2hData) {
+            consecutiveErrors++;
+            log.warn(`   ❌ H2H fetch failed`);
+            continue;
+        }
+
+        const sections = Array.isArray(h2hData) ? h2hData : (h2hData.DATA || []);
+
+        // Filter History
+        const homeRawHistory = sections.filter(x => (x.home_team?.name === m.event_home_team) || (x.away_team?.name === m.event_home_team));
+        const awayRawHistory = sections.filter(x => (x.home_team?.name === m.event_away_team) || (x.away_team?.name === m.event_away_team));
+        const homeAllHistory = homeRawHistory.slice(0, 5);
+        const awayAllHistory = awayRawHistory.slice(0, 5);
+        const homeAtHomeHistory = sections.filter(x => x.home_team?.name === m.event_home_team).slice(0, 8);
+        const awayAtAwayHistory = sections.filter(x => x.away_team?.name === m.event_away_team).slice(0, 8);
+        const mutualH2H = sections.filter(x =>
+            (x.home_team?.name === m.event_home_team && x.away_team?.name === m.event_away_team) ||
+            (x.home_team?.name === m.event_away_team && x.away_team?.name === m.event_home_team)
+        ).slice(0, 5);
+
+        const homeForm = calculateAdvancedStats(homeAllHistory, m.event_home_team);
+        const awayForm = calculateAdvancedStats(awayAllHistory, m.event_away_team);
+        const homeHomeStats = calculateAdvancedStats(homeAtHomeHistory, m.event_home_team);
+        const awayAwayStats = calculateAdvancedStats(awayAtAwayHistory, m.event_away_team);
+
+        if (!homeForm || !awayForm || !homeHomeStats || !awayAwayStats) {
+            log.warn(`   ❌ Insufficient stats`);
+            consecutiveErrors = 0;
+            continue;
+        }
+
+        consecutiveErrors = 0;
+        processed++;
+
+        const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
+
+        // Generate comprehensive AI prompt with ALL stats
+        const aiPrompt = generateRawStatsPrompt(m, stats, mutualH2H);
+
+        results.push({
+            id: mid,
+            matchId: mid,
+            match: `${m.event_home_team} vs ${m.event_away_team}`,
+            event_home_team: m.event_home_team,
+            event_away_team: m.event_away_team,
+            league: m.league_name,
+            league_name: m.league_name,
+            startTime: m.event_start_time,
+            stats: stats,
+            aiPrompt: aiPrompt
+        });
+
+        log.info(`   ✅ Stats collected`);
+    }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    log.info(`\n✅ Raw Stats Collection Complete: ${results.length} matches in ${duration}s`);
+
+    return { matches: results };
+}
+
+// Helper: Generate Comprehensive AI Prompt with ALL Stats
+function generateRawStatsPrompt(match, stats, mutualH2H) {
+    const { homeForm, awayForm, homeHomeStats, awayAwayStats } = stats;
+
+    // Format H2H games
+    const h2hGames = mutualH2H.map(g => {
+        const date = g.timestamp ? new Date(g.timestamp * 1000).toLocaleDateString('tr-TR') : 'N/A';
+        return `   - ${g.home_team?.name} ${g.home_team?.score}-${g.away_team?.score} ${g.away_team?.name} (${date})`;
+    }).join('\n') || '   - Karşılıklı maç bulunamadı';
+
+    return `SEN PROFESİYONEL BİR FUTBOL ANALİSTİSİN. AŞAĞIDAKİ İSTATİSTİKLERE DAYANARAK BU MAÇ İÇİN EN İYİ BAHİS TAHMİNİNİ YAP.
+
+═══════════════════════════════════════════════════════
+📊 MAÇ: ${match.event_home_team} vs ${match.event_away_team}
+📍 LİG: ${match.league_name}
+═══════════════════════════════════════════════════════
+
+🏠 EV SAHİBİ: ${match.event_home_team}
+────────────────────────────────────────────
+GENEL FORM (Son 5 Maç):
+  • Maç Sayısı: ${homeForm.matches}
+  • Ort. Attığı Gol: ${homeForm.avgScored.toFixed(2)}
+  • Ort. Yediği Gol: ${homeForm.avgConceded.toFixed(2)}
+  • Ort. Toplam Gol: ${homeForm.avgTotalGoals.toFixed(2)}
+  • Kazanma Oranı: %${homeForm.winRate.toFixed(0)}
+  • Mağlubiyet Sayısı: ${homeForm.lossCount}
+  • Gol Atma Oranı: %${homeForm.scoringRate.toFixed(0)}
+  • Clean Sheet: %${homeForm.cleanSheetRate.toFixed(0)}
+  • Over 1.5 Maç Oranı: %${homeForm.over15Rate.toFixed(0)}
+  • Over 2.5 Maç Oranı: %${homeForm.over25Rate.toFixed(0)}
+  • Under 2.5 Maç Oranı: %${homeForm.under25Rate.toFixed(0)}
+  • Under 3.5 Maç Oranı: %${homeForm.under35Rate.toFixed(0)}
+  • BTTS Maç Oranı: %${homeForm.bttsRate.toFixed(0)}
+
+EVİNDE PERFORMANSI (Son 8 Ev Maçı):
+  • Maç Sayısı: ${homeHomeStats.matches}
+  • Ort. Attığı Gol: ${homeHomeStats.avgScored.toFixed(2)}
+  • Ort. Yediği Gol: ${homeHomeStats.avgConceded.toFixed(2)}
+  • Kazanma Oranı: %${homeHomeStats.winRate.toFixed(0)}
+  • Gol Atma Oranı: %${homeHomeStats.scoringRate.toFixed(0)}
+  • Clean Sheet: %${homeHomeStats.cleanSheetRate.toFixed(0)}
+  • Over 2.5 Maç Oranı: %${homeHomeStats.over25Rate.toFixed(0)}
+  • BTTS Maç Oranı: %${homeHomeStats.bttsRate.toFixed(0)}
+
+🚌 DEPLASMAN: ${match.event_away_team}
+────────────────────────────────────────────
+GENEL FORM (Son 5 Maç):
+  • Maç Sayısı: ${awayForm.matches}
+  • Ort. Attığı Gol: ${awayForm.avgScored.toFixed(2)}
+  • Ort. Yediği Gol: ${awayForm.avgConceded.toFixed(2)}
+  • Ort. Toplam Gol: ${awayForm.avgTotalGoals.toFixed(2)}
+  • Kazanma Oranı: %${awayForm.winRate.toFixed(0)}
+  • Mağlubiyet Sayısı: ${awayForm.lossCount}
+  • Gol Atma Oranı: %${awayForm.scoringRate.toFixed(0)}
+  • Clean Sheet: %${awayForm.cleanSheetRate.toFixed(0)}
+  • Over 1.5 Maç Oranı: %${awayForm.over15Rate.toFixed(0)}
+  • Over 2.5 Maç Oranı: %${awayForm.over25Rate.toFixed(0)}
+  • Under 2.5 Maç Oranı: %${awayForm.under25Rate.toFixed(0)}
+  • Under 3.5 Maç Oranı: %${awayForm.under35Rate.toFixed(0)}
+  • BTTS Maç Oranı: %${awayForm.bttsRate.toFixed(0)}
+
+DEPLASMANDA PERFORMANSI (Son 8 Deplasman Maçı):
+  • Maç Sayısı: ${awayAwayStats.matches}
+  • Ort. Attığı Gol: ${awayAwayStats.avgScored.toFixed(2)}
+  • Ort. Yediği Gol: ${awayAwayStats.avgConceded.toFixed(2)}
+  • Kazanma Oranı: %${awayAwayStats.winRate.toFixed(0)}
+  • Gol Atma Oranı: %${awayAwayStats.scoringRate.toFixed(0)}
+  • Clean Sheet: %${awayAwayStats.cleanSheetRate.toFixed(0)}
+  • Over 2.5 Maç Oranı: %${awayAwayStats.over25Rate.toFixed(0)}
+  • BTTS Maç Oranı: %${awayAwayStats.bttsRate.toFixed(0)}
+
+⚔️ KARŞILIKLI GEÇMİŞ (Son 5 Maç)
+────────────────────────────────────────────
+${h2hGames}
+
+═══════════════════════════════════════════════════════
+🎯 GÖREV: Yukarıdaki tüm istatistikleri analiz et ve bu maç için:
+1. En güvenli bahis marketini belirle (Maç Sonucu, Over/Under, BTTS, Handikap vb.)
+2. Tahminin güven skorunu belirt (%0-100)
+3. Kısa ve net gerekçeni yaz
+
+ÖNEMLİ: Sadece istatistiksel verilere dayan, duygusal yorum yapma.
+═══════════════════════════════════════════════════════`;
+}
+
+module.exports = { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection, MARKET_MAP };
 

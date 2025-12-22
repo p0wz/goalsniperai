@@ -27,7 +27,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const picksRoutes = require('./routes/picks');
-const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, MARKET_MAP } = require('./dailyAnalyst');
+const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection, MARKET_MAP } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
@@ -1946,6 +1946,26 @@ app.get('/api/analysis/:market', optionalAuth, async (req, res) => {
     } catch (error) {
         log.error(`Single Market Analysis Failed (${market}):`, error);
         res.status(500).json({ success: false, error: 'Analysis failed' });
+    }
+});
+
+// ============================================
+// 📊 Raw Stats Collection Endpoint (No Market Filtering)
+// ----------------------------------------------------------------------
+// Returns all matches with H2H stats and comprehensive AI prompt
+// Query params: leagueFilter=true|false (default: true)
+app.get('/api/analysis/raw-stats', optionalAuth, async (req, res) => {
+    const leagueFilter = req.query.leagueFilter !== 'false'; // Default true
+    const limit = parseInt(req.query.limit) || 50;
+
+    log.info(`🚀 API Request: Raw Stats Collection (LeagueFilter: ${leagueFilter}, Limit: ${limit})`);
+
+    try {
+        const results = await runRawStatsCollection(leagueFilter, log, limit);
+        res.json({ success: true, data: results });
+    } catch (error) {
+        log.error('Raw Stats Collection Failed:', error);
+        res.status(500).json({ success: false, error: 'Raw stats collection failed' });
     }
 });
 

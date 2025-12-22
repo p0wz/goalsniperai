@@ -105,6 +105,11 @@ export const signalService = {
     rejectSignal: async (id) => {
         const response = await api.post(`/daily-analysis/reject/${id}`);
         return response.data;
+    },
+    // New: Raw Stats Collection (No Market Filtering)
+    getRawStats: async (leagueFilter = true, limit = 50) => {
+        const response = await api.get(`/analysis/raw-stats?leagueFilter=${leagueFilter}&limit=${limit}`);
+        return response.data;
     }
 };
 

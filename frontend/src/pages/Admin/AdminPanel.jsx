@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { signalService, betService, adminService, picksService, trainingService, sentioService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
+import { RawStatsTab } from '../../RawStatsTab';
 import clsx from 'clsx';
 import NeuButton from '../../components/ui/NeuButton';
 
@@ -469,7 +470,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'ai-analiz', 'sentio', 'ai-dataset', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'ai-analiz', 'sentio', 'ai-dataset', 'raw-stats', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -486,6 +487,7 @@ export default function AdminPanel({ user, handleLogout }) {
                             {tab === 'history' && '📜 Geçmiş'}
                             {tab === 'ai-dataset' && '📊 AI Dataset'}
                             {tab === 'sentio' && '💬 SENTIO'}
+                            {tab === 'raw-stats' && '📊 Ham Data'}
                             {tab === 'picks' && '⭐ Yönetin'}
                             {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
                         </button>
@@ -1173,6 +1175,11 @@ ${prompt}
                         </div>
                     )
                 }
+
+                {/* Raw Stats Tab */}
+                {activeTab === 'raw-stats' && (
+                    <RawStatsTab />
+                )}
 
                 {/* Market Tabs (Legacy/Other) */}
                 {
