@@ -31,6 +31,11 @@ const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutoma
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
+// New Bet Tracking System
+const approvedBets = require('./approvedBets');
+const trainingPool = require('./trainingPool');
+const autoSettlement = require('./autoSettlement');
+
 const app = express();
 
 // Security middleware
@@ -3048,6 +3053,87 @@ app.post('/api/payments/reject/:id', requireAuth, (req, res) => {
     log.warn(`[Payment] Rejected: ${payment.userEmail} - ${reason}`);
 
     res.json({ success: true, payment });
+});
+
+// ============================================
+// 🎯 Approved Bets Endpoints (New System)
+// ============================================
+const approvedBets = require('./approvedBets');
+
+// Approve a bet from daily analysis
+app.post('/api/bets/approve', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    try {
+        const result = approvedBets.approveBet(req.body);
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Get all approved bets
+app.get('/api/bets', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const bets = approvedBets.getAllBets();
+    const stats = approvedBets.getStats();
+    res.json({ success: true, bets, stats });
+});
+
+// Get pending bets only
+app.get('/api/bets/pending', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const bets = approvedBets.getPendingBets();
+    res.json({ success: true, bets });
+});
+
+// Get bet stats
+app.get('/api/bets/stats', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const stats = approvedBets.getStats();
+    res.json({ success: true, stats });
+});
+
+// Settle a bet manually
+app.post('/api/bets/:id/settle', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { status, score } = req.body;
+    const result = approvedBets.settleBet(req.params.id, status, score);
+    res.json(result);
+});
+
+// Delete a bet
+app.delete('/api/bets/:id', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const result = approvedBets.deleteBet(req.params.id);
+    res.json(result);
+});
+
+// Clear all bets
+app.delete('/api/bets', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const result = approvedBets.clearAllBets();
+    res.json(result);
 });
 
 // ============================================
