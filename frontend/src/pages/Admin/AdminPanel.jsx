@@ -201,7 +201,6 @@ export default function AdminPanel({ user, handleLogout }) {
         }
     };
 
-
     const handleRunDaily = async (leagueFilter = true) => {
         try {
             setIsAnalysing(true);
@@ -318,39 +317,50 @@ export default function AdminPanel({ user, handleLogout }) {
     };
 
     const handleApproveAICandidate = async (candidate) => {
-        // Add to Daily Picks/History
+        // Approve to NEW bet tracking system for auto-settlement
         try {
-            // Use approveSignal to trigger betTracker.recordBet (Add to History JSON)
-            // Note: candidate.id is now composite (matchId_market), so we use candidate.matchId for the actual ID.
-            const res = await signalService.approveSignal(candidate.matchId || candidate.id, {
-                matchData: {
-                    matchId: candidate.matchId || candidate.id,
-                    home_team: candidate.home_team || candidate.event_home_team,
-                    away_team: candidate.away_team || candidate.event_away_team,
-                    startTime: candidate.startTime
-                },
-                market: candidate.ai.market,
-                category: 'AI_BANKER',
-                confidence: candidate.ai.confidence || 85
-            });
+            const betData = {
+                match: candidate.match || `${candidate.home_team || candidate.event_home_team} vs ${candidate.away_team || candidate.event_away_team}`,
+                homeTeam: candidate.home_team || candidate.event_home_team || candidate.match?.split(' vs ')[0],
+                awayTeam: candidate.away_team || candidate.event_away_team || candidate.match?.split(' vs ')[1],
+                league: candidate.league,
+                matchDate: candidate.matchDate || candidate.startTime?.split('T')[0] || new Date().toISOString().split('T')[0],
+                matchTime: candidate.matchTime || candidate.startTime?.split('T')[1]?.slice(0, 5) || '15:00',
+                eventId: candidate.eventId || candidate.matchId || candidate.id,
+                market: candidate.ai?.market || candidate.market,
+                prediction: candidate.ai?.market || candidate.market,
+                odds: candidate.ai?.estimated_odds || 1.50,
+                confidence: candidate.ai?.confidence || 85,
+                stats: candidate.filterStats || {},
+                aiPrompt: candidate.aiPrompt || null,
+                aiReason: candidate.ai?.reason || null
+            };
+
+            // 1. Save to new approved bets system (for auto-settlement)
+            const res = await betsService.approve(betData);
 
             if (res.success) {
-                // Also record to AI Training Dataset with full stats
+                // 2. Also record to AI Training Dataset
                 await trainingService.record({
                     matchId: candidate.matchId || candidate.id,
-                    match: candidate.match || `${candidate.home_team || candidate.event_home_team} vs ${candidate.away_team || candidate.event_away_team}`,
-                    homeTeam: candidate.home_team || candidate.event_home_team,
-                    awayTeam: candidate.away_team || candidate.event_away_team,
+                    match: betData.match,
+                    homeTeam: betData.homeTeam,
+                    awayTeam: betData.awayTeam,
                     league: candidate.league,
                     startTime: candidate.startTime,
-                    market: candidate.ai.market,
-                    prediction: candidate.ai.market,
-                    odds: candidate.ai.estimated_odds || 1.50,
+                    market: betData.market,
+                    prediction: betData.market,
+                    odds: betData.odds,
                     features: candidate.filterStats || {}
                 });
 
                 // Remove from list
                 setAiCandidates(prev => prev.filter(p => p.id !== candidate.id));
+
+                // Refresh approved bets
+                fetchApprovedBets();
+
+                alert(`✅ Bahis onaylandı!\n${betData.match} - ${betData.market}`);
             } else {
                 alert("Hata: " + res.error);
             }
@@ -739,8 +749,8 @@ export default function AdminPanel({ user, handleLogout }) {
                                             <td className="px-4 py-3">{bet.market}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`px-2 py-1 rounded text-xs font-bold ${bet.status === 'WON' ? 'bg-green-500/20 text-green-500' :
-                                                        bet.status === 'LOST' ? 'bg-red-500/20 text-red-500' :
-                                                            'bg-yellow-500/20 text-yellow-500'
+                                                    bet.status === 'LOST' ? 'bg-red-500/20 text-red-500' :
+                                                        'bg-yellow-500/20 text-yellow-500'
                                                     }`}>
                                                     {bet.status}
                                                 </span>
