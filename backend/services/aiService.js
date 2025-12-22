@@ -262,38 +262,47 @@ OUTPUT JSON ONLY:
      */
     async chatWithSentio(userMessage, memory) {
         if (!memory || !memory.matches || memory.matches.length === 0) {
-            return "Henüz analiz yapılmamış. Lütfen admin'e danışın.";
+            return "Henüz analiz yapılmamış. Admin tarafından maçlar onaylandığında size yardımcı olabilirim.";
         }
 
-        const matchContext = memory.matches.map((m, i) =>
-            `${i + 1}. ${m.home} vs ${m.away} (${m.league}, ${m.time})
-   - Ev Galibiyet: ${m.stats?.homeWinRate || '?'}%, Ev Ort. Gol: ${m.stats?.homeAvgScored || '?'}
-   - Dep. Mağlubiyet: ${m.stats?.awayLossRate || '?'}%, Dep. Ort. Yenilen: ${m.stats?.awayAvgConceded || '?'}
-   - +1.5 Gol: ${m.stats?.over15Rate || '?'}%, +2.5 Gol: ${m.stats?.over25Rate || '?'}%`
-        ).join('\n');
+        // Build context from all matches with their stats
+        const matchContext = memory.matches.map((m, i) => {
+            // Use the pre-generated aiPrompt if available
+            if (m.aiPrompt) {
+                return `--- MAÇ ${i + 1} ---\n${m.aiPrompt}`;
+            }
+            // Fallback to basic info
+            return `${i + 1}. ${m.homeTeam || m.home} vs ${m.awayTeam || m.away} (${m.league})`;
+        }).join('\n\n');
 
         const prompt = `Sen SENTIO'sun - profesyonel bir futbol analisti ve bahis danışmanı.
-Dil: Türkçe cevap ver.
+Karakterin: Samimi, güvenilir ve analitik. Kullanıcıyla Türkçe konuş.
 
-BUGÜNÜN MAÇLARI (${memory.date}):
+📅 BUGÜNÜN MAÇLARI VE İSTATİSTİKLERİ (${memory.date || new Date().toLocaleDateString('tr-TR')}):
 ${matchContext}
 
-KULLANICI SORUSU: "${userMessage}"
+💬 KULLANICI SORUSU: "${userMessage}"
 
-GÖREV:
-1. Yukarıdaki istatistiklere dayanarak kullanıcının sorusunu cevapla.
-2. Tavsiyelerin net ve gerekçeli olsun.
-3. Eğer "banko" veya "güvenli" maç soruluyorsa, istatistikleri analiz et ve en güçlü 2-3 seçeneği sun.
-4. Oran tahmini yapma, sadece istatistik analizi yap.
+🎯 GÖREV:
+1. Yukarıdaki maç verilerine dayanarak kullanıcının sorusunu cevapla.
+2. Somut maç önerileri ver - takım isimlerini belirt.
+3. Neden bu maçları önerdiğini kısaca açıkla (istatistiklere referans ver).
+4. "Banko" veya "güvenli" soruluyorsa, istatistikleri analiz edip en güçlü 2-3 seçeneği sun.
+5. Kupon isterse, maçları ve tahminleri listele.
 
-CEVAP (Türkçe, samimi ve profesyonel):`;
+⚠️ KURALLAR:
+- Kesin sonuç garantisi verme, sadece analiz yap.
+- Yanıtın özlü ve net olsun (max 300 kelime).
+- Emoji kullanarak okunabilirliği artır.
+
+CEVAP:`;
 
         try {
             const response = await this._callLLM(prompt, 'sentio');
             return response;
         } catch (e) {
             console.error("SENTIO Chat Error:", e);
-            return "Üzgünüm, şu anda cevap veremiyorum. Lütfen daha sonra tekrar deneyin.";
+            return "Üzgünüm, şu anda bir teknik sorun yaşanıyor. Lütfen birkaç dakika sonra tekrar deneyin. 🔧";
         }
     }
 };
