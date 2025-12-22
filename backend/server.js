@@ -1922,6 +1922,27 @@ app.delete('/api/bet-history/:id', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// 📊 Raw Stats Collection Endpoint (No Market Filtering)
+// ----------------------------------------------------------------------
+// Returns all matches with H2H stats and comprehensive AI prompt
+// Query params: leagueFilter=true|false (default: true)
+// IMPORTANT: This route MUST be defined BEFORE /api/analysis/:market
+app.get('/api/analysis/raw-stats', optionalAuth, async (req, res) => {
+    const leagueFilter = req.query.leagueFilter !== 'false'; // Default true
+    const limit = parseInt(req.query.limit) || 50;
+
+    log.info(`🚀 API Request: Raw Stats Collection (LeagueFilter: ${leagueFilter}, Limit: ${limit})`);
+
+    try {
+        const results = await runRawStatsCollection(leagueFilter, log, limit);
+        res.json({ success: true, data: results });
+    } catch (error) {
+        log.error('Raw Stats Collection Failed:', error);
+        res.status(500).json({ success: false, error: 'Raw stats collection failed' });
+    }
+});
+
+// ============================================
 // 📈 Single Market Analysis Endpoint (New Modular API)
 // ----------------------------------------------------------------------
 // Supports: over25, btts, doubleChance, homeOver15, under35, under25, firstHalfOver05
@@ -1946,26 +1967,6 @@ app.get('/api/analysis/:market', optionalAuth, async (req, res) => {
     } catch (error) {
         log.error(`Single Market Analysis Failed (${market}):`, error);
         res.status(500).json({ success: false, error: 'Analysis failed' });
-    }
-});
-
-// ============================================
-// 📊 Raw Stats Collection Endpoint (No Market Filtering)
-// ----------------------------------------------------------------------
-// Returns all matches with H2H stats and comprehensive AI prompt
-// Query params: leagueFilter=true|false (default: true)
-app.get('/api/analysis/raw-stats', optionalAuth, async (req, res) => {
-    const leagueFilter = req.query.leagueFilter !== 'false'; // Default true
-    const limit = parseInt(req.query.limit) || 50;
-
-    log.info(`🚀 API Request: Raw Stats Collection (LeagueFilter: ${leagueFilter}, Limit: ${limit})`);
-
-    try {
-        const results = await runRawStatsCollection(leagueFilter, log, limit);
-        res.json({ success: true, data: results });
-    } catch (error) {
-        log.error('Raw Stats Collection Failed:', error);
-        res.status(500).json({ success: false, error: 'Raw stats collection failed' });
     }
 });
 
