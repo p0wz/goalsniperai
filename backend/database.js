@@ -92,6 +92,31 @@ async function initDatabase() {
             )
         `);
 
+        // Approved Bets table for auto-settlement tracking
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS approved_bets (
+                id TEXT PRIMARY KEY,
+                match TEXT NOT NULL,
+                home_team TEXT,
+                away_team TEXT,
+                league TEXT,
+                match_date TEXT,
+                match_time TEXT,
+                event_id TEXT,
+                market TEXT NOT NULL,
+                prediction TEXT,
+                odds REAL,
+                confidence INTEGER,
+                stats TEXT,
+                ai_prompt TEXT,
+                ai_reason TEXT,
+                status TEXT DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'WON', 'LOST')),
+                result_score TEXT,
+                approved_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                settled_at TEXT
+            )
+        `);
+
         // Create Admin
         await createAdminUser();
 

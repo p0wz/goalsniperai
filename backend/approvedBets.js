@@ -1,202 +1,266 @@
 /**
- * Approved Bets Storage Module
- * Simple JSON-based storage for admin-approved bets from Daily Analysis
+ * Approved Bets Storage Module - Turso/LibSQL Version
+ * Persistent database storage for admin-approved bets
  */
 
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 const { v4: uuidv4 } = require('uuid');
 
-const BETS_FILE = path.join(__dirname, 'data', 'approved_bets.json');
-
-// ============================================
-// 📁 Storage Functions
-// ============================================
-
-function loadBets() {
-    try {
-        if (fs.existsSync(BETS_FILE)) {
-            const data = fs.readFileSync(BETS_FILE, 'utf-8');
-            return JSON.parse(data);
-        }
-    } catch (e) {
-        console.error('[ApprovedBets] Load error:', e.message);
-    }
-    return { bets: [] };
+// Config - Use same Turso connection
+let url = process.env.TURSO_DATABASE_URL || 'file:local.db';
+if (url.startsWith('libsql://')) {
+    url = url.replace('libsql://', 'https://');
 }
 
-function saveBets(data) {
-    try {
-        // Ensure data directory exists
-        const dir = path.dirname(BETS_FILE);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        fs.writeFileSync(BETS_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {
-        console.error('[ApprovedBets] Save error:', e.message);
-    }
-}
+const authToken = process.env.TURSO_AUTH_TOKEN;
+
+const db = createClient({
+    url,
+    authToken,
+});
 
 // ============================================
 // 📝 Approve Bet (from Daily Analysis)
 // ============================================
 
-function approveBet(betData) {
-    const db = loadBets();
+async function approveBet(betData) {
+    try {
+        // Check for duplicate (same match + market + pending)
+        const existing = await db.execute({
+            sql: `SELECT id FROM approved_bets WHERE match = ? AND market = ? AND status = 'PENDING'`,
+            args: [betData.match, betData.market]
+        });
 
-    // Check for duplicate (same match + market)
-    const exists = db.bets.some(b =>
-        b.match === betData.match &&
-        b.market === betData.market &&
-        b.status === 'PENDING'
-    );
+        if (existing.rows.length > 0) {
+            return { success: false, error: 'Bet already exists', duplicate: true };
+        }
 
-    if (exists) {
-        return { success: false, error: 'Bet already exists', duplicate: true };
+        const id = uuidv4();
+        const now = new Date().toISOString();
+
+        await db.execute({
+            sql: `INSERT INTO approved_bets (
+                id, match, home_team, away_team, league, match_date, match_time,
+                event_id, market, prediction, odds, confidence, stats,
+                ai_prompt, ai_reason, status, approved_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
+            args: [
+                id,
+                betData.match,
+                betData.homeTeam || null,
+                betData.awayTeam || null,
+                betData.league || null,
+                betData.matchDate || null,
+                betData.matchTime || null,
+                betData.eventId || null,
+                betData.market,
+                betData.prediction || null,
+                betData.odds || null,
+                betData.confidence || null,
+                betData.stats ? JSON.stringify(betData.stats) : null,
+                betData.aiPrompt || null,
+                betData.aiReason || null,
+                now
+            ]
+        });
+
+        console.log(`[ApprovedBets] ✅ Approved: ${betData.match} - ${betData.market}`);
+        return { success: true, bet: { id, ...betData, status: 'PENDING', approvedAt: now } };
+    } catch (e) {
+        console.error('[ApprovedBets] Error:', e.message);
+        return { success: false, error: e.message };
     }
-
-    const newBet = {
-        id: uuidv4(),
-        match: betData.match,
-        homeTeam: betData.homeTeam,
-        awayTeam: betData.awayTeam,
-        league: betData.league,
-        matchTime: betData.matchTime,
-        market: betData.market,
-        prediction: betData.prediction,
-        odds: betData.odds || null,
-        confidence: betData.confidence || null,
-        stats: betData.stats || null,        // Full match stats for AI training
-        aiPrompt: betData.aiPrompt || null,  // AI-generated analysis
-        status: 'PENDING',
-        resultScore: null,
-        approvedAt: new Date().toISOString(),
-        settledAt: null
-    };
-
-    db.bets.push(newBet);
-    saveBets(db);
-
-    console.log(`[ApprovedBets] ✅ Approved: ${newBet.match} - ${newBet.market}`);
-    return { success: true, bet: newBet };
 }
 
 // ============================================
 // 📋 Get All Bets
 // ============================================
 
-function getAllBets() {
-    const db = loadBets();
-    // Return newest first
-    return db.bets.sort((a, b) => new Date(b.approvedAt) - new Date(a.approvedAt));
+async function getAllBets() {
+    try {
+        const result = await db.execute(`
+            SELECT * FROM approved_bets ORDER BY approved_at DESC
+        `);
+        return result.rows.map(formatBetRow);
+    } catch (e) {
+        console.error('[ApprovedBets] Get All Error:', e.message);
+        return [];
+    }
 }
 
-function getPendingBets() {
-    const db = loadBets();
-    return db.bets.filter(b => b.status === 'PENDING');
+async function getPendingBets() {
+    try {
+        const result = await db.execute(`
+            SELECT * FROM approved_bets WHERE status = 'PENDING' ORDER BY approved_at DESC
+        `);
+        return result.rows.map(formatBetRow);
+    } catch (e) {
+        console.error('[ApprovedBets] Get Pending Error:', e.message);
+        return [];
+    }
 }
 
-function getSettledBets() {
-    const db = loadBets();
-    return db.bets.filter(b => b.status === 'WON' || b.status === 'LOST');
+async function getSettledBets() {
+    try {
+        const result = await db.execute(`
+            SELECT * FROM approved_bets WHERE status IN ('WON', 'LOST') ORDER BY settled_at DESC
+        `);
+        return result.rows.map(formatBetRow);
+    } catch (e) {
+        console.error('[ApprovedBets] Get Settled Error:', e.message);
+        return [];
+    }
+}
+
+// Helper to format row to object
+function formatBetRow(row) {
+    return {
+        id: row.id,
+        match: row.match,
+        homeTeam: row.home_team,
+        awayTeam: row.away_team,
+        league: row.league,
+        matchDate: row.match_date,
+        matchTime: row.match_time,
+        eventId: row.event_id,
+        market: row.market,
+        prediction: row.prediction,
+        odds: row.odds,
+        confidence: row.confidence,
+        stats: row.stats ? JSON.parse(row.stats) : null,
+        aiPrompt: row.ai_prompt,
+        aiReason: row.ai_reason,
+        status: row.status,
+        resultScore: row.result_score,
+        approvedAt: row.approved_at,
+        settledAt: row.settled_at
+    };
 }
 
 // ============================================
 // ✅ Settle Bet (Manual: WON/LOST)
 // ============================================
 
-function settleBet(betId, status, resultScore = null) {
+async function settleBet(betId, status, resultScore = null) {
     if (!['WON', 'LOST'].includes(status)) {
         return { success: false, error: 'Status must be WON or LOST' };
     }
 
-    const db = loadBets();
-    const bet = db.bets.find(b => b.id === betId);
+    try {
+        const now = new Date().toISOString();
 
-    if (!bet) {
-        return { success: false, error: 'Bet not found' };
+        const result = await db.execute({
+            sql: `UPDATE approved_bets SET status = ?, result_score = ?, settled_at = ? WHERE id = ?`,
+            args: [status, resultScore, now, betId]
+        });
+
+        if (result.rowsAffected === 0) {
+            return { success: false, error: 'Bet not found' };
+        }
+
+        console.log(`[ApprovedBets] ⚖️ Settled: ${betId} → ${status}`);
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
-
-    bet.status = status;
-    bet.resultScore = resultScore;
-    bet.settledAt = new Date().toISOString();
-
-    saveBets(db);
-
-    console.log(`[ApprovedBets] ⚖️ Settled: ${bet.match} → ${status}`);
-    return { success: true, bet };
 }
 
 // ============================================
 // 🗑️ Delete Bet
 // ============================================
 
-function deleteBet(betId) {
-    const db = loadBets();
-    const index = db.bets.findIndex(b => b.id === betId);
+async function deleteBet(betId) {
+    try {
+        const result = await db.execute({
+            sql: `DELETE FROM approved_bets WHERE id = ?`,
+            args: [betId]
+        });
 
-    if (index === -1) {
-        return { success: false, error: 'Bet not found' };
+        if (result.rowsAffected === 0) {
+            return { success: false, error: 'Bet not found' };
+        }
+
+        console.log(`[ApprovedBets] 🗑️ Deleted: ${betId}`);
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
-
-    const deleted = db.bets.splice(index, 1)[0];
-    saveBets(db);
-
-    console.log(`[ApprovedBets] 🗑️ Deleted: ${deleted.match}`);
-    return { success: true, deleted };
 }
 
-function clearAllBets() {
-    saveBets({ bets: [] });
-    console.log('[ApprovedBets] 🗑️ All bets cleared');
-    return { success: true };
+async function clearAllBets() {
+    try {
+        await db.execute(`DELETE FROM approved_bets`);
+        console.log('[ApprovedBets] 🗑️ All bets cleared');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 }
 
 // ============================================
 // 📊 Statistics
 // ============================================
 
-function getStats() {
-    const db = loadBets();
-    const bets = db.bets;
+async function getStats() {
+    try {
+        const result = await db.execute(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = 'WON' THEN 1 ELSE 0 END) as won,
+                SUM(CASE WHEN status = 'LOST' THEN 1 ELSE 0 END) as lost
+            FROM approved_bets
+        `);
 
-    const total = bets.length;
-    const pending = bets.filter(b => b.status === 'PENDING').length;
-    const won = bets.filter(b => b.status === 'WON').length;
-    const lost = bets.filter(b => b.status === 'LOST').length;
-    const settled = won + lost;
+        const row = result.rows[0];
+        const total = row.total || 0;
+        const pending = row.pending || 0;
+        const won = row.won || 0;
+        const lost = row.lost || 0;
+        const settled = won + lost;
+        const winRate = settled > 0 ? ((won / settled) * 100).toFixed(1) : 0;
 
-    const winRate = settled > 0 ? ((won / settled) * 100).toFixed(1) : 0;
+        // Get by market stats
+        const marketResult = await db.execute(`
+            SELECT market, 
+                   COUNT(*) as total,
+                   SUM(CASE WHEN status = 'WON' THEN 1 ELSE 0 END) as won,
+                   SUM(CASE WHEN status = 'LOST' THEN 1 ELSE 0 END) as lost,
+                   SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending
+            FROM approved_bets 
+            GROUP BY market
+        `);
 
-    // Group by market
-    const byMarket = {};
-    bets.forEach(b => {
-        if (!byMarket[b.market]) {
-            byMarket[b.market] = { total: 0, won: 0, lost: 0, pending: 0 };
-        }
-        byMarket[b.market].total++;
-        if (b.status === 'WON') byMarket[b.market].won++;
-        if (b.status === 'LOST') byMarket[b.market].lost++;
-        if (b.status === 'PENDING') byMarket[b.market].pending++;
-    });
+        const byMarket = {};
+        marketResult.rows.forEach(r => {
+            byMarket[r.market] = {
+                total: r.total,
+                won: r.won,
+                lost: r.lost,
+                pending: r.pending
+            };
+        });
 
-    return {
-        total,
-        pending,
-        won,
-        lost,
-        settled,
-        winRate: parseFloat(winRate),
-        byMarket
-    };
+        return {
+            total,
+            pending,
+            won,
+            lost,
+            settled,
+            winRate: parseFloat(winRate),
+            byMarket
+        };
+    } catch (e) {
+        console.error('[ApprovedBets] Stats Error:', e.message);
+        return { total: 0, pending: 0, won: 0, lost: 0, settled: 0, winRate: 0, byMarket: {} };
+    }
 }
 
 // ============================================
-// 🔄 For Auto-Settlement (to be implemented)
+// 🔄 For Auto-Settlement
 // ============================================
 
-function updateBetResult(betId, status, resultScore) {
+async function updateBetResult(betId, status, resultScore) {
     return settleBet(betId, status, resultScore);
 }
 
