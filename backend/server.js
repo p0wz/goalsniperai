@@ -2537,7 +2537,6 @@ app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
 // ============================================
 // 🎯 Approved Bets System (Daily Analysis Only)
 // ============================================
-const approvedBets = require('./approvedBets');
 
 // Admin: Approve a bet from Daily Analysis
 app.post('/api/bets/approve', requireAuth, (req, res) => {
