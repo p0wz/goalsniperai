@@ -1401,18 +1401,48 @@ ${prompt}
                                                                             📋
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => handleAddToPicks(m, config.name, 'single')}
+                                                                            onClick={() => handleAddToPicks(m, key, 'single')}
                                                                             className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
                                                                             title="Add to Daily Picks"
                                                                         >
                                                                             ⭐ Pick
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => handleAddToPicks(m, config.name, 'parlay')}
+                                                                            onClick={() => handleAddToPicks(m, key, 'parlay')}
                                                                             className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
                                                                             title="Add to Daily Parlay"
                                                                         >
                                                                             🔥 Parlay
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    const res = await betsService.approve({
+                                                                                        eventId: m.event_key || m.matchId || m.id,
+                                                                                        match: `${m.event_home_team} vs ${m.event_away_team}`,
+                                                                                        homeTeam: m.event_home_team,
+                                                                                        awayTeam: m.event_away_team,
+                                                                                        league: m.league_name,
+                                                                                        market: key,
+                                                                                        prediction: key,
+                                                                                        matchDate: m.event_date || new Date().toISOString().split('T')[0],
+                                                                                        matchTime: m.startTime || m.event_start_time,
+                                                                                        stats: m.filterStats || m.stats || {},
+                                                                                        aiPrompt: m.aiPrompt || m.ai_prompts?.[0]
+                                                                                    });
+                                                                                    if (res.success) {
+                                                                                        alert('✅ Bahis onaylandı ve takibe alındı!');
+                                                                                    } else {
+                                                                                        alert('Hata: ' + res.error);
+                                                                                    }
+                                                                                } catch (e) {
+                                                                                    alert('Hata: ' + e.message);
+                                                                                }
+                                                                            }}
+                                                                            className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
+                                                                            title="Onayla & Takibe Al"
+                                                                        >
+                                                                            ✅ Takip
                                                                         </button>
                                                                     </div>
                                                                 </td>
