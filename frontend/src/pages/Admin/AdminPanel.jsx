@@ -108,10 +108,15 @@ export default function AdminPanel({ user, handleLogout }) {
     const fetchApprovedBets = async () => {
         setLoadingApprovedBets(true);
         try {
-            const res = await betsService.getAll();
-            if (res.success) {
-                setApprovedBets(res.bets || []);
-                setApprovedBetsStats(res.stats || null);
+            const [betsRes, statsRes] = await Promise.all([
+                betsService.getAll(),
+                betsService.getStats()
+            ]);
+            if (betsRes.success) {
+                setApprovedBets(betsRes.bets || []);
+            }
+            if (statsRes.success) {
+                setApprovedBetsStats(statsRes);
             }
         } catch (err) {
             console.error("Failed to load approved bets", err);
