@@ -597,7 +597,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'ai-analiz', 'bets', 'training', 'sentio', 'payments', 'ai-dataset', 'raw-stats', 'analiz', 'history', 'picks', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'bets', 'training', 'sentio', 'payments', 'raw-stats', 'analiz', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -609,16 +609,12 @@ export default function AdminPanel({ user, handleLogout }) {
                             )}
                         >
                             {tab === 'live' && '📡 Live'}
-                            {tab === 'ai-analiz' && '🤖 AI Analiz'}
                             {tab === 'bets' && '🎯 Approved Bets'}
                             {tab === 'training' && '🧠 Training Pool'}
                             {tab === 'analiz' && '🎯 Analiz'}
-                            {tab === 'history' && '📜 Geçmiş'}
-                            {tab === 'ai-dataset' && '📊 AI Dataset'}
                             {tab === 'sentio' && '💬 SENTIO'}
                             {tab === 'payments' && '💰 Ödemeler'}
                             {tab === 'raw-stats' && '📊 Ham Data'}
-                            {tab === 'picks' && '⭐ Yönetin'}
                             {MARKET_CONFIG[tab] && `${MARKET_CONFIG[tab].icon} ${MARKET_CONFIG[tab].name}`}
                         </button>
                     ))}
