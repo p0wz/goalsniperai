@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { signalService, betService, trainingService } from './services/api';
+import { signalService, betService, trainingService, betsService } from './services/api';
 import clsx from 'clsx';
 
 // Market Configuration
@@ -81,6 +81,45 @@ function MarketTab({ marketKey, handleAddToPicks }) {
         }
     };
 
+    const copyAllPrompts = () => {
+        if (candidates.length === 0) return;
+
+        const allPrompts = candidates.map((m, i) => {
+            const header = `\n${'='.repeat(60)}\n📊 MAÇ ${i + 1}/${candidates.length}: ${m.event_home_team} vs ${m.event_away_team}\n${'='.repeat(60)}\n`;
+            return header + m.aiPrompt;
+        }).join('\n\n');
+
+        const fullText = `🎯 ${config.name} - TOPLU ANALİZ (${candidates.length} MAÇ)\n${allPrompts}`;
+        navigator.clipboard.writeText(fullText);
+        alert(`✅ ${candidates.length} maçın prompt'u kopyalandı!`);
+    };
+
+    const handleApproveBet = async (m) => {
+        try {
+            const res = await betsService.approve({
+                eventId: m.event_key || m.matchId,
+                match: `${m.event_home_team} vs ${m.event_away_team}`,
+                homeTeam: m.event_home_team,
+                awayTeam: m.event_away_team,
+                league: m.league_name,
+                market: config.name,
+                prediction: config.name,
+                matchDate: m.event_date || new Date().toISOString().split('T')[0],
+                matchTime: m.event_start_time || m.event_time,
+                stats: m.filterStats || m.stats || {},
+                aiPrompt: m.aiPrompt
+            });
+
+            if (res.success) {
+                alert('✅ Bahis onaylandı ve takibe alındı!');
+            } else {
+                alert('Hata: ' + res.error);
+            }
+        } catch (e) {
+            alert('Hata: ' + e.message);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -128,6 +167,18 @@ function MarketTab({ marketKey, handleAddToPicks }) {
                         </button>
                     </div>
 
+                    {/* Bulk Copy Button */}
+                    {candidates.length > 0 && (
+                        <div className="flex justify-end">
+                            <button
+                                onClick={copyAllPrompts}
+                                className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 flex items-center gap-2"
+                            >
+                                📋 Tümünü Kopyala ({candidates.length} maç)
+                            </button>
+                        </div>
+                    )}
+
                     {/* Results Table */}
                     {candidates.length > 0 ? (
                         <div className="rounded-lg border bg-card overflow-hidden">
@@ -171,39 +222,9 @@ function MarketTab({ marketKey, handleAddToPicks }) {
                                                     🔥 Parlay
                                                 </button>
                                                 <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const res = await signalService.approveSignal(m.event_key || m.matchId, {
-                                                                matchData: {
-                                                                    matchId: m.event_key || m.matchId,
-                                                                    home_team: m.event_home_team,
-                                                                    away_team: m.event_away_team,
-                                                                    startTime: m.event_start_time
-                                                                },
-                                                                market: config.name,
-                                                                category: 'DAILY_ANALYSIS',
-                                                                confidence: 85
-                                                            });
-                                                            if (res.success) {
-                                                                // Also record to AI Training Dataset
-                                                                await trainingService.record({
-                                                                    matchId: m.event_key || m.matchId,
-                                                                    match: `${m.event_home_team} vs ${m.event_away_team}`,
-                                                                    homeTeam: m.event_home_team,
-                                                                    awayTeam: m.event_away_team,
-                                                                    league: m.league_name,
-                                                                    startTime: m.event_time || m.event_start_time,
-                                                                    market: config.name,
-                                                                    prediction: config.name,
-                                                                    odds: m.odds || 1.50,
-                                                                    features: m.filterStats || m.stats || {}
-                                                                });
-                                                                alert("✅ Maç geçmişe ve AI Dataset'e eklendi!");
-                                                            } else alert("Hata: " + res.error);
-                                                        } catch (e) { alert(e.message); }
-                                                    }}
+                                                    onClick={() => handleApproveBet(m)}
                                                     className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
-                                                    title="Geçmişe Ekle & Takip Et"
+                                                    title="Onayla & Takibe Al"
                                                 >
                                                     ✅ Takip
                                                 </button>

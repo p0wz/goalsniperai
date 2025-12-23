@@ -1161,8 +1161,35 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
         }
 
         if (passes) {
-            // Generate AI Prompt
-            matchData.aiPrompt = generateDetailedPrompt(m, stats, matchData.market, matchData.fhStats);
+            // Query Vector DB for similar matches
+            let similarMatchesText = '';
+            try {
+                const similarMatches = await vectorDB.findSimilarMatches({
+                    homeTeam: m.event_home_team,
+                    awayTeam: m.event_away_team,
+                    league: m.league_name,
+                    market: matchData.market,
+                    stats: {
+                        homeAvgGoals: homeForm.avgScored,
+                        awayAvgGoals: awayForm.avgScored,
+                        h2hAvgGoals: mutualH2H.length > 0 ?
+                            mutualH2H.reduce((sum, g) => sum + (g.home_team?.score || 0) + (g.away_team?.score || 0), 0) / mutualH2H.length : 0,
+                        homePPG: homeForm.winRate / 33.33,
+                        awayPPG: awayForm.winRate / 33.33
+                    }
+                }, 5);
+
+                if (similarMatches.length > 0) {
+                    similarMatchesText = vectorDB.formatSimilarMatchesForPrompt(similarMatches);
+                    log.info(`   📊 Found ${similarMatches.length} similar matches from history`);
+                }
+            } catch (e) {
+                // Vector DB not configured - continue without
+            }
+
+            // Generate AI Prompt (with similar matches if available)
+            matchData.aiPrompt = generateDetailedPrompt(m, stats, matchData.market, matchData.fhStats, similarMatchesText);
+            matchData.similarMatches = similarMatchesText; // Store for bulk copy
             candidates.push(matchData);
             log.info(`   ✅ ${m.event_home_team} vs ${m.event_away_team} → PASS`);
         }
@@ -1175,11 +1202,17 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
 }
 
 // Helper: Generate Detailed AI Prompt for a single match
-function generateDetailedPrompt(match, stats, market, fhStats = null) {
+function generateDetailedPrompt(match, stats, market, fhStats = null, similarMatchesText = '') {
     const { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual } = stats;
+
+    // Similar matches section (from Vector DB)
+    const similarSection = similarMatchesText ? `
+${similarMatchesText}
+` : '';
 
     if (market === 'First Half Over 0.5' && fhStats) {
         return `Act as a professional football betting analyst.
+${similarSection}
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
 Market: First Half Over 0.5 Goals
@@ -1197,6 +1230,7 @@ Analyze and provide your verdict.`;
     }
 
     return `Act as a professional football betting analyst.
+${similarSection}
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
 
