@@ -885,7 +885,7 @@ export default function AdminPanel({ user, handleLogout }) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {trainingPool.map(entry => (
+                                    {Array.isArray(trainingPool) && trainingPool.map(entry => (
                                         <tr key={entry.id} className="hover:bg-muted/20">
                                             <td className="px-4 py-3">
                                                 <div className="font-medium">{entry.match}</div>
