@@ -142,14 +142,16 @@ export default function AdminPanel({ user, handleLogout }) {
     const fetchTrainingPool = async () => {
         setLoadingTrainingPool(true);
         try {
-            const res = await fetch('/api/training-pool', { credentials: 'include' });
-            const data = await res.json();
+            const res = await api.get('/training-pool');
+            const data = res.data;
             if (data.success) {
                 setTrainingPool(data.entries || []);
                 setTrainingPoolStats(data.stats || null);
             }
         } catch (err) {
             console.error("Failed to load training pool", err);
+            setTrainingPool([]);
+            setTrainingPoolStats(null);
         } finally {
             setLoadingTrainingPool(false);
         }
