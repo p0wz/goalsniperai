@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService, betsService } from '../../services/api';
+import api, { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService, betsService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import { RawStatsTab } from '../../RawStatsTab';
 import NBAProps from './NBAProps';
