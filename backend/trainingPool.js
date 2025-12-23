@@ -1,153 +1,177 @@
 /**
- * Training Pool Storage Module
- * Stores settled bets for AI training
+ * Training Pool Storage Module - Turso/LibSQL Version
+ * Stores settled bets for AI training (persistent)
  */
 
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 const { v4: uuidv4 } = require('uuid');
 
-const POOL_FILE = path.join(__dirname, 'data', 'training_pool.json');
-
-// ============================================
-// 📁 Storage Functions
-// ============================================
-
-function loadPool() {
-    try {
-        if (fs.existsSync(POOL_FILE)) {
-            const data = fs.readFileSync(POOL_FILE, 'utf-8');
-            return JSON.parse(data);
-        }
-    } catch (e) {
-        console.error('[TrainingPool] Load error:', e.message);
-    }
-    return { entries: [], stats: { total: 0, won: 0, lost: 0 } };
+// Config - Use same Turso connection
+let url = process.env.TURSO_DATABASE_URL || 'file:local.db';
+if (url.startsWith('libsql://')) {
+    url = url.replace('libsql://', 'https://');
 }
 
-function savePool(data) {
-    try {
-        const dir = path.dirname(POOL_FILE);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        fs.writeFileSync(POOL_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {
-        console.error('[TrainingPool] Save error:', e.message);
-    }
-}
+const authToken = process.env.TURSO_AUTH_TOKEN;
+
+const db = createClient({
+    url,
+    authToken,
+});
 
 // ============================================
 // 📝 Add Settled Bet to Training Pool
 // ============================================
 
-function addEntry(settledBet) {
-    const pool = loadPool();
+async function addEntry(settledBet) {
+    try {
+        const id = uuidv4();
+        const now = new Date().toISOString();
 
-    const entry = {
-        id: uuidv4(),
-        // Match Info
-        match: settledBet.match,
-        homeTeam: settledBet.homeTeam,
-        awayTeam: settledBet.awayTeam,
-        league: settledBet.league,
-        eventId: settledBet.eventId,
-        matchDate: settledBet.matchDate,
-        matchTime: settledBet.matchTime,
-        // Prediction
-        market: settledBet.market,
-        prediction: settledBet.prediction,
-        // Result
-        result: settledBet.result,           // WON or LOST
-        finalScore: settledBet.finalScore,   // "2-1"
-        homeGoals: settledBet.homeGoals,
-        awayGoals: settledBet.awayGoals,
-        totalGoals: settledBet.homeGoals + settledBet.awayGoals,
-        // Stats at approval time (for AI training)
-        stats: settledBet.stats || null,
-        aiPrompt: settledBet.aiPrompt || null,
-        // Timestamps
-        approvedAt: settledBet.approvedAt,
-        settledAt: new Date().toISOString()
-    };
+        await db.execute({
+            sql: `INSERT INTO training_pool (
+                id, match, home_team, away_team, league, market, prediction,
+                result, final_score, home_goals, away_goals, stats, ai_prompt, settled_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+                id,
+                settledBet.match,
+                settledBet.homeTeam || null,
+                settledBet.awayTeam || null,
+                settledBet.league || null,
+                settledBet.market,
+                settledBet.prediction || null,
+                settledBet.result,
+                settledBet.finalScore || null,
+                settledBet.homeGoals || null,
+                settledBet.awayGoals || null,
+                settledBet.stats ? JSON.stringify(settledBet.stats) : null,
+                settledBet.aiPrompt || null,
+                now
+            ]
+        });
 
-    pool.entries.push(entry);
-
-    // Update stats
-    pool.stats.total++;
-    if (settledBet.result === 'WON') pool.stats.won++;
-    if (settledBet.result === 'LOST') pool.stats.lost++;
-
-    savePool(pool);
-
-    console.log(`[TrainingPool] ✅ Added: ${entry.match} - ${entry.market} → ${entry.result}`);
-    return { success: true, entry };
+        console.log(`[TrainingPool] ✅ Added: ${settledBet.match} → ${settledBet.result}`);
+        return { success: true, id };
+    } catch (e) {
+        console.error('[TrainingPool] Add Error:', e.message);
+        return { success: false, error: e.message };
+    }
 }
 
 // ============================================
-// 📋 Get Training Pool
+// 📋 Get All Entries
 // ============================================
 
-function getAllEntries() {
-    const pool = loadPool();
-    return pool.entries.sort((a, b) => new Date(b.settledAt) - new Date(a.settledAt));
+async function getAllEntries() {
+    try {
+        const result = await db.execute(`
+            SELECT * FROM training_pool ORDER BY settled_at DESC
+        `);
+        return result.rows.map(formatRow);
+    } catch (e) {
+        console.error('[TrainingPool] Get All Error:', e.message);
+        return [];
+    }
 }
 
-function getStats() {
-    const pool = loadPool();
-    const entries = pool.entries;
+async function getEntriesByResult(result) {
+    try {
+        const data = await db.execute({
+            sql: `SELECT * FROM training_pool WHERE result = ? ORDER BY settled_at DESC`,
+            args: [result]
+        });
+        return data.rows.map(formatRow);
+    } catch (e) {
+        return [];
+    }
+}
 
-    const total = entries.length;
-    const won = entries.filter(e => e.result === 'WON').length;
-    const lost = entries.filter(e => e.result === 'LOST').length;
-    const winRate = total > 0 ? ((won / total) * 100).toFixed(1) : 0;
-
-    // Group by market
-    const byMarket = {};
-    entries.forEach(e => {
-        if (!byMarket[e.market]) {
-            byMarket[e.market] = { total: 0, won: 0, lost: 0 };
-        }
-        byMarket[e.market].total++;
-        if (e.result === 'WON') byMarket[e.market].won++;
-        if (e.result === 'LOST') byMarket[e.market].lost++;
-    });
-
-    // Group by league
-    const byLeague = {};
-    entries.forEach(e => {
-        const league = e.league || 'Unknown';
-        if (!byLeague[league]) {
-            byLeague[league] = { total: 0, won: 0, lost: 0 };
-        }
-        byLeague[league].total++;
-        if (e.result === 'WON') byLeague[league].won++;
-        if (e.result === 'LOST') byLeague[league].lost++;
-    });
-
+function formatRow(row) {
     return {
-        total,
-        won,
-        lost,
-        winRate: parseFloat(winRate),
-        byMarket,
-        byLeague
+        id: row.id,
+        match: row.match,
+        homeTeam: row.home_team,
+        awayTeam: row.away_team,
+        league: row.league,
+        market: row.market,
+        prediction: row.prediction,
+        result: row.result,
+        finalScore: row.final_score,
+        homeGoals: row.home_goals,
+        awayGoals: row.away_goals,
+        stats: row.stats ? JSON.parse(row.stats) : null,
+        aiPrompt: row.ai_prompt,
+        settledAt: row.settled_at
     };
 }
 
 // ============================================
-// 🗑️ Clear Pool (Admin only)
+// 📊 Statistics
 // ============================================
 
-function clearPool() {
-    savePool({ entries: [], stats: { total: 0, won: 0, lost: 0 } });
-    console.log('[TrainingPool] 🗑️ Pool cleared');
-    return { success: true };
+async function getStats() {
+    try {
+        const result = await db.execute(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN result = 'WON' THEN 1 ELSE 0 END) as won,
+                SUM(CASE WHEN result = 'LOST' THEN 1 ELSE 0 END) as lost
+            FROM training_pool
+        `);
+
+        const row = result.rows[0];
+        const total = row.total || 0;
+        const won = row.won || 0;
+        const lost = row.lost || 0;
+        const winRate = total > 0 ? ((won / total) * 100).toFixed(1) : 0;
+
+        return { total, won, lost, winRate: parseFloat(winRate) };
+    } catch (e) {
+        return { total: 0, won: 0, lost: 0, winRate: 0 };
+    }
+}
+
+// ============================================
+// 🗑️ Clear Pool
+// ============================================
+
+async function clearPool() {
+    try {
+        await db.execute(`DELETE FROM training_pool`);
+        console.log('[TrainingPool] 🗑️ Pool cleared');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// ============================================
+// 🗑️ Delete Entry
+// ============================================
+
+async function deleteEntry(id) {
+    try {
+        const result = await db.execute({
+            sql: `DELETE FROM training_pool WHERE id = ?`,
+            args: [id]
+        });
+
+        if (result.rowsAffected === 0) {
+            return { success: false, error: 'Entry not found' };
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 }
 
 module.exports = {
     addEntry,
     getAllEntries,
+    getEntriesByResult,
     getStats,
-    clearPool
+    clearPool,
+    deleteEntry
 };

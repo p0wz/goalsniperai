@@ -117,6 +117,26 @@ async function initDatabase() {
             )
         `);
 
+        // Training Pool table for settled bets (AI training data)
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS training_pool (
+                id TEXT PRIMARY KEY,
+                match TEXT NOT NULL,
+                home_team TEXT,
+                away_team TEXT,
+                league TEXT,
+                market TEXT,
+                prediction TEXT,
+                result TEXT CHECK(result IN ('WON', 'LOST')),
+                final_score TEXT,
+                home_goals INTEGER,
+                away_goals INTEGER,
+                stats TEXT,
+                ai_prompt TEXT,
+                settled_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         // Create Admin
         await createAdminUser();
 
