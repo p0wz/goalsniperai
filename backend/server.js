@@ -2779,26 +2779,6 @@ app.post('/api/admin/bot/stop', requireAuth, (req, res) => {
 });
 
 // ============================================
-// 🌐 SPA Fallback (React Router)
-// ============================================
-// All non-API routes serve React index.html
-// All non-API routes return 404 (or basic JSON) since we are API-only
-app.get('*', (req, res) => {
-    if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'API endpoint not found' });
-    }
-
-    // For local dev convenience, if frontend build exists, serve it
-    const frontendIndex = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
-    if (fs.existsSync(frontendIndex)) {
-        return res.sendFile(frontendIndex);
-    }
-
-    res.status(404).json({ error: 'Not Found. This is the API Backend.' });
-});
-
-
-// ============================================
 // 🤖 Auto-Settlement Job
 // ============================================
 async function runAutoSettlement() {
@@ -3387,6 +3367,23 @@ function startBanner() {
 \x1b[1m\x1b[32m+==========================================+\x1b[0m
 `);
 }
+
+// ============================================
+// 🌐 SPA Fallback / 404 Handler (MUST BE LAST)
+// ============================================
+app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+
+    // For local dev convenience, if frontend build exists, serve it
+    const frontendIndex = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+    if (fs.existsSync(frontendIndex)) {
+        return res.sendFile(frontendIndex);
+    }
+
+    res.status(404).json({ error: 'Not Found. This is the API Backend.' });
+});
 
 app.listen(PORT, async () => {
     startBanner();
