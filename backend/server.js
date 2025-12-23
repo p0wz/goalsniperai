@@ -3180,6 +3180,87 @@ app.post('/api/settlement/run', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// 🏀 NBA Props API
+// ============================================
+const nbaService = require('./nba/nbaService');
+
+// Initialize NBA Redis (separate instance)
+if (process.env.NBA_REDIS_URL) {
+    nbaService.initNBARedis(process.env.NBA_REDIS_URL);
+}
+
+// Get today's NBA games
+app.get('/api/nba/games', async (req, res) => {
+    try {
+        const result = await nbaService.getTodaysGames();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get all NBA teams
+app.get('/api/nba/teams', async (req, res) => {
+    try {
+        const result = await nbaService.getTeams();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get team roster
+app.get('/api/nba/roster/:teamId', async (req, res) => {
+    try {
+        const result = await nbaService.getTeamRoster(parseInt(req.params.teamId));
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get player game logs
+app.get('/api/nba/player/:playerId/logs', async (req, res) => {
+    try {
+        const lastN = parseInt(req.query.lastN) || 20;
+        const result = await nbaService.getPlayerGameLogs(parseInt(req.params.playerId), lastN);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get player hit rates with custom lines
+app.post('/api/nba/player/:playerId/hit-rates', async (req, res) => {
+    try {
+        const lines = req.body.lines || {};
+        const lastN = parseInt(req.body.lastN) || 20;
+
+        // First get game logs
+        const logsResult = await nbaService.getPlayerGameLogs(parseInt(req.params.playerId), lastN);
+
+        if (!logsResult.success) {
+            return res.json(logsResult);
+        }
+
+        const result = await nbaService.getHitRatesWithLines(parseInt(req.params.playerId), lines, lastN);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Find player by name
+app.get('/api/nba/player/search/:name', async (req, res) => {
+    try {
+        const result = await nbaService.findPlayerId(req.params.name);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================
 // 🚀 Server Startup
 // ============================================
 function startBanner() {

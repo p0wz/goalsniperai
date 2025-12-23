@@ -298,5 +298,39 @@ export const betsService = {
     }
 };
 
+// NBA Props Service
+export const nbaService = {
+    // Get today's games
+    getGames: async () => {
+        const response = await api.get('/nba/games');
+        return response.data;
+    },
+    // Get all teams
+    getTeams: async () => {
+        const response = await api.get('/nba/teams');
+        return response.data;
+    },
+    // Get team roster
+    getRoster: async (teamId) => {
+        const response = await api.get(`/nba/roster/${teamId}`);
+        return response.data;
+    },
+    // Get player game logs
+    getPlayerLogs: async (playerId, lastN = 20) => {
+        const response = await api.get(`/nba/player/${playerId}/logs?lastN=${lastN}`);
+        return response.data;
+    },
+    // Get player hit rates
+    getHitRates: async (playerId, lines = {}, lastN = 20) => {
+        const response = await api.post(`/nba/player/${playerId}/hit-rates`, { lines, lastN });
+        return response.data;
+    },
+    // Search player by name
+    searchPlayer: async (name) => {
+        const response = await api.get(`/nba/player/search/${encodeURIComponent(name)}`);
+        return response.data;
+    }
+};
+
 export default api;
 
