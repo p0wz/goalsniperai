@@ -5,6 +5,7 @@
 const axios = require('axios');
 const betTracker = require('./betTracker');
 const { analyzeFirstHalfPreMatch, validateWithRealHTScores } = require('./analysis/firstHalfAnalyzer');
+const vectorDB = require('./vectorDB');
 require('dotenv').config();
 
 // Config
@@ -1386,8 +1387,33 @@ async function runRawStatsCollection(leagueFilter = true, log = console, customL
 
         const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
 
-        // Generate comprehensive AI prompt with ALL stats
-        const aiPrompt = generateRawStatsPrompt(m, stats, mutualH2H);
+        // Query Vector DB for similar matches
+        let similarMatchesText = '';
+        try {
+            const similarMatches = await vectorDB.findSimilarMatches({
+                homeTeam: m.event_home_team,
+                awayTeam: m.event_away_team,
+                league: m.league_name,
+                stats: {
+                    homeAvgGoals: homeForm.avgScored,
+                    awayAvgGoals: awayForm.avgScored,
+                    h2hAvgGoals: mutualH2H.length > 0 ?
+                        mutualH2H.reduce((sum, g) => sum + (g.home_team?.score || 0) + (g.away_team?.score || 0), 0) / mutualH2H.length : 0,
+                    homePPG: homeForm.winRate / 33.33,
+                    awayPPG: awayForm.winRate / 33.33
+                }
+            }, 5);
+
+            if (similarMatches.length > 0) {
+                similarMatchesText = vectorDB.formatSimilarMatchesForPrompt(similarMatches);
+                log.info(`   📊 Found ${similarMatches.length} similar matches from history`);
+            }
+        } catch (e) {
+            // Vector DB not configured or error - continue without
+        }
+
+        // Generate comprehensive AI prompt with ALL stats (including similar matches)
+        const aiPrompt = generateRawStatsPrompt(m, stats, mutualH2H, similarMatchesText);
 
         results.push({
             id: mid,
@@ -1412,7 +1438,7 @@ async function runRawStatsCollection(leagueFilter = true, log = console, customL
 }
 
 // Helper: Generate Comprehensive AI Prompt with ALL Stats
-function generateRawStatsPrompt(match, stats, mutualH2H) {
+function generateRawStatsPrompt(match, stats, mutualH2H, similarMatchesText = '') {
     const { homeForm, awayForm, homeHomeStats, awayAwayStats } = stats;
 
     // Format H2H games
@@ -1421,8 +1447,13 @@ function generateRawStatsPrompt(match, stats, mutualH2H) {
         return `   - ${g.home_team?.name} ${g.home_team?.score}-${g.away_team?.score} ${g.away_team?.name} (${date})`;
     }).join('\n') || '   - Karşılıklı maç bulunamadı';
 
-    return `SEN PROFESİYONEL BİR FUTBOL ANALİSTİSİN. AŞAĞIDAKİ İSTATİSTİKLERE DAYANARAK BU MAÇ İÇİN EN İYİ BAHİS TAHMİNİNİ YAP.
+    // Similar matches section (from Vector DB)
+    const similarSection = similarMatchesText ? `
+${similarMatchesText}
+` : '';
 
+    return `SEN PROFESİYONEL BİR FUTBOL ANALİSTİSİN. AŞAĞIDAKİ İSTATİSTİKLERE DAYANARAK BU MAÇ İÇİN EN İYİ BAHİS TAHMİNİNİ YAP.
+${similarSection}
 ═══════════════════════════════════════════════════════
 📊 MAÇ: ${match.event_home_team} vs ${match.event_away_team}
 📍 LİG: ${match.league_name}

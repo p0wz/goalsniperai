@@ -3205,4 +3205,14 @@ app.listen(PORT, async () => {
     // Start Services
     autoSettlement.startScheduler();
     log.info(`Auto-Settlement: Scheduler started (every 15 min)`);
+
+    // Initialize Vector DB
+    const vectorDB = require('./vectorDB');
+    const connected = await vectorDB.initVectorDB();
+    if (connected) {
+        const stats = await vectorDB.getStats();
+        log.info(`Vector DB: Connected (${stats.totalVectors} vectors)`);
+    } else {
+        log.warn(`Vector DB: Not configured (set PINECONE_API_KEY and PINECONE_HOST)`);
+    }
 });

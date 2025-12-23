@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const approvedBets = require('./approvedBets');
 const trainingPool = require('./trainingPool');
+const vectorDB = require('./vectorDB');
 
 // Flashscore API Config
 const FLASHSCORE_API = {
@@ -361,12 +362,18 @@ async function runSettlementCheck() {
             approvedBets.settleBet(bet.id, status, result.finalScore);
 
             // Add to training pool
-            trainingPool.addEntry({
+            const settledBetData = {
                 ...bet,
                 result: status,
                 finalScore: result.finalScore,
                 homeGoals: result.homeGoals,
                 awayGoals: result.awayGoals
+            };
+            trainingPool.addEntry(settledBetData);
+
+            // Store in Vector DB for similarity search
+            vectorDB.storeMatch(settledBetData).catch(e => {
+                console.log('[AutoSettlement] VectorDB store skipped:', e.message);
             });
 
             console.log(`[AutoSettlement] ⚖️ ${bet.match} | ${bet.market} | ${result.finalScore} → ${status}`);
