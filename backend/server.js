@@ -3180,6 +3180,84 @@ app.post('/api/settlement/run', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// 🎯 Approved Bets API
+// ============================================
+
+// Get all approved bets
+app.get('/api/bets', async (req, res) => {
+    try {
+        const bets = await approvedBets.getAllBets();
+        res.json({ success: true, bets });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get pending bets only
+app.get('/api/bets/pending', async (req, res) => {
+    try {
+        const bets = await approvedBets.getPendingBets();
+        res.json({ success: true, bets });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get bets stats
+app.get('/api/bets/stats', async (req, res) => {
+    try {
+        const stats = await approvedBets.getStats();
+        res.json({ success: true, ...stats });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Approve a new bet
+app.post('/api/bets/approve', requireAuth, async (req, res) => {
+    try {
+        const result = await approvedBets.approveBet(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Settle a bet
+app.post('/api/bets/:betId/settle', requireAuth, async (req, res) => {
+    try {
+        const { status, resultScore } = req.body;
+        const result = await approvedBets.settleBet(req.params.betId, status, resultScore);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Delete a bet
+app.delete('/api/bets/:betId', requireAuth, async (req, res) => {
+    try {
+        const result = await approvedBets.deleteBet(req.params.betId);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Clear all bets
+app.delete('/api/bets', requireAuth, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    try {
+        const result = await approvedBets.clearAllBets();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================
 // 🏀 NBA Props API
 // ============================================
 const nbaService = require('./nba/nbaService');
