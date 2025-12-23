@@ -758,7 +758,7 @@ export default function AdminPanel({ user, handleLogout }) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {approvedBets.map(bet => (
+                                    {Array.isArray(approvedBets) && approvedBets.map(bet => (
                                         <tr key={bet.id} className="hover:bg-muted/20">
                                             <td className="px-4 py-3">
                                                 <div className="font-medium">{bet.match}</div>

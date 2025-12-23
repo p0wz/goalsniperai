@@ -324,8 +324,8 @@ async function runSettlementCheck() {
     console.log('[AutoSettlement] 🔄 Running settlement check...');
 
     try {
-        const pendingBets = approvedBets.getPendingBets();
-        console.log(`[AutoSettlement] Found ${pendingBets.length} pending bets`);
+        const pendingBets = await approvedBets.getPendingBets();
+        console.log(`[AutoSettlement] Found ${pendingBets?.length || 0} pending bets`);
 
         let settled = 0;
         let skipped = 0;
