@@ -3258,6 +3258,44 @@ app.delete('/api/bets', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// 🧠 Training Pool API
+// ============================================
+
+// Get all training pool entries
+app.get('/api/training-pool', async (req, res) => {
+    try {
+        const entries = await trainingPool.getAllEntries();
+        const stats = await trainingPool.getStats();
+        res.json({ success: true, entries, stats });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message, entries: [], stats: {} });
+    }
+});
+
+// Delete training pool entry
+app.delete('/api/training-pool/:id', requireAuth, async (req, res) => {
+    try {
+        const result = await trainingPool.deleteEntry(req.params.id);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Clear training pool
+app.delete('/api/training-pool', requireAuth, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    try {
+        const result = await trainingPool.clearPool();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================
 // 🏀 NBA Props API
 // ============================================
 const nbaService = require('./nba/nbaService');
