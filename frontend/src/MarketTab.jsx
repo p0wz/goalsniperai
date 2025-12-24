@@ -113,10 +113,11 @@ function MarketTab({ marketKey, handleAddToPicks }) {
             if (res.success) {
                 alert('✅ Bahis onaylandı ve takibe alındı!');
             } else {
-                alert('Hata: ' + res.error);
+                alert('Hata: ' + (res.error || 'Bilinmeyen hata'));
             }
         } catch (e) {
-            alert('Hata: ' + e.message);
+            console.error('Approve error:', e);
+            alert('Hata: ' + (e?.response?.data?.error || e?.message || 'Bağlantı hatası'));
         }
     };
 
