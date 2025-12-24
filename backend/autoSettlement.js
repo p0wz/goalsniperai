@@ -359,7 +359,7 @@ async function runSettlementCheck() {
             const status = isWon ? 'WON' : 'LOST';
 
             // Settle the bet
-            approvedBets.settleBet(bet.id, status, result.finalScore);
+            await approvedBets.settleBet(bet.id, status, result.finalScore);
 
             // Add to training pool
             const settledBetData = {
@@ -369,7 +369,7 @@ async function runSettlementCheck() {
                 homeGoals: result.homeGoals,
                 awayGoals: result.awayGoals
             };
-            trainingPool.addEntry(settledBetData);
+            await trainingPool.addEntry(settledBetData);
 
             // Store in Vector DB for similarity search
             vectorDB.storeMatch(settledBetData).catch(e => {
