@@ -227,7 +227,7 @@ async function fetchMatchResult(eventId) {
     }
 
     try {
-        const url = `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/detail/${eventId}`;
+        const url = `${FLASHSCORE_API.baseURL}/api/flashscore/v1/match/details/${eventId}`;
         const response = await axios.get(url, {
             headers: FLASHSCORE_API.headers,
             timeout: 10000
