@@ -766,9 +766,9 @@ PURE FORM SCORE: ${fh.score}/100
  Reason: ${fh.reason}
 
 KEY METRICS:
-- Home Team 1H Goal Rate (Home Games): ${fh.metrics.home_ht_rate}%
-- Away Team 1H Goal Rate (Away Games): ${fh.metrics.away_ht_rate}%
-- H2H 1H Goal Rate: ${fh.metrics.h2h_ht_rate}%
+- Home Team FH Goal Potential: ${fh.metrics?.home_pot ?? 'N/A'}%
+- Away Team FH Goal Potential: ${fh.metrics?.away_pot ?? 'N/A'}%
+- H2H FH Goal Potential: ${fh.metrics?.h2h_pot ?? 'N/A'}%
 
 TASK:
 Based on these specific First Half statistics, write a short, punchy analysis for a bettor. Confirm if the statistics make this a "Solid Pick". Mention any risks if standard form (not just 1H) suggests a slow start.`,
@@ -936,9 +936,9 @@ Market: First Half Over 0.5 Goals
 PURE FORM SCORE: ${match.fhStats.score}/100
 Reason: ${match.fhStats.reason}
 KEY METRICS:
-- Home Team 1H Goal Rate: ${match.fhStats.metrics.home_ht_rate}%
-- Away Team 1H Goal Rate: ${match.fhStats.metrics.away_ht_rate}%
-- H2H 1H Goal Rate: ${match.fhStats.metrics.h2h_ht_rate}%
+- Home Team FH Goal Potential: ${match.fhStats?.metrics?.home_pot ?? 'N/A'}%
+- Away Team FH Goal Potential: ${match.fhStats?.metrics?.away_pot ?? 'N/A'}%
+- H2H FH Goal Potential: ${match.fhStats?.metrics?.h2h_pot ?? 'N/A'}%
 
 TASK:
 Analyze this "First Half Over 0.5 Goal" pick based on the pure form score. Is it a solid value?`;
