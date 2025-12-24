@@ -110,6 +110,11 @@ export const signalService = {
     getRawStats: async (leagueFilter = true, limit = 50) => {
         const response = await api.get(`/analysis/raw-stats?leagueFilter=${leagueFilter}&limit=${limit}`);
         return response.data;
+    },
+    // New: Get Last Cached Analysis (for page refresh persistence)
+    getLastAnalysis: async (market) => {
+        const response = await api.get(`/analysis/last/${market}`);
+        return response.data;
     }
 };
 

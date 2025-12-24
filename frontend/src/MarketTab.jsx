@@ -28,7 +28,21 @@ function MarketTab({ marketKey, handleAddToPicks }) {
     // Fetch history on mount
     useEffect(() => {
         fetchHistory();
+        // Auto-load cached analysis on page load
+        fetchLastAnalysis();
     }, [marketKey]);
+
+    const fetchLastAnalysis = async () => {
+        try {
+            const res = await signalService.getLastAnalysis(marketKey);
+            if (res.success && res.data && res.data.candidates) {
+                setCandidates(res.data.candidates);
+                console.log(`📦 Loaded cached ${marketKey} analysis (${res.data.candidates.length} matches)`);
+            }
+        } catch (e) {
+            console.log('No cached analysis available');
+        }
+    };
 
     const fetchHistory = async () => {
         try {

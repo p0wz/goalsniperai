@@ -1955,8 +1955,9 @@ app.get('/api/analysis/raw-stats', optionalAuth, async (req, res) => {
 app.get('/api/analysis/:market', optionalAuth, async (req, res) => {
     const { market } = req.params;
     const leagueFilter = req.query.leagueFilter !== 'false'; // Default true
+    const force = req.query.force === 'true'; // Force fresh analysis
 
-    log.info(`🚀 API Request: Single Market Analysis - ${market} (LeagueFilter: ${leagueFilter})`);
+    log.info(`🚀 API Request: Single Market Analysis - ${market} (LeagueFilter: ${leagueFilter}, Force: ${force})`);
 
     // Validate market
     if (!MARKET_MAP[market]) {
@@ -1966,12 +1967,65 @@ app.get('/api/analysis/:market', optionalAuth, async (req, res) => {
         });
     }
 
+    const cacheKey = `goalsniper:analysis:${market}`;
+
+    // Check Redis cache first (if not forcing)
+    if (!force) {
+        try {
+            const cached = await betTracker.redisGet(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                // Check if cache is from today
+                const today = new Date().toISOString().split('T')[0];
+                if (parsed.date === today && parsed.data) {
+                    log.info(`📦 Returning cached analysis for ${market}`);
+                    return res.json({ success: true, data: parsed.data, fromCache: true });
+                }
+            }
+        } catch (e) {
+            log.warn(`Cache read error: ${e.message}`);
+        }
+    }
+
     try {
         const results = await runSingleMarketAnalysis(market, leagueFilter, log);
+
+        // Save to Redis cache
+        const cacheData = {
+            date: new Date().toISOString().split('T')[0],
+            timestamp: new Date().toISOString(),
+            data: results
+        };
+        await betTracker.redisSet(cacheKey, cacheData);
+        log.info(`💾 Saved analysis to Redis: ${market}`);
+
         res.json({ success: true, data: results });
     } catch (error) {
         log.error(`Single Market Analysis Failed (${market}):`, error);
         res.status(500).json({ success: false, error: 'Analysis failed' });
+    }
+});
+
+// Get Last Analysis (for page refresh persistence)
+app.get('/api/analysis/last/:market', optionalAuth, async (req, res) => {
+    const { market } = req.params;
+    const cacheKey = `goalsniper:analysis:${market}`;
+
+    try {
+        const cached = await betTracker.redisGet(cacheKey);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            return res.json({
+                success: true,
+                data: parsed.data,
+                timestamp: parsed.timestamp,
+                fromCache: true
+            });
+        }
+        return res.json({ success: true, data: null, message: 'No cached analysis' });
+    } catch (e) {
+        log.error(`Cache read error: ${e.message}`);
+        return res.json({ success: true, data: null });
     }
 });
 

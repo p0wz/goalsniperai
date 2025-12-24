@@ -337,5 +337,8 @@ module.exports = {
     saveCoupon,
     settleCoupon,
     deleteCoupon,
-    deleteBet
+    deleteBet,
+    // Redis Helpers (for analysis cache)
+    redisGet,
+    redisSet
 };
