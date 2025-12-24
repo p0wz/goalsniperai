@@ -332,14 +332,20 @@ async function runSettlementCheck() {
         let errors = 0;
 
         for (const bet of pendingBets) {
+            console.log(`[AutoSettlement] Processing: ${bet.match} | eventId: ${bet.eventId} | date: ${bet.matchDate} ${bet.matchTime}`);
+
             // Check if ready for settlement
             if (!isReadyForSettlement(bet)) {
+                console.log(`[AutoSettlement] ⏳ Not ready: ${bet.match} (waiting for 3h after match)`);
                 skipped++;
                 continue;
             }
 
+            console.log(`[AutoSettlement] ✓ Ready for settlement, fetching result...`);
+
             // Fetch match result
             const result = await fetchMatchResult(bet.eventId);
+            console.log(`[AutoSettlement] API Result:`, JSON.stringify(result).substring(0, 200));
 
             if (!result.success) {
                 console.log(`[AutoSettlement] ❌ Could not get result for ${bet.match}: ${result.error}`);
