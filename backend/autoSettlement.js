@@ -234,40 +234,66 @@ async function fetchMatchResult(eventId) {
         });
 
         const data = response.data;
+        console.log(`[AutoSettlement] Full API response keys:`, Object.keys(data));
 
-        // Parse score from response
-        // Flashscore returns various formats, we need to handle them
+        // Parse score from response - Flashscore4 has various formats
         let homeGoals = null;
         let awayGoals = null;
         let matchStatus = null;
 
-        // Try to extract score from data
-        if (data.homeScore !== undefined && data.awayScore !== undefined) {
+        // Format 1: home_team.score and away_team.score (most common in Flashscore4)
+        if (data.home_team?.score !== undefined && data.away_team?.score !== undefined) {
+            homeGoals = parseInt(data.home_team.score) || 0;
+            awayGoals = parseInt(data.away_team.score) || 0;
+        }
+        // Format 2: home_score.current and away_score.current
+        else if (data.home_score?.current !== undefined && data.away_score?.current !== undefined) {
+            homeGoals = parseInt(data.home_score.current) || 0;
+            awayGoals = parseInt(data.away_score.current) || 0;
+        }
+        // Format 3: result_home and result_away
+        else if (data.result_home !== undefined && data.result_away !== undefined) {
+            homeGoals = parseInt(data.result_home) || 0;
+            awayGoals = parseInt(data.result_away) || 0;
+        }
+        // Format 4: homeScore and awayScore direct
+        else if (data.homeScore !== undefined && data.awayScore !== undefined) {
             homeGoals = parseInt(data.homeScore) || 0;
             awayGoals = parseInt(data.awayScore) || 0;
-        } else if (data.score) {
-            // Format: "2-1" or "2 - 1"
+        }
+        // Format 5: score string like "2-1"
+        else if (data.score) {
             const scoreParts = data.score.replace(/\s/g, '').split('-');
             if (scoreParts.length === 2) {
                 homeGoals = parseInt(scoreParts[0]) || 0;
                 awayGoals = parseInt(scoreParts[1]) || 0;
             }
-        } else if (data.result) {
+        }
+        // Format 6: result string like "2-1"
+        else if (data.result) {
             const resultParts = String(data.result).replace(/\s/g, '').split('-');
             if (resultParts.length === 2) {
                 homeGoals = parseInt(resultParts[0]) || 0;
                 awayGoals = parseInt(resultParts[1]) || 0;
             }
         }
+        // Format 7: scores object with home/away
+        else if (data.scores?.home !== undefined && data.scores?.away !== undefined) {
+            homeGoals = parseInt(data.scores.home) || 0;
+            awayGoals = parseInt(data.scores.away) || 0;
+        }
 
-        // Check if match is finished
-        matchStatus = data.status || data.matchStatus || data.eventStatus;
+        // Check if match is finished - Flashscore4 uses 'stage' field
+        matchStatus = data.stage || data.status || data.matchStatus || data.eventStatus;
         const isFinished = matchStatus && (
             matchStatus.toLowerCase().includes('finished') ||
             matchStatus.toLowerCase().includes('ended') ||
             matchStatus.toLowerCase().includes('ft') ||
-            matchStatus === 'FINISHED'
+            matchStatus === 'FINISHED' ||
+            matchStatus === 'Finished'
         );
+
+        console.log(`[AutoSettlement] Parsed: home=${homeGoals}, away=${awayGoals}, status=${matchStatus}, isFinished=${isFinished}`);
 
         if (homeGoals !== null && awayGoals !== null) {
             return {
