@@ -1211,20 +1211,21 @@ ${similarMatchesText}
 ` : '';
 
     if (market === 'First Half Over 0.5' && fhStats) {
+        const metrics = fhStats.metrics || {};
         return `Act as a professional football betting analyst.
 ${similarSection}
 Match: ${match.event_home_team} vs ${match.event_away_team}
 League: ${match.league_name}
 Market: First Half Over 0.5 Goals
 
-PURE FORM SCORE: ${fhStats.score}/100
-Confidence: ${fhStats.confidence}
-Reason: ${fhStats.reason}
+PURE FORM SCORE: ${fhStats.score || 'N/A'}/100
+Confidence: ${fhStats.confidence || 'N/A'}
+Reason: ${fhStats.reason || 'N/A'}
 
 KEY METRICS:
-- Home Team FH Goal Potential: ${fhStats.metrics.home_pot}%
-- Away Team FH Goal Potential: ${fhStats.metrics.away_pot}%
-- H2H FH Goal Potential: ${fhStats.metrics.h2h_pot}%
+- Home Team FH Goal Potential: ${metrics.home_pot ?? 'N/A'}%
+- Away Team FH Goal Potential: ${metrics.away_pot ?? 'N/A'}%
+- H2H FH Goal Potential: ${metrics.h2h_pot ?? 'N/A'}%
 
 Analyze and provide your verdict.`;
     }
