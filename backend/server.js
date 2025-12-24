@@ -3195,10 +3195,13 @@ app.get('/api/bets/stats', async (req, res) => {
 
 // Approve a new bet
 app.post('/api/bets/approve', requireAuth, async (req, res) => {
+    console.log('[API] /api/bets/approve called with:', JSON.stringify(req.body).substring(0, 200));
     try {
         const result = await approvedBets.approveBet(req.body);
+        console.log('[API] approveBet result:', JSON.stringify(result).substring(0, 200));
         res.json(result);
     } catch (err) {
+        console.error('[API] approveBet error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
