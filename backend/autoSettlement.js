@@ -293,6 +293,13 @@ async function fetchMatchResult(eventId) {
 // ============================================
 
 function isReadyForSettlement(bet) {
+    // Try Unix timestamp first (if matchTime is a number or numeric string)
+    if (bet.matchTime && !isNaN(parseFloat(bet.matchTime))) {
+        const matchTimestamp = parseFloat(bet.matchTime) * 1000; // Convert to milliseconds
+        const settlementTime = matchTimestamp + (SETTLEMENT_DELAY_HOURS * 60 * 60 * 1000);
+        return Date.now() >= settlementTime;
+    }
+
     if (!bet.matchDate || !bet.matchTime) {
         // If no time info, check if approved more than 4 hours ago
         const approvedAt = new Date(bet.approvedAt);
@@ -300,10 +307,17 @@ function isReadyForSettlement(bet) {
         return hoursAgo >= 4;
     }
 
-    // Parse match datetime
+    // Parse match datetime (HH:MM format)
     const [year, month, day] = bet.matchDate.split('-').map(Number);
-    const [hours, minutes] = bet.matchTime.split(':').map(Number);
+    const timeParts = bet.matchTime.split(':');
+    if (timeParts.length < 2) {
+        // Invalid time format, fall back to approval time
+        const approvedAt = new Date(bet.approvedAt);
+        const hoursAgo = (Date.now() - approvedAt.getTime()) / (1000 * 60 * 60);
+        return hoursAgo >= 4;
+    }
 
+    const [hours, minutes] = timeParts.map(Number);
     const matchDateTime = new Date(year, month - 1, day, hours, minutes);
     const settlementTime = new Date(matchDateTime.getTime() + (SETTLEMENT_DELAY_HOURS * 60 * 60 * 1000));
 
