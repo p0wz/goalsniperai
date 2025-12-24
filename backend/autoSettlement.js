@@ -116,9 +116,9 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     }
 
     // ============================================
-    // HOME TEAM GOALS (Ev Sahibi Gol)
+    // HOME TEAM GOALS (Ev Sahibi Gol) - including camelCase
     // ============================================
-    if (marketLower.includes('home team over 1.5') || marketLower.includes('ev 1.5') ||
+    if (marketLower === 'homeover15' || marketLower.includes('home team over 1.5') || marketLower.includes('ev 1.5') ||
         marketLower.includes('home over 1.5') || predLower.includes('home over 1.5')) {
         return homeGoals >= 2;
     }
@@ -132,9 +132,9 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     }
 
     // ============================================
-    // AWAY TEAM GOALS (Deplasman Gol)
+    // AWAY TEAM GOALS (Deplasman Gol) - including camelCase
     // ============================================
-    if (marketLower.includes('dep 0.5') || marketLower.includes('away over 0.5') ||
+    if (marketLower === 'awayover05' || marketLower.includes('dep 0.5') || marketLower.includes('away over 0.5') ||
         marketLower.includes('away team over 0.5') || predLower.includes('away over 0.5')) {
         return awayGoals >= 1;
     }
@@ -144,9 +144,9 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     }
 
     // ============================================
-    // FIRST HALF GOALS (İlk Yarı)
+    // FIRST HALF GOALS (İlk Yarı) - including camelCase
     // ============================================
-    if (marketLower.includes('first half over 0.5') || marketLower.includes('1y 0.5') ||
+    if (marketLower === 'firsthalfover05' || marketLower.includes('first half over 0.5') || marketLower.includes('1y 0.5') ||
         marketLower.includes('ht over 0.5') || predLower.includes('first half over')) {
         // If we have HT data, use it; otherwise assume FT has some goals
         if (halfTimeHome !== null && halfTimeAway !== null) {
@@ -164,9 +164,9 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     }
 
     // ============================================
-    // COMBO: MS1 & 1.5 Üst (Home Win + Over 1.5)
+    // COMBO: MS1 & 1.5 Üst (Home Win + Over 1.5) - including camelCase
     // ============================================
-    if (marketLower.includes('ms1 & 1.5') || marketLower.includes('ms1 and 1.5') ||
+    if (marketLower === 'ms1andover15' || marketLower.includes('ms1 & 1.5') || marketLower.includes('ms1 and 1.5') ||
         marketLower.includes('home win and over 1.5') || predLower.includes('ms1 & 1.5')) {
         return homeGoals > awayGoals && totalGoals >= 2;
     }
