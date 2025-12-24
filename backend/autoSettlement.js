@@ -37,44 +37,44 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     const predLower = (prediction || '').toLowerCase().trim();
 
     // ============================================
-    // OVER/UNDER TOTAL GOALS
+    // OVER/UNDER TOTAL GOALS (including camelCase: over25, under35)
     // ============================================
-    if (marketLower.includes('over 0.5') || predLower.includes('over 0.5')) {
+    if (marketLower.includes('over 0.5') || marketLower === 'over05' || predLower.includes('over 0.5')) {
         return totalGoals >= 1;
     }
-    if (marketLower.includes('over 1.5') || predLower.includes('over 1.5')) {
+    if (marketLower.includes('over 1.5') || marketLower === 'over15' || predLower.includes('over 1.5')) {
         return totalGoals >= 2;
     }
-    if (marketLower.includes('over 2.5') || predLower.includes('over 2.5')) {
+    if (marketLower.includes('over 2.5') || marketLower === 'over25' || predLower.includes('over 2.5')) {
         return totalGoals >= 3;
     }
-    if (marketLower.includes('over 3.5') || predLower.includes('over 3.5')) {
+    if (marketLower.includes('over 3.5') || marketLower === 'over35' || predLower.includes('over 3.5')) {
         return totalGoals >= 4;
     }
-    if (marketLower.includes('over 4.5') || predLower.includes('over 4.5')) {
+    if (marketLower.includes('over 4.5') || marketLower === 'over45' || predLower.includes('over 4.5')) {
         return totalGoals >= 5;
     }
 
-    if (marketLower.includes('under 0.5') || predLower.includes('under 0.5')) {
+    if (marketLower.includes('under 0.5') || marketLower === 'under05' || predLower.includes('under 0.5')) {
         return totalGoals === 0;
     }
-    if (marketLower.includes('under 1.5') || predLower.includes('under 1.5')) {
+    if (marketLower.includes('under 1.5') || marketLower === 'under15' || predLower.includes('under 1.5')) {
         return totalGoals <= 1;
     }
-    if (marketLower.includes('under 2.5') || predLower.includes('under 2.5')) {
+    if (marketLower.includes('under 2.5') || marketLower === 'under25' || predLower.includes('under 2.5')) {
         return totalGoals <= 2;
     }
-    if (marketLower.includes('under 3.5') || predLower.includes('under 3.5')) {
+    if (marketLower.includes('under 3.5') || marketLower === 'under35' || predLower.includes('under 3.5')) {
         return totalGoals <= 3;
     }
-    if (marketLower.includes('under 4.5') || predLower.includes('under 4.5')) {
+    if (marketLower.includes('under 4.5') || marketLower === 'under45' || predLower.includes('under 4.5')) {
         return totalGoals <= 4;
     }
 
     // ============================================
-    // BTTS (Both Teams To Score)
+    // BTTS (Both Teams To Score) - including camelCase 'btts'
     // ============================================
-    if (marketLower.includes('btts yes') || predLower.includes('btts yes') ||
+    if (marketLower === 'btts' || marketLower.includes('btts yes') || predLower.includes('btts yes') ||
         marketLower.includes('btts: yes') || predLower === 'gg' ||
         marketLower.includes('btts (both')) {
         return homeGoals >= 1 && awayGoals >= 1;
@@ -98,11 +98,12 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     }
 
     // ============================================
-    // DOUBLE CHANCE
+    // DOUBLE CHANCE - including camelCase 'doublechance'
     // ============================================
-    if (marketLower.includes('1x') || predLower.includes('1x') ||
+    if (marketLower === 'doublechance' || marketLower.includes('1x') || predLower.includes('1x') ||
         marketLower.includes('home or draw') || predLower.includes('home or draw') ||
         marketLower.includes('1x double')) {
+        // Default doublechance to 1X (home or draw)
         return homeGoals >= awayGoals; // Home win OR Draw
     }
     if (marketLower.includes('x2') || predLower.includes('x2') ||
@@ -175,11 +176,11 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     }
 
     // ============================================
-    // HANDICAP Markets (-1.5)
+    // HANDICAP Markets (-1.5) - including camelCase 'handicap'
     // ============================================
-    if (marketLower.includes('hnd. ms1 (-1.5)') || marketLower.includes('handicap home -1.5') ||
+    if (marketLower === 'handicap' || marketLower.includes('hnd. ms1 (-1.5)') || marketLower.includes('handicap home -1.5') ||
         marketLower.includes('home -1.5') || predLower.includes('home -1.5')) {
-        // Home team wins by 2+ goals
+        // Home team wins by 2+ goals (default handicap = Home -1.5)
         return (homeGoals - awayGoals) >= 2;
     }
     if (marketLower.includes('hnd. ms2 (-1.5)') || marketLower.includes('handicap away -1.5') ||
