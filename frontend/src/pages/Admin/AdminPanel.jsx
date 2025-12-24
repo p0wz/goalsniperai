@@ -214,13 +214,12 @@ export default function AdminPanel({ user, handleLogout }) {
     // Trigger manual settlement run
     const handleManualSettlement = async () => {
         try {
-            const res = await fetch('/api/settlement/run', { method: 'POST', credentials: 'include' });
-            const data = await res.json();
-            alert(data.message || 'Settlement triggered');
+            const res = await api.post('/settlement/run');
+            alert(res.data?.message || 'Settlement triggered');
             fetchApprovedBets();
             fetchTrainingPool();
         } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Error: ' + (err?.response?.data?.error || err.message));
         }
     };
 
