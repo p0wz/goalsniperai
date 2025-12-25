@@ -3133,15 +3133,28 @@ app.delete('/api/training-pool', requireAuth, async (req, res) => {
     }
 });
 
-// Sync training pool to Pinecone VectorDB
+// Sync training pool to Pinecone VectorDB (only new entries)
 app.post('/api/training-pool/sync-pinecone', requireAuth, async (req, res) => {
     if (req.user?.role !== 'admin') {
         return res.status(403).json({ success: false, error: 'Admin only' });
     }
 
     try {
-        const entries = await trainingPool.getAllEntries();
-        log.info(`[VectorDB Sync] Starting sync of ${entries.length} entries to Pinecone...`);
+        // Only get entries that haven't been synced yet
+        const entries = await trainingPool.getUnsyncedEntries();
+
+        if (entries.length === 0) {
+            log.info('[VectorDB Sync] No new entries to sync');
+            return res.json({
+                success: true,
+                message: 'No new entries to sync',
+                synced: 0,
+                failed: 0,
+                total: 0
+            });
+        }
+
+        log.info(`[VectorDB Sync] Starting sync of ${entries.length} NEW entries to Pinecone...`);
 
         let synced = 0;
         let failed = 0;
@@ -3166,6 +3179,8 @@ app.post('/api/training-pool/sync-pinecone', requireAuth, async (req, res) => {
 
                 const result = await vectorDB.storeMatch(matchData);
                 if (result.success) {
+                    // Mark as synced in DB
+                    await trainingPool.markAsSynced(entry.id);
                     synced++;
                 } else {
                     failed++;
@@ -3183,7 +3198,7 @@ app.post('/api/training-pool/sync-pinecone', requireAuth, async (req, res) => {
         log.info(`[VectorDB Sync] ✅ Complete: ${synced} synced, ${failed} failed`);
         res.json({
             success: true,
-            message: `Synced ${synced} entries to Pinecone`,
+            message: `Synced ${synced} new entries to Pinecone`,
             synced,
             failed,
             total: entries.length

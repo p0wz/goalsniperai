@@ -167,11 +167,49 @@ async function deleteEntry(id) {
     }
 }
 
+// ============================================
+// 🔄 Pinecone Sync Functions
+// ============================================
+
+async function getUnsyncedEntries() {
+    try {
+        // First, ensure the column exists (migration)
+        await db.execute(`
+            ALTER TABLE training_pool ADD COLUMN synced_to_pinecone INTEGER DEFAULT 0
+        `).catch(() => { }); // Ignore if column already exists
+
+        const result = await db.execute(`
+            SELECT * FROM training_pool 
+            WHERE synced_to_pinecone = 0 OR synced_to_pinecone IS NULL
+            ORDER BY settled_at DESC
+        `);
+        return result.rows.map(formatRow);
+    } catch (e) {
+        console.error('[TrainingPool] Get Unsynced Error:', e.message);
+        return [];
+    }
+}
+
+async function markAsSynced(id) {
+    try {
+        await db.execute({
+            sql: `UPDATE training_pool SET synced_to_pinecone = 1 WHERE id = ?`,
+            args: [id]
+        });
+        return { success: true };
+    } catch (e) {
+        console.error('[TrainingPool] Mark Synced Error:', e.message);
+        return { success: false, error: e.message };
+    }
+}
+
 module.exports = {
     addEntry,
     getAllEntries,
     getEntriesByResult,
     getStats,
     clearPool,
-    deleteEntry
+    deleteEntry,
+    getUnsyncedEntries,
+    markAsSynced
 };
