@@ -808,6 +808,7 @@ export default function AdminPanel({ user, handleLogout }) {
                                     <tr>
                                         <th className="px-4 py-3 text-left">Match</th>
                                         <th className="px-4 py-3 text-left">Market</th>
+                                        <th className="px-4 py-3 text-center">Odds</th>
                                         <th className="px-4 py-3 text-center">Status</th>
                                         <th className="px-4 py-3 text-center">Score</th>
                                         <th className="px-4 py-3 text-center">Actions</th>
@@ -821,6 +822,7 @@ export default function AdminPanel({ user, handleLogout }) {
                                                 <div className="text-xs text-muted-foreground">{bet.league} | {bet.matchTime}</div>
                                             </td>
                                             <td className="px-4 py-3">{bet.market}</td>
+                                            <td className="px-4 py-3 text-center font-bold text-blue-500">{bet.odds || '-'}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`px-2 py-1 rounded text-xs font-bold ${bet.status === 'WON' ? 'bg-green-500/20 text-green-500' :
                                                     bet.status === 'LOST' ? 'bg-red-500/20 text-red-500' :
@@ -842,7 +844,7 @@ export default function AdminPanel({ user, handleLogout }) {
                                         </tr>
                                     ))}
                                     {approvedBets.length === 0 && (
-                                        <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No approved bets yet</td></tr>
+                                        <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No approved bets yet</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -1514,6 +1516,7 @@ ${prompt}
                                                                                             league: m.league_name,
                                                                                             market: key,
                                                                                             prediction: key,
+                                                                                            odds: matchOdds[matchId] || null, // Manual odds input
                                                                                             matchDate: m.event_date || new Date().toISOString().split('T')[0],
                                                                                             matchTime: m.startTime || m.event_start_time,
                                                                                             stats: m.filterStats || m.stats || {},
