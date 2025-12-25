@@ -14,7 +14,7 @@ const PINECONE_HOST = process.env.PINECONE_HOST || ''; // e.g., xxx.svc.pinecone
 
 // Voyage AI for embeddings (200M tokens/month free)
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY || '';
-const VOYAGE_MODEL = 'voyage-3-lite'; // Fast, cost-effective model
+const VOYAGE_MODEL = 'voyage-3.5-lite'; // Fast, cost-effective model (200M free tokens)
 
 let pineconeClient = null;
 
