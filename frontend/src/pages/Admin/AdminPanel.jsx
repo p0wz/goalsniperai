@@ -75,7 +75,21 @@ export default function AdminPanel({ user, handleLogout }) {
         fetchBotStatus();
         fetchApprovedBets();
         fetchTrainingPool();
+        fetchCachedDailyAnalysis(); // Load cached analysis on page load
     }, []);
+
+    // Load cached daily analysis on mount
+    const fetchCachedDailyAnalysis = async () => {
+        try {
+            const res = await signalService.getLastDailyAnalysis();
+            if (res.success && res.data && !res.data.error) {
+                setDailyAnalysis(res.data);
+                console.log('📦 Loaded cached daily analysis');
+            }
+        } catch (e) {
+            console.log('No cached daily analysis available');
+        }
+    };
 
     const fetchBotStatus = async () => {
         try {

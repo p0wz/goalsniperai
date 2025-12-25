@@ -115,6 +115,11 @@ export const signalService = {
     getLastAnalysis: async (market) => {
         const response = await api.get(`/analysis/last/${market}`);
         return response.data;
+    },
+    // New: Get Last Daily Analysis (for Analiz Merkezi page reload persistence)
+    getLastDailyAnalysis: async () => {
+        const response = await api.get('/daily-analysis?force=false');
+        return response.data;
     }
 };
 
