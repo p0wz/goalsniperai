@@ -35,6 +35,7 @@ const ALLOWED_LEAGUES = require('./allowed_leagues');
 const approvedBets = require('./approvedBets');
 const trainingPool = require('./trainingPool');
 const autoSettlement = require('./autoSettlement');
+const vectorDB = require('./vectorDB');
 
 const app = express();
 
