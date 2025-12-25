@@ -49,6 +49,26 @@ export default function AdminPanel({ user, handleLogout }) {
     const [trainingPoolStats, setTrainingPoolStats] = useState(null);
     const [loadingTrainingPool, setLoadingTrainingPool] = useState(false);
 
+    // Manual Odds Input State
+    const [matchOdds, setMatchOdds] = useState({});
+
+    // Update odds for a specific match
+    const updateMatchOdds = (matchId, odds) => {
+        setMatchOdds(prev => ({ ...prev, [matchId]: odds }));
+    };
+
+    // Get prompt with odds included
+    const getPromptWithOdds = (match, marketName) => {
+        const matchId = match.event_key || match.matchId || match.id;
+        const odds = matchOdds[matchId];
+        const prompt = match.aiPrompt || match.ai_prompts?.[0] || '';
+        if (odds && prompt) {
+            const oddsText = `\n\n💰 ORAN BİLGİSİ:\n${marketName} Oranı: ${odds}\n⚠️ Bu oranı analiz sırasında değerlendir.`;
+            return prompt + oddsText;
+        }
+        return prompt;
+    };
+
     useEffect(() => {
         fetchLiveSignals();
         fetchBetHistory();
@@ -1417,78 +1437,93 @@ ${prompt}
                                                             <th className="p-3 text-left font-medium">Maç</th>
                                                             <th className="p-3 text-center font-medium">Saat</th>
                                                             <th className="p-3 text-left font-medium">Lig</th>
+                                                            <th className="p-3 text-center font-medium w-20">Oran</th>
                                                             <th className="p-3 text-center font-medium">AI Prompt</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {items.map((m, i) => (
-                                                            <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
-                                                                <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
-                                                                <td className="p-3 text-center text-sm">
-                                                                    {m.startTime ? new Date(m.startTime * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                                </td>
-                                                                <td className="p-3 text-muted-foreground">{m.league_name}</td>
-                                                                <td className="p-3 text-center">
-                                                                    <div className="flex justify-center gap-2">
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                if (m.aiPrompt || m.ai_prompts?.[0]) {
-                                                                                    navigator.clipboard.writeText(m.aiPrompt || m.ai_prompts?.[0]);
-                                                                                    alert('AI Prompt kopyalandı!');
-                                                                                }
-                                                                            }}
-                                                                            className="px-3 py-1 rounded text-xs font-medium bg-muted hover:bg-primary hover:text-primary-foreground transition-all"
-                                                                        >
-                                                                            📋
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleAddToPicks(m, key, 'single')}
-                                                                            className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
-                                                                            title="Add to Daily Picks"
-                                                                        >
-                                                                            ⭐ Pick
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleAddToPicks(m, key, 'parlay')}
-                                                                            className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
-                                                                            title="Add to Daily Parlay"
-                                                                        >
-                                                                            🔥 Parlay
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    const res = await betsService.approve({
-                                                                                        eventId: m.event_key || m.matchId || m.id,
-                                                                                        match: `${m.event_home_team} vs ${m.event_away_team}`,
-                                                                                        homeTeam: m.event_home_team,
-                                                                                        awayTeam: m.event_away_team,
-                                                                                        league: m.league_name,
-                                                                                        market: key,
-                                                                                        prediction: key,
-                                                                                        matchDate: m.event_date || new Date().toISOString().split('T')[0],
-                                                                                        matchTime: m.startTime || m.event_start_time,
-                                                                                        stats: m.filterStats || m.stats || {},
-                                                                                        aiPrompt: m.aiPrompt || m.ai_prompts?.[0]
-                                                                                    });
-                                                                                    if (res.success) {
-                                                                                        alert('✅ Bahis onaylandı ve takibe alındı!');
-                                                                                    } else {
-                                                                                        alert('Hata: ' + res.error);
+                                                        {items.map((m, i) => {
+                                                            const matchId = m.event_key || m.matchId || m.id || i;
+                                                            return (
+                                                                <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+                                                                    <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
+                                                                    <td className="p-3 text-center text-sm">
+                                                                        {m.startTime ? new Date(m.startTime * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                                    </td>
+                                                                    <td className="p-3 text-muted-foreground">{m.league_name}</td>
+                                                                    <td className="p-3 text-center">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="1.85"
+                                                                            value={matchOdds[matchId] || ''}
+                                                                            onChange={(e) => updateMatchOdds(matchId, e.target.value)}
+                                                                            className="w-16 px-2 py-1 text-center text-sm rounded border bg-background focus:ring-2 focus:ring-primary focus:border-primary"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-3 text-center">
+                                                                        <div className="flex justify-center gap-2">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const prompt = getPromptWithOdds(m, key);
+                                                                                    if (prompt) {
+                                                                                        navigator.clipboard.writeText(prompt);
+                                                                                        alert(matchOdds[matchId] ? `AI Prompt kopyalandı! (Oran: ${matchOdds[matchId]})` : 'AI Prompt kopyalandı!');
                                                                                     }
-                                                                                } catch (e) {
-                                                                                    alert('Hata: ' + e.message);
-                                                                                }
-                                                                            }}
-                                                                            className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
-                                                                            title="Onayla & Takibe Al"
-                                                                        >
-                                                                            ✅ Takip
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
+                                                                                }}
+                                                                                className={`px-3 py-1 rounded text-xs font-medium transition-all ${matchOdds[matchId] ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-muted hover:bg-primary hover:text-primary-foreground'}`}
+                                                                                title={matchOdds[matchId] ? `Oran dahil: ${matchOdds[matchId]}` : 'Oran girilmedi'}
+                                                                            >
+                                                                                {matchOdds[matchId] ? '📋💰' : '📋'}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleAddToPicks(m, key, 'single')}
+                                                                                className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
+                                                                                title="Add to Daily Picks"
+                                                                            >
+                                                                                ⭐ Pick
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleAddToPicks(m, key, 'parlay')}
+                                                                                className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
+                                                                                title="Add to Daily Parlay"
+                                                                            >
+                                                                                🔥 Parlay
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    try {
+                                                                                        const res = await betsService.approve({
+                                                                                            eventId: m.event_key || m.matchId || m.id,
+                                                                                            match: `${m.event_home_team} vs ${m.event_away_team}`,
+                                                                                            homeTeam: m.event_home_team,
+                                                                                            awayTeam: m.event_away_team,
+                                                                                            league: m.league_name,
+                                                                                            market: key,
+                                                                                            prediction: key,
+                                                                                            matchDate: m.event_date || new Date().toISOString().split('T')[0],
+                                                                                            matchTime: m.startTime || m.event_start_time,
+                                                                                            stats: m.filterStats || m.stats || {},
+                                                                                            aiPrompt: m.aiPrompt || m.ai_prompts?.[0]
+                                                                                        });
+                                                                                        if (res.success) {
+                                                                                            alert('✅ Bahis onaylandı ve takibe alındı!');
+                                                                                        } else {
+                                                                                            alert('Hata: ' + res.error);
+                                                                                        }
+                                                                                    } catch (e) {
+                                                                                        alert('Hata: ' + e.message);
+                                                                                    }
+                                                                                }}
+                                                                                className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
+                                                                                title="Onayla & Takibe Al"
+                                                                            >
+                                                                                ✅ Takip
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             ) : (
@@ -1592,209 +1627,215 @@ ${prompt}
                 }
 
                 {/* SENTIO Management Tab */}
-                {activeTab === 'sentio' && (
-                    <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl font-bold flex items-center gap-2">
-                                    🤖 SENTIO Chat Yönetimi
-                                </h2>
-                                <p className="text-sm text-muted-foreground">
-                                    Kullanıcıların sohbet edebileceği maçları yönetin
-                                </p>
-                            </div>
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const res = await sentioService.getMemoryStatus();
-                                        if (res.success) {
-                                            setSentioMemory({
-                                                date: res.date,
-                                                matchCount: res.matchCount,
-                                                matches: res.matches || [],
-                                                populatedAt: res.populatedAt
-                                            });
-                                        }
-                                    } catch (e) {
-                                        alert('Hafıza durumu alınamadı: ' + e.message);
-                                    }
-                                }}
-                                className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-500 font-medium hover:bg-cyan-500/30"
-                            >
-                                🔄 Yenile
-                            </button>
-                        </div>
-
-                        {/* Memory Status Card */}
-                        <div className="rounded-xl p-6 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-3xl shadow-lg">
-                                        🧠
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-white">SENTIO Hafızası</h3>
-                                        <p className="text-sm text-white/60">
-                                            {sentioMemory.date || 'Henüz yüklenmedi'}
-                                        </p>
-                                    </div>
+                {
+                    activeTab === 'sentio' && (
+                        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                                        🤖 SENTIO Chat Yönetimi
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Kullanıcıların sohbet edebileceği maçları yönetin
+                                    </p>
                                 </div>
-                                <div className="flex items-center gap-6">
-                                    <div className="text-center">
-                                        <div className="text-3xl font-bold text-cyan-400">{sentioMemory.matchCount || 0}</div>
-                                        <div className="text-xs text-white/50">Maç Sayısı</div>
-                                    </div>
-                                    <button
-                                        onClick={async () => {
-                                            if (!confirm('SENTIO hafızasını temizlemek istediğinizden emin misiniz?')) return;
-                                            try {
-                                                const res = await sentioService.clearMemory();
-                                                if (res.success) {
-                                                    setSentioMemory({ date: null, matchCount: 0, matches: [] });
-                                                    alert('✅ SENTIO hafızası temizlendi');
-                                                }
-                                            } catch (e) {
-                                                alert('Hata: ' + e.message);
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const res = await sentioService.getMemoryStatus();
+                                            if (res.success) {
+                                                setSentioMemory({
+                                                    date: res.date,
+                                                    matchCount: res.matchCount,
+                                                    matches: res.matches || [],
+                                                    populatedAt: res.populatedAt
+                                                });
                                             }
-                                        }}
-                                        className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 border border-red-500/30"
-                                    >
-                                        🗑️ Hafızayı Temizle
-                                    </button>
+                                        } catch (e) {
+                                            alert('Hafıza durumu alınamadı: ' + e.message);
+                                        }
+                                    }}
+                                    className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-500 font-medium hover:bg-cyan-500/30"
+                                >
+                                    🔄 Yenile
+                                </button>
+                            </div>
+
+                            {/* Memory Status Card */}
+                            <div className="rounded-xl p-6 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
+                                <div className="flex items-center justify-between flex-wrap gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-3xl shadow-lg">
+                                            🧠
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">SENTIO Hafızası</h3>
+                                            <p className="text-sm text-white/60">
+                                                {sentioMemory.date || 'Henüz yüklenmedi'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-6">
+                                        <div className="text-center">
+                                            <div className="text-3xl font-bold text-cyan-400">{sentioMemory.matchCount || 0}</div>
+                                            <div className="text-xs text-white/50">Maç Sayısı</div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm('SENTIO hafızasını temizlemek istediğinizden emin misiniz?')) return;
+                                                try {
+                                                    const res = await sentioService.clearMemory();
+                                                    if (res.success) {
+                                                        setSentioMemory({ date: null, matchCount: 0, matches: [] });
+                                                        alert('✅ SENTIO hafızası temizlendi');
+                                                    }
+                                                } catch (e) {
+                                                    alert('Hata: ' + e.message);
+                                                }
+                                            }}
+                                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 border border-red-500/30"
+                                        >
+                                            🗑️ Hafızayı Temizle
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Match List */}
-                        {sentioMemory.matches && sentioMemory.matches.length > 0 ? (
-                            <div className="rounded-lg border bg-card overflow-hidden">
-                                <div className="p-3 bg-muted border-b">
-                                    <h3 className="font-medium">📋 Hafızadaki Maçlar</h3>
-                                </div>
-                                <div className="divide-y max-h-96 overflow-y-auto">
-                                    {sentioMemory.matches.map((m, i) => (
-                                        <div key={i} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                                            <div>
-                                                <div className="font-medium">{m.homeTeam} vs {m.awayTeam}</div>
-                                                <div className="text-xs text-muted-foreground">{m.league}</div>
+                            {/* Match List */}
+                            {sentioMemory.matches && sentioMemory.matches.length > 0 ? (
+                                <div className="rounded-lg border bg-card overflow-hidden">
+                                    <div className="p-3 bg-muted border-b">
+                                        <h3 className="font-medium">📋 Hafızadaki Maçlar</h3>
+                                    </div>
+                                    <div className="divide-y max-h-96 overflow-y-auto">
+                                        {sentioMemory.matches.map((m, i) => (
+                                            <div key={i} className="p-3 flex items-center justify-between hover:bg-muted/50">
+                                                <div>
+                                                    <div className="font-medium">{m.homeTeam} vs {m.awayTeam}</div>
+                                                    <div className="text-xs text-muted-foreground">{m.league}</div>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {m.approvedAt ? new Date(m.approvedAt).toLocaleTimeString('tr-TR') : ''}
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {m.approvedAt ? new Date(m.approvedAt).toLocaleTimeString('tr-TR') : ''}
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                                    <p className="text-lg text-muted-foreground">📭 SENTIO hafızası boş</p>
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        "📊 Ham Data" sekmesinden maçları SENTIO'ya gönderin.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Usage Info */}
+                            <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                                <h3 className="font-medium text-cyan-400 mb-2">💡 Nasıl Çalışır?</h3>
+                                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                                    <li><strong>"📊 Ham Data"</strong> sekmesine gidin</li>
+                                    <li>Maçları tarayın (Lig Filtreli veya Tüm Maçlar)</li>
+                                    <li><strong>"🤖 Tümünü SENTIO'ya Gönder"</strong> butonuna tıklayın</li>
+                                    <li>Kullanıcılar dashboard'da SENTIO Chat üzerinden bu maçlar hakkında sohbet edebilir</li>
+                                </ul>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Raw Stats Tab */}
+                {
+                    activeTab === 'raw-stats' && (
+                        <RawStatsTab />
+                    )
+                }
+
+                {/* Payments Tab */}
+                {
+                    activeTab === 'payments' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-semibold">💰 Ödeme Yönetimi</h2>
+                                <button
+                                    onClick={async () => {
+                                        setLoadingPayments(true);
+                                        try {
+                                            const res = await paymentService.getPending();
+                                            if (res.success) setPendingPayments(res.payments);
+                                        } catch (e) { console.error(e); }
+                                        finally { setLoadingPayments(false); }
+                                    }}
+                                    className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
+                                >
+                                    {loadingPayments ? '...' : '🔄 Yenile'}
+                                </button>
+                            </div>
+
+                            {pendingPayments.length > 0 ? (
+                                <div className="space-y-4">
+                                    {pendingPayments.map(payment => (
+                                        <div key={payment.id} className="border rounded-lg p-4 bg-card">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <div className="font-bold text-lg">{payment.userName}</div>
+                                                    <div className="text-sm text-muted-foreground">{payment.userEmail}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-2xl font-bold text-green-500">${payment.amount}</div>
+                                                    <div className="text-xs text-muted-foreground">{payment.planType === 'monthly' ? 'Aylık' : 'Yıllık'}</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                                                <div><span className="text-muted-foreground">Kripto:</span> {payment.cryptoType}</div>
+                                                <div><span className="text-muted-foreground">Tarih:</span> {new Date(payment.createdAt).toLocaleString('tr-TR')}</div>
+                                                <div className="col-span-2"><span className="text-muted-foreground">ID:</span> <code className="text-xs">{payment.id}</code></div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!confirm(`${payment.userName} kullanıcısını PRO yapmak istediğinize emin misiniz?`)) return;
+                                                        try {
+                                                            const res = await paymentService.confirm(payment.id);
+                                                            if (res.success) {
+                                                                alert('✅ Ödeme onaylandı, kullanıcı PRO yapıldı!');
+                                                                setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
+                                                            }
+                                                        } catch (e) { alert('Hata: ' + e.message); }
+                                                    }}
+                                                    className="flex-1 py-2 bg-green-500 text-white rounded font-bold hover:bg-green-600"
+                                                >
+                                                    ✅ Onayla
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        const reason = prompt('Red sebebi (opsiyonel):');
+                                                        try {
+                                                            const res = await paymentService.reject(payment.id, reason);
+                                                            if (res.success) {
+                                                                alert('❌ Ödeme reddedildi');
+                                                                setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
+                                                            }
+                                                        } catch (e) { alert('Hata: ' + e.message); }
+                                                    }}
+                                                    className="flex-1 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600"
+                                                >
+                                                    ❌ Reddet
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="text-center py-12 border-2 border-dashed rounded-xl">
-                                <p className="text-lg text-muted-foreground">📭 SENTIO hafızası boş</p>
-                                <p className="text-sm text-muted-foreground mt-2">
-                                    "📊 Ham Data" sekmesinden maçları SENTIO'ya gönderin.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Usage Info */}
-                        <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                            <h3 className="font-medium text-cyan-400 mb-2">💡 Nasıl Çalışır?</h3>
-                            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                                <li><strong>"📊 Ham Data"</strong> sekmesine gidin</li>
-                                <li>Maçları tarayın (Lig Filtreli veya Tüm Maçlar)</li>
-                                <li><strong>"🤖 Tümünü SENTIO'ya Gönder"</strong> butonuna tıklayın</li>
-                                <li>Kullanıcılar dashboard'da SENTIO Chat üzerinden bu maçlar hakkında sohbet edebilir</li>
-                            </ul>
+                            ) : (
+                                <div className="text-center py-12 border rounded-lg">
+                                    <div className="text-4xl mb-2">💸</div>
+                                    <p className="text-muted-foreground">Bekleyen ödeme yok</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Yenilemek için butona tıklayın</p>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                )}
-
-                {/* Raw Stats Tab */}
-                {activeTab === 'raw-stats' && (
-                    <RawStatsTab />
-                )}
-
-                {/* Payments Tab */}
-                {activeTab === 'payments' && (
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-semibold">💰 Ödeme Yönetimi</h2>
-                            <button
-                                onClick={async () => {
-                                    setLoadingPayments(true);
-                                    try {
-                                        const res = await paymentService.getPending();
-                                        if (res.success) setPendingPayments(res.payments);
-                                    } catch (e) { console.error(e); }
-                                    finally { setLoadingPayments(false); }
-                                }}
-                                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
-                            >
-                                {loadingPayments ? '...' : '🔄 Yenile'}
-                            </button>
-                        </div>
-
-                        {pendingPayments.length > 0 ? (
-                            <div className="space-y-4">
-                                {pendingPayments.map(payment => (
-                                    <div key={payment.id} className="border rounded-lg p-4 bg-card">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <div className="font-bold text-lg">{payment.userName}</div>
-                                                <div className="text-sm text-muted-foreground">{payment.userEmail}</div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-2xl font-bold text-green-500">${payment.amount}</div>
-                                                <div className="text-xs text-muted-foreground">{payment.planType === 'monthly' ? 'Aylık' : 'Yıllık'}</div>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                                            <div><span className="text-muted-foreground">Kripto:</span> {payment.cryptoType}</div>
-                                            <div><span className="text-muted-foreground">Tarih:</span> {new Date(payment.createdAt).toLocaleString('tr-TR')}</div>
-                                            <div className="col-span-2"><span className="text-muted-foreground">ID:</span> <code className="text-xs">{payment.id}</code></div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={async () => {
-                                                    if (!confirm(`${payment.userName} kullanıcısını PRO yapmak istediğinize emin misiniz?`)) return;
-                                                    try {
-                                                        const res = await paymentService.confirm(payment.id);
-                                                        if (res.success) {
-                                                            alert('✅ Ödeme onaylandı, kullanıcı PRO yapıldı!');
-                                                            setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
-                                                        }
-                                                    } catch (e) { alert('Hata: ' + e.message); }
-                                                }}
-                                                className="flex-1 py-2 bg-green-500 text-white rounded font-bold hover:bg-green-600"
-                                            >
-                                                ✅ Onayla
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    const reason = prompt('Red sebebi (opsiyonel):');
-                                                    try {
-                                                        const res = await paymentService.reject(payment.id, reason);
-                                                        if (res.success) {
-                                                            alert('❌ Ödeme reddedildi');
-                                                            setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
-                                                        }
-                                                    } catch (e) { alert('Hata: ' + e.message); }
-                                                }}
-                                                className="flex-1 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600"
-                                            >
-                                                ❌ Reddet
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12 border rounded-lg">
-                                <div className="text-4xl mb-2">💸</div>
-                                <p className="text-muted-foreground">Bekleyen ödeme yok</p>
-                                <p className="text-xs text-muted-foreground mt-1">Yenilemek için butona tıklayın</p>
-                            </div>
-                        )}
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Market Tabs (Legacy/Other) */}
                 {
