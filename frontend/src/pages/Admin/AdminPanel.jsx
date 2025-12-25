@@ -1424,7 +1424,8 @@ Yukarıdaki maç havuzunu detaylı incele. Amacımız "BANKO" (Güvenilir) kupon
 ════════════════════════════════════════
 
 ${items.map((m, idx) => {
-                                                                    const prompt = m.aiPrompt || m.ai_prompts?.[0] || '';
+                                                                    // Use getPromptWithOdds to include odds if entered
+                                                                    const prompt = getPromptWithOdds(m, config.name);
                                                                     return `\n[${idx + 1}/${items.length}] ${m.event_home_team} vs ${m.event_away_team}
 ----------------------------------------
 ${prompt}
