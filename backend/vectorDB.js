@@ -141,14 +141,14 @@ async function storeMatch(matchData) {
                     values: embedding,
                     metadata: {
                         match: matchData.match || `${matchData.homeTeam} vs ${matchData.awayTeam}`,
-                        homeTeam: matchData.homeTeam,
-                        awayTeam: matchData.awayTeam,
-                        league: matchData.league,
-                        market: matchData.market,
-                        result: matchData.result,
-                        finalScore: matchData.finalScore,
-                        homeGoals: matchData.homeGoals,
-                        awayGoals: matchData.awayGoals,
+                        homeTeam: matchData.homeTeam || 'Unknown',
+                        awayTeam: matchData.awayTeam || 'Unknown',
+                        league: matchData.league || 'Unknown',
+                        market: matchData.market || 'Unknown',
+                        result: matchData.result || 'PENDING',
+                        finalScore: matchData.finalScore || 'N/A',
+                        homeGoals: matchData.homeGoals ?? -1,  // Use -1 for unknown
+                        awayGoals: matchData.awayGoals ?? -1,  // Use -1 for unknown
                         settledAt: matchData.settledAt || new Date().toISOString()
                     }
                 }]
