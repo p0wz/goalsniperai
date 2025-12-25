@@ -24,6 +24,23 @@ function MarketTab({ marketKey, handleAddToPicks }) {
     const [loading, setLoading] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [copiedId, setCopiedId] = useState(null);
+    const [matchOdds, setMatchOdds] = useState({}); // Store odds for each match
+
+    // Update odds for a specific match
+    const updateMatchOdds = (matchId, odds) => {
+        setMatchOdds(prev => ({ ...prev, [matchId]: odds }));
+    };
+
+    // Get prompt with odds included
+    const getPromptWithOdds = (match) => {
+        const matchId = match.event_key || match.matchId;
+        const odds = matchOdds[matchId];
+        if (odds && match.aiPrompt) {
+            const oddsText = `\n\n💰 ORAN BİLGİSİ:\n${config.name} Oranı: ${odds}\n⚠️ Bu oranı analiz sırasında değerlendir.`;
+            return match.aiPrompt + oddsText;
+        }
+        return match.aiPrompt;
+    };
 
     // Fetch history on mount
     useEffect(() => {
@@ -88,8 +105,9 @@ function MarketTab({ marketKey, handleAddToPicks }) {
     };
 
     const copyPrompt = (match) => {
-        if (match.aiPrompt) {
-            navigator.clipboard.writeText(match.aiPrompt);
+        const promptWithOdds = getPromptWithOdds(match);
+        if (promptWithOdds) {
+            navigator.clipboard.writeText(promptWithOdds);
             setCopiedId(match.event_key || match.matchId);
             setTimeout(() => setCopiedId(null), 2000);
         }
@@ -100,7 +118,7 @@ function MarketTab({ marketKey, handleAddToPicks }) {
 
         const allPrompts = candidates.map((m, i) => {
             const header = `\n${'='.repeat(60)}\n📊 MAÇ ${i + 1}/${candidates.length}: ${m.event_home_team} vs ${m.event_away_team}\n${'='.repeat(60)}\n`;
-            return header + m.aiPrompt;
+            return header + getPromptWithOdds(m);
         }).join('\n\n');
 
         const fullText = `🎯 ${config.name} - TOPLU ANALİZ (${candidates.length} MAÇ)\n${allPrompts}`;
@@ -202,50 +220,66 @@ function MarketTab({ marketKey, handleAddToPicks }) {
                                     <tr>
                                         <th className="p-3 text-left">Maç</th>
                                         <th className="p-3 text-left">Lig</th>
+                                        <th className="p-3 text-center w-24">Oran</th>
                                         <th className="p-3 text-center">AI Prompt</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {candidates.map((m, i) => (
-                                        <tr key={i} className="border-t hover:bg-muted/50">
-                                            <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
-                                            <td className="p-3 text-muted-foreground">{m.league_name}</td>
-                                            <td className="p-3 text-center flex gap-2 justify-center">
-                                                <button
-                                                    onClick={() => copyPrompt(m)}
-                                                    className={clsx(
-                                                        "px-3 py-1 rounded text-xs font-medium transition-all",
-                                                        copiedId === (m.event_key || m.matchId)
-                                                            ? "bg-green-500 text-white"
-                                                            : "bg-muted hover:bg-primary hover:text-primary-foreground"
-                                                    )}
-                                                >
-                                                    {copiedId === (m.event_key || m.matchId) ? '✓' : '📋'}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAddToPicks(m, config.name, 'single')}
-                                                    className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
-                                                    title="Add to Daily Picks"
-                                                >
-                                                    ⭐ Pick
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAddToPicks(m, config.name, 'parlay')}
-                                                    className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
-                                                    title="Add to Daily Parlay"
-                                                >
-                                                    🔥 Parlay
-                                                </button>
-                                                <button
-                                                    onClick={() => handleApproveBet(m)}
-                                                    className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
-                                                    title="Onayla & Takibe Al"
-                                                >
-                                                    ✅ Takip
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {candidates.map((m, i) => {
+                                        const matchId = m.event_key || m.matchId;
+                                        return (
+                                            <tr key={i} className="border-t hover:bg-muted/50">
+                                                <td className="p-3 font-medium">{m.event_home_team} vs {m.event_away_team}</td>
+                                                <td className="p-3 text-muted-foreground">{m.league_name}</td>
+                                                <td className="p-3 text-center">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="1.85"
+                                                        value={matchOdds[matchId] || ''}
+                                                        onChange={(e) => updateMatchOdds(matchId, e.target.value)}
+                                                        className="w-16 px-2 py-1 text-center text-sm rounded border bg-background focus:ring-2 focus:ring-primary focus:border-primary"
+                                                    />
+                                                </td>
+                                                <td className="p-3 text-center flex gap-2 justify-center">
+                                                    <button
+                                                        onClick={() => copyPrompt(m)}
+                                                        className={clsx(
+                                                            "px-3 py-1 rounded text-xs font-medium transition-all",
+                                                            copiedId === matchId
+                                                                ? "bg-green-500 text-white"
+                                                                : matchOdds[matchId]
+                                                                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                                                                    : "bg-muted hover:bg-primary hover:text-primary-foreground"
+                                                        )}
+                                                        title={matchOdds[matchId] ? `Oran dahil: ${matchOdds[matchId]}` : 'Oran girilmedi'}
+                                                    >
+                                                        {copiedId === matchId ? '✓' : matchOdds[matchId] ? '📋💰' : '📋'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleAddToPicks(m, config.name, 'single')}
+                                                        className="px-3 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all border border-yellow-500/20"
+                                                        title="Add to Daily Picks"
+                                                    >
+                                                        ⭐ Pick
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleAddToPicks(m, config.name, 'parlay')}
+                                                        className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20"
+                                                        title="Add to Daily Parlay"
+                                                    >
+                                                        🔥 Parlay
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleApproveBet(m)}
+                                                        className="px-3 py-1 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
+                                                        title="Onayla & Takibe Al"
+                                                    >
+                                                        ✅ Takip
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -323,8 +357,9 @@ function MarketTab({ marketKey, handleAddToPicks }) {
                         </div>
                     )}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }
 
