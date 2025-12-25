@@ -3132,6 +3132,66 @@ app.delete('/api/training-pool', requireAuth, async (req, res) => {
     }
 });
 
+// Sync training pool to Pinecone VectorDB
+app.post('/api/training-pool/sync-pinecone', requireAuth, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    try {
+        const entries = await trainingPool.getAllEntries();
+        log.info(`[VectorDB Sync] Starting sync of ${entries.length} entries to Pinecone...`);
+
+        let synced = 0;
+        let failed = 0;
+
+        for (const entry of entries) {
+            try {
+                const matchData = {
+                    id: entry.id,
+                    eventId: entry.eventId,
+                    match: entry.match,
+                    homeTeam: entry.homeTeam,
+                    awayTeam: entry.awayTeam,
+                    league: entry.league,
+                    market: entry.market,
+                    result: entry.result,
+                    finalScore: entry.finalScore,
+                    homeGoals: entry.homeGoals,
+                    awayGoals: entry.awayGoals,
+                    settledAt: entry.settledAt,
+                    stats: entry.stats
+                };
+
+                const result = await vectorDB.storeMatch(matchData);
+                if (result.success) {
+                    synced++;
+                } else {
+                    failed++;
+                    log.warn(`[VectorDB Sync] Failed: ${entry.match} - ${result.error}`);
+                }
+
+                // Small delay to avoid rate limits
+                await new Promise(r => setTimeout(r, 200));
+            } catch (e) {
+                failed++;
+                log.error(`[VectorDB Sync] Error: ${e.message}`);
+            }
+        }
+
+        log.info(`[VectorDB Sync] ✅ Complete: ${synced} synced, ${failed} failed`);
+        res.json({
+            success: true,
+            message: `Synced ${synced} entries to Pinecone`,
+            synced,
+            failed,
+            total: entries.length
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // ============================================
 // 🏀 NBA Props API
 // ============================================
