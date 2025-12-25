@@ -223,6 +223,21 @@ export default function AdminPanel({ user, handleLogout }) {
         }
     };
 
+    // Sync training pool to Pinecone VectorDB
+    const handleSyncPinecone = async () => {
+        if (!confirm('Training Pool verilerini Pinecone\'a sync et?')) return;
+        try {
+            const res = await api.post('/training-pool/sync-pinecone');
+            if (res.data.success) {
+                alert(`✅ Pinecone Sync tamamlandı!\n${res.data.synced} kayıt sync edildi, ${res.data.failed} başarısız.`);
+            } else {
+                alert('Hata: ' + res.data.error);
+            }
+        } catch (err) {
+            alert('Error: ' + (err?.response?.data?.error || err.message));
+        }
+    };
+
     const handleRunDaily = async (leagueFilter = true) => {
         try {
             setIsAnalysing(true);
@@ -709,6 +724,12 @@ export default function AdminPanel({ user, handleLogout }) {
                                     className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                                 >
                                     ⚡ Run Settlement
+                                </button>
+                                <button
+                                    onClick={handleSyncPinecone}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                                >
+                                    🧠 Sync Pinecone
                                 </button>
                                 <button
                                     onClick={fetchApprovedBets}
