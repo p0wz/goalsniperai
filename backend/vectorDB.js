@@ -68,7 +68,8 @@ async function generateEmbedding(text) {
     try {
         const response = await axios.post('https://api.voyageai.com/v1/embeddings', {
             input: [text],
-            model: VOYAGE_MODEL
+            model: VOYAGE_MODEL,
+            output_dimension: 512  // Match Pinecone index dimension
         }, {
             headers: {
                 'Authorization': `Bearer ${VOYAGE_API_KEY}`,
