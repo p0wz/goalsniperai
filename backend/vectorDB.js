@@ -1,19 +1,20 @@
 /**
  * Vector Database Module
  * Uses Pinecone for storing and querying match embeddings
- * Embeddings generated via Gemini API
+ * Embeddings generated via Voyage AI (high free tier quota)
  */
 
 require('dotenv').config();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 
 // Pinecone configuration
 const PINECONE_API_KEY = process.env.PINECONE_API_KEY || '';
 const PINECONE_INDEX = process.env.PINECONE_INDEX || 'goalsniper-matches';
 const PINECONE_HOST = process.env.PINECONE_HOST || ''; // e.g., xxx.svc.pinecone.io
 
-// Gemini for embeddings
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Voyage AI for embeddings (200M tokens/month free)
+const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY || '';
+const VOYAGE_MODEL = 'voyage-3-lite'; // Fast, cost-effective model
 
 let pineconeClient = null;
 
@@ -40,7 +41,8 @@ async function initVectorDB() {
 
         if (response.ok) {
             const stats = await response.json();
-            console.log(`[VectorDB] ✅ Connected to Pinecone. Vectors: ${stats.totalVectorCount || 0}`);
+            const voyageStatus = VOYAGE_API_KEY ? '✅' : '❌';
+            console.log(`[VectorDB] ✅ Connected to Pinecone. Vectors: ${stats.totalVectorCount || 0} | Voyage AI: ${voyageStatus}`);
             pineconeClient = { host: PINECONE_HOST, apiKey: PINECONE_API_KEY };
             return true;
         } else {
@@ -54,16 +56,32 @@ async function initVectorDB() {
 }
 
 // ============================================
-// 🧠 Generate Embedding using Gemini
+// 🧠 Generate Embedding using Voyage AI
 // ============================================
 
 async function generateEmbedding(text) {
+    if (!VOYAGE_API_KEY) {
+        console.error('[VectorDB] Voyage API key not configured');
+        return null;
+    }
+
     try {
-        const model = genAI.getGenerativeModel({ model: 'embedding-001' });
-        const result = await model.embedContent(text);
-        return result.embedding.values;
+        const response = await axios.post('https://api.voyageai.com/v1/embeddings', {
+            input: [text],
+            model: VOYAGE_MODEL
+        }, {
+            headers: {
+                'Authorization': `Bearer ${VOYAGE_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.data && response.data.data && response.data.data[0]) {
+            return response.data.data[0].embedding;
+        }
+        return null;
     } catch (e) {
-        console.error('[VectorDB] Embedding error:', e.message);
+        console.error('[VectorDB] Voyage Embedding error:', e.response?.data?.detail || e.message);
         return null;
     }
 }
