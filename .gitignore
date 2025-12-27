@@ -35,3 +35,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+flutter_sdk/
+flutter_sdk.zip
+temp-betting-buddy/
+overview.md

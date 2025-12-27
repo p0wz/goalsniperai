@@ -133,8 +133,27 @@ function formatBetRow(row) {
         status: row.status,
         resultScore: row.result_score,
         approvedAt: row.approved_at,
-        settledAt: row.settled_at
+        settledAt: row.settled_at,
+        isMobile: row.is_mobile === 1 // Convert to boolean
     };
+}
+
+// ============================================
+// 📱 Toggle Mobile Status
+// ============================================
+
+async function toggleMobile(betId, isMobile) {
+    try {
+        const val = isMobile ? 1 : 0;
+        await db.execute({
+            sql: `UPDATE approved_bets SET is_mobile = ? WHERE id = ?`,
+            args: [val, betId]
+        });
+        console.log(`[ApprovedBets] 📱 Mobile Toggle: ${betId} -> ${isMobile}`);
+        return { success: true, isMobile: !!val };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 }
 
 // ============================================
@@ -291,5 +310,6 @@ module.exports = {
     clearAllBets,
     clearPendingBets,
     getStats,
-    updateBetResult
+    updateBetResult,
+    toggleMobile
 };

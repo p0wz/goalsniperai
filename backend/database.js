@@ -140,6 +140,14 @@ async function initDatabase() {
         // Create Admin
         await createAdminUser();
 
+        // Migration: Add is_mobile column if not exists
+        try {
+            await db.execute("ALTER TABLE approved_bets ADD COLUMN is_mobile INTEGER DEFAULT 0");
+            console.log('[DB] Added is_mobile column to approved_bets');
+        } catch (e) {
+            // Ignore error if column already exists
+        }
+
         console.log('[DB] Turso Tables Initialized');
     } catch (e) {
         console.error('[DB] Init Error:', e);

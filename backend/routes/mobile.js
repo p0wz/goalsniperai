@@ -18,28 +18,11 @@ router.get('/picks', requireAuth, async (req, res) => {
     try {
         const allBets = await approvedBets.getAllBets();
 
-        // Get today's date
-        const today = new Date().toISOString().split('T')[0];
-
-        // Filter for today's bets or pending bets
-        const todayPicks = allBets.filter(bet => {
-            // Include pending bets
-            if (bet.status === 'PENDING') return true;
-
-            // Include bets approved today
-            if (bet.approvedAt) {
-                const approvedDate = bet.approvedAt.split('T')[0];
-                if (approvedDate === today) return true;
-            }
-
-            // Include bets with today's match date
-            if (bet.matchDate === today) return true;
-
-            return false;
-        });
+        // ONLY show manually selected Mobile picks
+        const mobilePicks = allBets.filter(bet => bet.isMobile);
 
         // Format for mobile
-        const picks = todayPicks.map(bet => ({
+        const picks = mobilePicks.map(bet => ({
             id: bet.id,
             match: bet.match,
             homeTeam: bet.homeTeam,
@@ -51,7 +34,8 @@ router.get('/picks', requireAuth, async (req, res) => {
             confidence: bet.confidence,
             status: bet.status,
             resultScore: bet.resultScore,
-            approvedAt: bet.approvedAt
+            approvedAt: bet.approvedAt,
+            isMobile: true
         }));
 
         res.json({

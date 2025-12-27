@@ -171,6 +171,15 @@ export const adminService = {
     optimizeStrategy: async () => {
         const response = await api.post('/admin/optimize-strategy');
         return response.data;
+    },
+    // Mobile Management
+    toggleMobile: async (betId, isMobile) => {
+        const response = await api.post('/admin/mobile/toggle', { betId, isMobile });
+        return response.data;
+    },
+    clearMobileList: async () => {
+        const response = await api.delete('/admin/mobile/clear-list');
+        return response.data;
     }
 };
 

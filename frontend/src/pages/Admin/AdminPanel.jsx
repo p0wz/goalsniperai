@@ -679,6 +679,7 @@ export default function AdminPanel({ user, handleLogout }) {
                         >
                             {tab === 'live' && '📡 Live'}
                             {tab === 'bets' && '🎯 Approved Bets'}
+                            {tab === 'mobile' && '📱 Mobil Yönetim'}
                             {tab === 'training' && '🧠 Training Pool'}
                             {tab === 'analiz' && '🎯 Analiz'}
                             {tab === 'sentio' && '💬 SENTIO'}
@@ -799,6 +800,85 @@ export default function AdminPanel({ user, handleLogout }) {
                             </div>
                         </div>
 
+                        {/* Mobile Bets List Section */}
+                        {activeTab === 'mobile' && (
+                            <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h2 className="text-2xl font-bold flex items-center gap-2">📱 Mobil Uygulama Yönetimi</h2>
+                                            <p className="opacity-90 mt-1">
+                                                Burada listelenen maçlar mobil uygulamada kullanıcılar tarafından görülmektedir.
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-3xl font-bold">{approvedBets.filter(b => b.isMobile).length}</div>
+                                            <div className="text-xs opacity-75 uppercase tracking-wider">Aktif Mobil Maç</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 flex gap-3">
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm('Tüm mobil listeyi temizlemek istediğinize emin misiniz? Maçlar silinmez, sadece mobilden kaldırılır.')) return;
+                                                try {
+                                                    await adminService.clearMobileList();
+                                                    fetchApprovedBets();
+                                                    alert('✅ Mobil liste temizlendi!');
+                                                } catch (e) { alert(e.message); }
+                                            }}
+                                            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-bold text-sm backdrop-blur-sm transition-all border border-white/30"
+                                        >
+                                            🗑️ Listeyi Temizle
+                                        </button>
+                                        <button
+                                            onClick={fetchApprovedBets}
+                                            className="px-4 py-2 bg-white text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-50 transition-all shadow-sm"
+                                        >
+                                            🔄 Listeyi Yenile
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    {approvedBets.filter(b => b.isMobile).map(bet => (
+                                        <div key={bet.id} className="bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
+                                            <div className="p-4 border-b bg-muted/30 flex justify-between items-start">
+                                                <div>
+                                                    <div className="font-bold text-lg">{bet.match}</div>
+                                                    <div className="text-xs text-muted-foreground">{bet.league} • {bet.matchTime}</div>
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        await adminService.toggleMobile(bet.id, false);
+                                                        fetchApprovedBets();
+                                                    }}
+                                                    className="p-2 hover:bg-red-100 text-red-500 rounded-lg transition-colors"
+                                                    title="Mobilden Kaldır"
+                                                >
+                                                    ❌
+                                                </button>
+                                            </div>
+                                            <div className="p-4">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-sm font-medium text-muted-foreground">Tahmin</span>
+                                                    <span className="font-mono font-bold bg-muted px-2 py-0.5 rounded text-sm">{bet.market}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-medium text-muted-foreground">Oran</span>
+                                                    <span className="font-bold text-blue-600">{bet.odds}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {approvedBets.filter(b => b.isMobile).length === 0 && (
+                                        <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">
+                                            Mobil listede hiç maç yok. "Analiz Merkezi" veya "Approved Bets" sekmesinden ekleyin.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Stats */}
                         {approvedBetsStats && (
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -857,13 +937,30 @@ export default function AdminPanel({ user, handleLogout }) {
                                             </td>
                                             <td className="px-4 py-3 text-center font-mono">{bet.resultScore || '-'}</td>
                                             <td className="px-4 py-3 text-center">
-                                                {bet.status === 'PENDING' && (
-                                                    <div className="flex gap-1 justify-center">
-                                                        <button onClick={() => handleSettleApprovedBet(bet.id, 'WON')} className="px-2 py-1 bg-green-600 text-white rounded text-xs">✓</button>
-                                                        <button onClick={() => handleSettleApprovedBet(bet.id, 'LOST')} className="px-2 py-1 bg-red-600 text-white rounded text-xs">✗</button>
-                                                    </div>
-                                                )}
-                                                <button onClick={() => handleDeleteApprovedBet(bet.id)} className="px-2 py-1 text-red-400 hover:text-red-300 text-xs">🗑</button>
+                                                <div className="flex gap-1 justify-center items-center">
+                                                    {/* Mobile Toggle */}
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await adminService.toggleMobile(bet.id, !bet.isMobile);
+                                                                // Optimistic update
+                                                                setApprovedBets(prev => prev.map(p => p.id === bet.id ? { ...p, isMobile: !bet.isMobile } : p));
+                                                            } catch (e) { alert('Failed to toggle'); }
+                                                        }}
+                                                        className={`p-1.5 rounded transition-all mr-2 ${bet.isMobile ? 'bg-blue-100 text-blue-600 shadow-inner' : 'bg-muted text-gray-400 hover:bg-gray-200'}`}
+                                                        title={bet.isMobile ? "Mobilde Yayında" : "Mobili Aç"}
+                                                    >
+                                                        📱
+                                                    </button>
+
+                                                    {bet.status === 'PENDING' && (
+                                                        <>
+                                                            <button onClick={() => handleSettleApprovedBet(bet.id, 'WON')} className="px-2 py-1 bg-green-600 text-white rounded text-xs">✓</button>
+                                                            <button onClick={() => handleSettleApprovedBet(bet.id, 'LOST')} className="px-2 py-1 bg-red-600 text-white rounded text-xs">✗</button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <button onClick={() => handleDeleteApprovedBet(bet.id)} className="ml-2 px-2 py-1 text-red-400 hover:text-red-300 text-xs">🗑</button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1560,6 +1657,54 @@ ${prompt}
                                                                                 title="Onayla & Takibe Al"
                                                                             >
                                                                                 ✅ Takip
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    try {
+                                                                                        // 1. Approve Bet
+                                                                                        const res = await betsService.approve({
+                                                                                            eventId: m.event_key || m.matchId || m.id,
+                                                                                            match: `${m.event_home_team} vs ${m.event_away_team}`,
+                                                                                            homeTeam: m.event_home_team,
+                                                                                            awayTeam: m.event_away_team,
+                                                                                            league: m.league_name,
+                                                                                            market: key,
+                                                                                            prediction: key,
+                                                                                            odds: matchOdds[matchId] || null,
+                                                                                            matchDate: m.event_date || new Date().toISOString().split('T')[0],
+                                                                                            matchTime: m.startTime || m.event_start_time,
+                                                                                            stats: m.filterStats || m.stats || {},
+                                                                                            aiPrompt: m.aiPrompt || m.ai_prompts?.[0]
+                                                                                        });
+
+                                                                                        if (res.success) {
+                                                                                            // 2. Toggle Mobile ON
+                                                                                            const betId = res.bet?.id; // Assuming approve returns the bet object with ID
+                                                                                            if (betId) {
+                                                                                                await adminService.toggleMobile(betId, true);
+                                                                                                alert('✅ Mobil uygulamaya eklendi!');
+                                                                                            } else {
+                                                                                                alert('✅ Maç eklendi ama mobil toggle yapılamadı (ID yok).');
+                                                                                            }
+                                                                                            fetchApprovedBets(); // Refresh lists
+                                                                                        } else {
+                                                                                            // Check if duplicate, then just toggle
+                                                                                            if (res.duplicate) {
+                                                                                                // Need to find the bet ID... this is tricky without knowing it.
+                                                                                                // Maybe retry finding by match name?
+                                                                                                alert('⚠️ Bu maç zaten ekli. Approved Bets sekmesinden mobil durumunu açınız.');
+                                                                                            } else {
+                                                                                                alert('Hata: ' + res.error);
+                                                                                            }
+                                                                                        }
+                                                                                    } catch (e) {
+                                                                                        alert('Hata: ' + e.message);
+                                                                                    }
+                                                                                }}
+                                                                                className="px-3 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white transition-all border border-blue-500/20"
+                                                                                title="Onayla & Mobile Ekle"
+                                                                            >
+                                                                                📱 Mobil+
                                                                             </button>
                                                                         </div>
                                                                     </td>

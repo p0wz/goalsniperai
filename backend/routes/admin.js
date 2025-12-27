@@ -306,8 +306,35 @@ router.delete('/picks/:id', async (req, res) => {
 });
 
 // ============================================
-// 📱 Clear Mobile Predictions (Daily Reset - ALL)
 // ============================================
+// 📱 Mobile Management
+// ============================================
+
+router.post('/mobile/toggle', async (req, res) => {
+    try {
+        const { betId, isMobile } = req.body;
+        const approvedBets = require('../approvedBets');
+        const result = await approvedBets.toggleMobile(betId, isMobile);
+        res.json(result);
+    } catch (error) {
+        console.error('[ADMIN] Mobile Toggle Error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// Clear Mobile List (Manual Reset)
+router.delete('/mobile/clear-list', async (req, res) => {
+    try {
+        const { db } = require('../database');
+        await db.execute("UPDATE approved_bets SET is_mobile = 0");
+        res.json({ success: true, message: 'Mobil liste temizlendi (maçlar silinmedi, sadece listeden çıktı)' });
+    } catch (error) {
+        console.error('[ADMIN] Clear Mobile List Error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// 📱 Clear Mobile Predictions (Delete Pending Bets)
 router.delete('/mobile-predictions', async (req, res) => {
     try {
         const approvedBets = require('../approvedBets');
