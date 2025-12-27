@@ -40,17 +40,10 @@ const vectorDB = require('./vectorDB');
 
 const app = express();
 
-// Security middleware
+// Security middleware - relaxed CSP for API server
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"]
-        }
-    }
+    contentSecurityPolicy: false, // Disable CSP for API - frontend handles this
+    crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 // CORS configuration
