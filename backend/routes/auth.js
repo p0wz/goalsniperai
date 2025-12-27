@@ -117,8 +117,10 @@ router.post('/login', authLimiter, async (req, res) => {
             });
         }
 
-        // Verify password
-        if (!verifyPassword(user, password)) {
+        // Verify password using bcrypt
+        const bcrypt = require('bcryptjs');
+        const isValid = await bcrypt.compare(password, user.password_hash);
+        if (!isValid) {
             return res.status(401).json({
                 success: false,
                 error: 'Invalid email or password'

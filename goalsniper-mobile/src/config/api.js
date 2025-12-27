@@ -1,8 +1,10 @@
 // GoalSniper Mobile - API Configuration
 
+// Production API (Render)
 const API_BASE_URL = 'https://goalsniper-pro.onrender.com';
 
 export const API_CONFIG = {
+    BASE_URL: API_BASE_URL,
     baseUrl: API_BASE_URL,
 
     endpoints: {

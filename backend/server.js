@@ -56,7 +56,12 @@ app.use(helmet({
 // CORS configuration
 const rawAllowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 // Normalize origins: remove trailing slashes and whitespace
-const allowedOrigins = rawAllowedOrigins.map(url => url.trim().replace(/\/$/, ''));
+const allowedOrigins = [
+    ...rawAllowedOrigins.map(url => url.trim().replace(/\/$/, '')),
+    'http://localhost:8090',  // Mobile app local testing
+    'http://localhost:8081',  // Expo Metro bundler
+    'http://localhost:19006', // Expo web
+];
 
 app.use(cors({
     credentials: true,
