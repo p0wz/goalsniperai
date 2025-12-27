@@ -264,6 +264,23 @@ async function updateBetResult(betId, status, resultScore) {
     return settleBet(betId, status, resultScore);
 }
 
+// ============================================
+// 🗑️ Clear Pending Bets (For Mobile Reset)
+// ============================================
+
+async function clearPendingBets() {
+    try {
+        const result = await db.execute(`
+            DELETE FROM approved_bets WHERE status = 'PENDING'
+        `);
+        console.log(`[ApprovedBets] 🗑️ Cleared all pending bets`);
+        return { success: true, deleted: result.rowsAffected || 0 };
+    } catch (e) {
+        console.error('[ApprovedBets] Clear Pending Error:', e.message);
+        return { success: false, error: e.message };
+    }
+}
+
 module.exports = {
     approveBet,
     getAllBets,
@@ -272,6 +289,7 @@ module.exports = {
     settleBet,
     deleteBet,
     clearAllBets,
+    clearPendingBets,
     getStats,
     updateBetResult
 };

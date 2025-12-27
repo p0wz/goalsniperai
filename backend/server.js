@@ -27,6 +27,7 @@ const { requireAuth, optionalAuth } = require('./auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const picksRoutes = require('./routes/picks');
+const mobileRoutes = require('./routes/mobile');
 const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection, MARKET_MAP } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
@@ -3300,6 +3301,11 @@ function startBanner() {
 \x1b[1m\x1b[32m+==========================================+\x1b[0m
 `);
 }
+
+// ============================================
+// 📱 Mobile API Routes
+// ============================================
+app.use('/api/mobile', mobileRoutes);
 
 // ============================================
 // 🌐 SPA Fallback / 404 Handler (MUST BE LAST)

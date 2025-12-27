@@ -1,5 +1,5 @@
 // GoalSniper Mobile - Premium Login Screen
-// Glassmorphism, gradients, and neon accents
+// With proper auth flow for web and native
 
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
@@ -12,23 +12,28 @@ import {
     Theme,
     Spinner,
 } from 'tamagui';
-import { authService } from '../../services/api';
+import { API_CONFIG } from '../../config/api';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 // Premium Theme
 const theme = {
-    bg: '#000000',
-    bgCard: 'rgba(15, 15, 20, 0.95)',
-    primary: '#00FF88',
-    secondary: '#00D4FF',
-    accent: '#8B5CF6',
+    bg: '#0A0A0A',
+    cardBg: '#111111',
+    primary: '#4ADE80',
     text: '#FFFFFF',
-    textSecondary: 'rgba(255, 255, 255, 0.7)',
-    textMuted: 'rgba(255, 255, 255, 0.4)',
-    border: 'rgba(255, 255, 255, 0.1)',
-    inputBg: 'rgba(255, 255, 255, 0.05)',
+    textSecondary: '#9CA3AF',
+    textMuted: '#6B7280',
+    border: '#1A1A1A',
+    inputBg: '#0F0F0F',
 };
+
+const api = axios.create({
+    baseURL: API_CONFIG.BASE_URL,
+    timeout: 10000,
+});
 
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
@@ -43,12 +48,24 @@ export default function LoginScreen({ navigation }) {
 
         setLoading(true);
         try {
-            const result = await authService.login(email, password);
-            if (result.token) {
-                // Navigation handled by auth state
+            const response = await api.post('/api/auth/login', { email, password });
+
+            if (response.data.token) {
+                // Save token based on platform
+                if (Platform.OS === 'web') {
+                    localStorage.setItem('authToken', response.data.token);
+                    // Force page reload to trigger auth check
+                    window.location.reload();
+                } else {
+                    await SecureStore.setItemAsync('authToken', response.data.token);
+                    // Navigation will automatically update when auth state changes
+                }
+            } else {
+                Alert.alert('Hata', 'Giriş başarısız');
             }
         } catch (error) {
-            Alert.alert('Hata', 'Giriş yapılamadı');
+            console.error('Login error:', error);
+            Alert.alert('Hata', error.response?.data?.error || 'Giriş yapılamadı');
         } finally {
             setLoading(false);
         }
@@ -68,7 +85,7 @@ export default function LoginScreen({ navigation }) {
                     width={400}
                     height={400}
                     backgroundColor={theme.primary}
-                    opacity={0.08}
+                    opacity={0.06}
                     borderRadius={200}
                 />
                 <YStack
@@ -77,29 +94,19 @@ export default function LoginScreen({ navigation }) {
                     right={-100}
                     width={300}
                     height={300}
-                    backgroundColor={theme.secondary}
-                    opacity={0.06}
+                    backgroundColor={theme.primary}
+                    opacity={0.04}
                     borderRadius={150}
-                />
-                <YStack
-                    position="absolute"
-                    top={height / 2}
-                    left={-50}
-                    width={200}
-                    height={200}
-                    backgroundColor={theme.accent}
-                    opacity={0.05}
-                    borderRadius={100}
                 />
 
                 <YStack flex={1} justifyContent="center" padding="$6">
 
                     {/* Logo Section */}
-                    <YStack alignItems="center" marginBottom="$10">
+                    <YStack alignItems="center" marginBottom="$8">
                         <YStack
-                            width={100}
-                            height={100}
-                            borderRadius={30}
+                            width={90}
+                            height={90}
+                            borderRadius={26}
                             backgroundColor={theme.primary + '15'}
                             borderWidth={1}
                             borderColor={theme.primary + '30'}
@@ -107,12 +114,12 @@ export default function LoginScreen({ navigation }) {
                             justifyContent="center"
                             marginBottom="$4"
                         >
-                            <Text fontSize={50}>🎯</Text>
+                            <Text fontSize={44}>🎯</Text>
                         </YStack>
 
                         <Text
                             color={theme.text}
-                            fontSize={36}
+                            fontSize={32}
                             fontWeight="900"
                             letterSpacing={-1}
                         >
@@ -128,7 +135,7 @@ export default function LoginScreen({ navigation }) {
                         >
                             <Text
                                 color={theme.primary}
-                                fontSize={14}
+                                fontSize={12}
                                 fontWeight="800"
                                 letterSpacing={2}
                             >
@@ -138,7 +145,7 @@ export default function LoginScreen({ navigation }) {
 
                         <Text
                             color={theme.textMuted}
-                            fontSize={14}
+                            fontSize={13}
                             marginTop="$3"
                             textAlign="center"
                         >
@@ -147,9 +154,9 @@ export default function LoginScreen({ navigation }) {
                     </YStack>
 
                     {/* Form */}
-                    <YStack gap="$4" marginBottom="$6">
+                    <YStack gap="$4" marginBottom="$5">
                         <YStack gap="$2">
-                            <Text color={theme.textSecondary} fontSize={13} fontWeight="600" marginLeft="$1">
+                            <Text color={theme.textSecondary} fontSize={12} fontWeight="600" marginLeft="$1">
                                 Email
                             </Text>
                             <Input
@@ -168,13 +175,12 @@ export default function LoginScreen({ navigation }) {
                                 paddingHorizontal="$4"
                                 focusStyle={{
                                     borderColor: theme.primary,
-                                    backgroundColor: theme.primary + '08',
                                 }}
                             />
                         </YStack>
 
                         <YStack gap="$2">
-                            <Text color={theme.textSecondary} fontSize={13} fontWeight="600" marginLeft="$1">
+                            <Text color={theme.textSecondary} fontSize={12} fontWeight="600" marginLeft="$1">
                                 Şifre
                             </Text>
                             <Input
@@ -192,7 +198,6 @@ export default function LoginScreen({ navigation }) {
                                 paddingHorizontal="$4"
                                 focusStyle={{
                                     borderColor: theme.primary,
-                                    backgroundColor: theme.primary + '08',
                                 }}
                             />
                         </YStack>
@@ -202,18 +207,16 @@ export default function LoginScreen({ navigation }) {
                             backgroundColor={theme.primary}
                             color={theme.bg}
                             fontWeight="800"
-                            fontSize={16}
+                            fontSize={15}
                             borderRadius={14}
-                            marginTop="$3"
+                            marginTop="$2"
                             onPress={handleLogin}
                             disabled={loading}
-                            animation="quick"
                             pressStyle={{
                                 scale: 0.98,
-                                backgroundColor: theme.primary,
                                 opacity: 0.9,
                             }}
-                            height={56}
+                            height={54}
                         >
                             {loading ? <Spinner color={theme.bg} /> : 'Giriş Yap'}
                         </Button>
@@ -221,22 +224,21 @@ export default function LoginScreen({ navigation }) {
 
                     {/* Footer */}
                     <XStack justifyContent="center" gap="$2">
-                        <Text color={theme.textMuted} fontSize={14}>
+                        <Text color={theme.textMuted} fontSize={13}>
                             Hesabın yok mu?
                         </Text>
                         <Text
                             color={theme.primary}
-                            fontSize={14}
+                            fontSize={13}
                             fontWeight="700"
                             onPress={() => navigation.navigate('Register')}
-                            pressStyle={{ opacity: 0.7 }}
                         >
                             Kayıt Ol
                         </Text>
                     </XStack>
 
                     {/* Trust badges */}
-                    <XStack justifyContent="center" gap="$4" marginTop="$8">
+                    <XStack justifyContent="center" gap="$5" marginTop="$8">
                         <XStack alignItems="center" gap="$1">
                             <Text fontSize={14}>🔒</Text>
                             <Text color={theme.textMuted} fontSize={11}>Güvenli</Text>
