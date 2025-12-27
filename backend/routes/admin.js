@@ -305,4 +305,24 @@ router.delete('/picks/:id', async (req, res) => {
     }
 });
 
+// ============================================
+// 📱 Clear Mobile Predictions (Daily Reset - ALL)
+// ============================================
+router.delete('/mobile-predictions', async (req, res) => {
+    try {
+        const approvedBets = require('../approvedBets');
+        const result = await approvedBets.clearAllBets();
+        console.log('[ADMIN] All mobile predictions cleared for daily reset');
+        res.json({
+            success: true,
+            message: 'Tüm mobil tahminler sıfırlandı',
+            ...result
+        });
+    } catch (error) {
+        console.error('[ADMIN] Clear mobile predictions error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;
+

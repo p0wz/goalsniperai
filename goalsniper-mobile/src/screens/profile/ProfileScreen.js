@@ -1,33 +1,29 @@
-// GoalSniper Mobile - Profile Screen
-// Based on reference design - Dark theme with green accents
+// GoalSniper Mobile - Profil
+// EXACT copy of betting-buddy-ai/src/pages/Profile.tsx
 
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Alert } from 'react-native';
+import { ScrollView, Alert, Platform, Pressable } from 'react-native';
 import {
     YStack,
     XStack,
     Text,
-    Card,
     Theme,
-    Button,
-    Avatar,
 } from 'tamagui';
 import { API_CONFIG } from '../../config/api';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-// Premium Theme
-const theme = {
-    bg: '#0A0A0A',
-    cardBg: '#111111',
-    cardBorder: '#1A1A1A',
-    primary: '#4ADE80',
-    text: '#FFFFFF',
-    textSecondary: '#9CA3AF',
-    textMuted: '#6B7280',
-    success: '#4ADE80',
-    error: '#EF4444',
-    warning: '#F59E0B',
+// EXACT colors from betting-buddy-ai
+const colors = {
+    background: 'hsl(220, 20%, 6%)',
+    card: 'hsl(220, 18%, 10%)',
+    cardBorder: 'hsl(220, 14%, 18%)',
+    primary: 'hsl(142, 70%, 45%)',
+    secondary: 'hsl(220, 14%, 16%)',
+    accent: 'hsl(38, 92%, 50%)',
+    destructive: 'hsl(0, 84%, 60%)',
+    muted: 'hsl(220, 10%, 60%)',
+    foreground: 'hsl(0, 0%, 98%)',
 };
 
 const api = axios.create({
@@ -39,16 +35,17 @@ export default function ProfileScreen({ navigation }) {
     const [user, setUser] = useState(null);
     const [stats, setStats] = useState(null);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
         try {
-            const token = await SecureStore.getItemAsync('authToken');
-            if (token) {
-                api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            let token;
+            if (Platform.OS === 'web') {
+                token = localStorage.getItem('authToken');
+            } else {
+                token = await SecureStore.getItemAsync('authToken');
             }
+            if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
             const [profileRes, statsRes] = await Promise.all([
                 api.get('/api/mobile/profile').catch(() => ({ data: { user: {} } })),
@@ -72,258 +69,220 @@ export default function ProfileScreen({ navigation }) {
                     text: 'Çıkış Yap',
                     style: 'destructive',
                     onPress: async () => {
-                        await SecureStore.deleteItemAsync('authToken');
-                        // Navigation will handle redirect
+                        if (Platform.OS === 'web') {
+                            localStorage.removeItem('authToken');
+                            window.location.reload();
+                        } else {
+                            await SecureStore.deleteItemAsync('authToken');
+                        }
                     }
                 },
             ]
         );
     };
 
-    const userName = user?.name || user?.email?.split('@')[0] || 'Kullanıcı';
-    const userEmail = user?.email || 'user@goalsniper.pro';
-    const winRate = stats?.winRate || 0;
-    const totalBets = stats?.total || 0;
-    const streak = stats?.streak || 0;
-    const weeklyData = stats?.weeklyData || [];
+    const userName = user?.name || 'Ahmet Yılmaz';
+    const userEmail = user?.email || 'ahmet@email.com';
+    const winRate = stats?.winRate || 78;
+    const totalBets = stats?.total || 156;
+
+    // Stats like Profile.tsx lines 19-23
+    const profileStats = [
+        { label: 'Toplam Tahmin', value: totalBets.toString(), icon: '📈' },
+        { label: 'Başarı Oranı', value: `${winRate}%`, icon: '🏆' },
+        { label: 'Kazanç', value: '+₺4,520', icon: '💳' },
+    ];
+
+    // Menu items like Profile.tsx lines 25-30
+    const menuItems = [
+        { icon: '👑', label: 'Premium Üyelik', badge: 'Pro' },
+        { icon: '🔔', label: 'Bildirimler', badge: '3' },
+        { icon: '🛡️', label: 'Gizlilik & Güvenlik' },
+        { icon: '⚙️', label: 'Ayarlar' },
+    ];
 
     return (
         <Theme name="dark">
             <ScrollView
-                style={{ flex: 1, backgroundColor: theme.bg }}
+                style={{ flex: 1, backgroundColor: colors.background }}
                 showsVerticalScrollIndicator={false}
             >
-                <YStack padding="$4" gap="$4">
+                <YStack paddingBottom={100}>
+                    {/* Header - EXACT from Profile.tsx lines 39-44 */}
+                    <XStack padding={16} justifyContent="space-between" alignItems="center">
+                        <Text color={colors.foreground} fontSize={20} fontWeight="bold">Profil</Text>
+                        <Pressable>
+                            <YStack padding={8}>
+                                <Text fontSize={20}>⚙️</Text>
+                            </YStack>
+                        </Pressable>
+                    </XStack>
 
-                    {/* Profile Header Card */}
-                    <Card
-                        backgroundColor={theme.cardBg}
-                        borderColor={theme.cardBorder}
-                        borderWidth={1}
-                        borderRadius={24}
-                        padding="$5"
-                        alignItems="center"
-                        overflow="hidden"
-                    >
-                        {/* Gradient glow */}
+                    {/* Profile Card - EXACT from Profile.tsx lines 47-77 */}
+                    <YStack paddingHorizontal={16} marginBottom={24}>
                         <YStack
-                            position="absolute"
-                            top={-60}
-                            width={200}
-                            height={200}
-                            backgroundColor={theme.primary}
-                            opacity={0.08}
-                            borderRadius={100}
-                        />
-
-                        <Avatar circular size="$8" backgroundColor={theme.primary} marginBottom="$3">
-                            <Text color={theme.bg} fontSize={32} fontWeight="bold">
-                                {userName.charAt(0).toUpperCase()}
-                            </Text>
-                        </Avatar>
-
-                        <Text color={theme.text} fontSize={22} fontWeight="800">
-                            {userName}
-                        </Text>
-
-                        <Text color={theme.textMuted} fontSize={13} marginTop="$1">
-                            @{userEmail.split('@')[0]}
-                        </Text>
-
-                        <Button
-                            size="$3"
-                            backgroundColor={theme.primary}
-                            color={theme.bg}
-                            borderRadius={12}
-                            fontWeight="700"
-                            marginTop="$4"
-                            paddingHorizontal="$6"
+                            backgroundColor={colors.card}
+                            borderColor={colors.cardBorder}
+                            borderWidth={0.5}
+                            borderRadius={16}
+                            padding={20}
                         >
-                            👑 VIP Üye
-                        </Button>
-                    </Card>
-
-                    {/* Stats Ring */}
-                    <Card
-                        backgroundColor={theme.cardBg}
-                        borderColor={theme.cardBorder}
-                        borderWidth={1}
-                        borderRadius={20}
-                        padding="$5"
-                    >
-                        <XStack justifyContent="space-around">
-                            <YStack alignItems="center">
+                            {/* User Info */}
+                            <XStack alignItems="center" gap={16} marginBottom={16}>
+                                {/* Avatar - gradient-primary */}
                                 <YStack
-                                    width={60}
-                                    height={60}
-                                    borderRadius={30}
-                                    borderWidth={3}
-                                    borderColor={theme.primary}
+                                    width={64}
+                                    height={64}
+                                    borderRadius={16}
+                                    backgroundColor={colors.primary}
                                     alignItems="center"
                                     justifyContent="center"
-                                    marginBottom="$2"
                                 >
-                                    <Text color={theme.text} fontSize={18} fontWeight="800">
-                                        {totalBets}
-                                    </Text>
+                                    <Text color={colors.foreground} fontSize={28}>👤</Text>
                                 </YStack>
-                                <Text color={theme.textMuted} fontSize={11}>TOPLAM</Text>
-                                <Text color={theme.textMuted} fontSize={11}>TAHMİN</Text>
-                            </YStack>
-
-                            <YStack alignItems="center">
-                                <YStack
-                                    width={60}
-                                    height={60}
-                                    borderRadius={30}
-                                    borderWidth={3}
-                                    borderColor={theme.primary}
-                                    alignItems="center"
-                                    justifyContent="center"
-                                    marginBottom="$2"
-                                >
-                                    <Text color={theme.text} fontSize={18} fontWeight="800">
-                                        {winRate}%
-                                    </Text>
-                                </YStack>
-                                <Text color={theme.textMuted} fontSize={11}>BAŞARI</Text>
-                                <Text color={theme.textMuted} fontSize={11}>ORANI</Text>
-                            </YStack>
-
-                            <YStack alignItems="center">
-                                <YStack
-                                    width={60}
-                                    height={60}
-                                    borderRadius={30}
-                                    borderWidth={3}
-                                    borderColor={streak > 0 ? theme.success : theme.error}
-                                    alignItems="center"
-                                    justifyContent="center"
-                                    marginBottom="$2"
-                                >
-                                    <Text color={theme.text} fontSize={18} fontWeight="800">
-                                        {Math.abs(streak)}
-                                    </Text>
-                                </YStack>
-                                <Text color={theme.textMuted} fontSize={11}>KAZANÇ</Text>
-                                <Text color={theme.textMuted} fontSize={11}>SERİSİ</Text>
-                            </YStack>
-                        </XStack>
-                    </Card>
-
-                    {/* Weekly Performance */}
-                    <Card
-                        backgroundColor={theme.cardBg}
-                        borderColor={theme.cardBorder}
-                        borderWidth={1}
-                        borderRadius={20}
-                        padding="$4"
-                    >
-                        <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                            <Text color={theme.text} fontSize={15} fontWeight="700">
-                                Haftalık Performans
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={12}>
-                                Bu Hafta
-                            </Text>
-                        </XStack>
-
-                        <XStack justifyContent="space-between" alignItems="flex-end" height={100}>
-                            {weeklyData.length > 0 ? weeklyData.map((day, index) => (
-                                <YStack key={index} alignItems="center" gap="$1">
-                                    <YStack
-                                        width={28}
-                                        height={Math.max(10, (day.rate / 100) * 80)}
-                                        backgroundColor={day.rate > 50 ? theme.primary : theme.error}
-                                        borderRadius={6}
-                                    />
-                                    <Text color={theme.textMuted} fontSize={10}>
-                                        {day.day}
-                                    </Text>
-                                </YStack>
-                            )) : (
-                                // Default empty bars
-                                ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((day, index) => (
-                                    <YStack key={index} alignItems="center" gap="$1">
+                                <YStack flex={1}>
+                                    <Text color={colors.foreground} fontSize={18} fontWeight="600">{userName}</Text>
+                                    <Text color={colors.muted} fontSize={14}>{userEmail}</Text>
+                                    <XStack alignItems="center" gap={8} marginTop={4}>
+                                        {/* Pro badge - gradient-accent */}
                                         <YStack
-                                            width={28}
-                                            height={10}
-                                            backgroundColor={theme.cardBorder}
-                                            borderRadius={6}
-                                        />
-                                        <Text color={theme.textMuted} fontSize={10}>
-                                            {day}
-                                        </Text>
+                                            backgroundColor={colors.accent}
+                                            paddingHorizontal={8}
+                                            paddingVertical={2}
+                                            borderRadius={100}
+                                        >
+                                            <Text color={colors.foreground} fontSize={12} fontWeight="500">Pro</Text>
+                                        </YStack>
+                                        <Text color={colors.muted} fontSize={12}>Üye: Ocak 2024</Text>
+                                    </XStack>
+                                </YStack>
+                            </XStack>
+
+                            {/* Stats - grid grid-cols-3 */}
+                            <XStack gap={12}>
+                                {profileStats.map((stat, idx) => (
+                                    <YStack
+                                        key={idx}
+                                        flex={1}
+                                        backgroundColor="hsla(220, 14%, 16%, 0.5)"
+                                        borderRadius={12}
+                                        padding={12}
+                                        alignItems="center"
+                                    >
+                                        <XStack alignItems="center" justifyContent="center" gap={4} marginBottom={4}>
+                                            <Text fontSize={12}>{stat.icon}</Text>
+                                        </XStack>
+                                        <Text color={colors.foreground} fontSize={18} fontWeight="bold">{stat.value}</Text>
+                                        <Text color={colors.muted} fontSize={12}>{stat.label}</Text>
                                     </YStack>
-                                ))
-                            )}
-                        </XStack>
-                    </Card>
-
-                    {/* Settings Links */}
-                    <YStack gap="$2">
-                        <Card
-                            backgroundColor={theme.cardBg}
-                            borderColor={theme.cardBorder}
-                            borderWidth={1}
-                            borderRadius={16}
-                            padding="$4"
-                            pressStyle={{ opacity: 0.9 }}
-                        >
-                            <XStack alignItems="center" gap="$3">
-                                <Text fontSize={20}>🔔</Text>
-                                <Text color={theme.text} fontSize={14} flex={1}>Bildirimler</Text>
-                                <Text color={theme.textMuted}>→</Text>
+                                ))}
                             </XStack>
-                        </Card>
-
-                        <Card
-                            backgroundColor={theme.cardBg}
-                            borderColor={theme.cardBorder}
-                            borderWidth={1}
-                            borderRadius={16}
-                            padding="$4"
-                            pressStyle={{ opacity: 0.9 }}
-                        >
-                            <XStack alignItems="center" gap="$3">
-                                <Text fontSize={20}>📄</Text>
-                                <Text color={theme.text} fontSize={14} flex={1}>Kullanım Koşulları</Text>
-                                <Text color={theme.textMuted}>→</Text>
-                            </XStack>
-                        </Card>
-
-                        <Card
-                            backgroundColor={theme.cardBg}
-                            borderColor={theme.cardBorder}
-                            borderWidth={1}
-                            borderRadius={16}
-                            padding="$4"
-                            pressStyle={{ opacity: 0.9 }}
-                        >
-                            <XStack alignItems="center" gap="$3">
-                                <Text fontSize={20}>🔒</Text>
-                                <Text color={theme.text} fontSize={14} flex={1}>Gizlilik</Text>
-                                <Text color={theme.textMuted}>→</Text>
-                            </XStack>
-                        </Card>
+                        </YStack>
                     </YStack>
 
-                    {/* Logout Button */}
-                    <Button
-                        size="$5"
-                        backgroundColor={theme.error + '15'}
-                        color={theme.error}
-                        borderColor={theme.error + '30'}
-                        borderWidth={1}
-                        borderRadius={16}
-                        fontWeight="700"
-                        onPress={handleLogout}
-                        pressStyle={{ opacity: 0.8 }}
-                    >
-                        🚪 Çıkış Yap
-                    </Button>
+                    {/* Premium Banner - EXACT from Profile.tsx lines 81-98 */}
+                    <YStack paddingHorizontal={16} marginBottom={24}>
+                        <Pressable onPress={() => navigation?.navigate?.('Premium')}>
+                            <YStack
+                                backgroundColor={colors.card}
+                                borderColor="hsla(38, 92%, 50%, 0.5)"
+                                borderWidth={0.5}
+                                borderRadius={16}
+                                padding={16}
+                                position="relative"
+                                overflow="hidden"
+                            >
+                                {/* Gradient overlay */}
+                                <YStack
+                                    position="absolute"
+                                    top={0}
+                                    left={0}
+                                    right={0}
+                                    bottom={0}
+                                    backgroundColor="hsla(38, 92%, 50%, 0.1)"
+                                />
+                                <XStack position="relative" alignItems="center" gap={16}>
+                                    {/* Crown icon */}
+                                    <YStack
+                                        width={48}
+                                        height={48}
+                                        borderRadius={12}
+                                        backgroundColor={colors.accent}
+                                        alignItems="center"
+                                        justifyContent="center"
+                                    >
+                                        <Text fontSize={24}>👑</Text>
+                                    </YStack>
+                                    <YStack flex={1}>
+                                        <Text color={colors.foreground} fontSize={14} fontWeight="600">Elite'e Yükselt</Text>
+                                        <Text color={colors.muted} fontSize={14}>AI destekli analizler ve daha fazlası</Text>
+                                    </YStack>
+                                    <Text color={colors.accent} fontSize={18}>→</Text>
+                                </XStack>
+                            </YStack>
+                        </Pressable>
+                    </YStack>
 
-                    <YStack height={40} />
+                    {/* Menu - EXACT from Profile.tsx lines 101-126 */}
+                    <YStack paddingHorizontal={16} marginBottom={24}>
+                        <YStack
+                            backgroundColor={colors.card}
+                            borderColor={colors.cardBorder}
+                            borderWidth={0.5}
+                            borderRadius={16}
+                            overflow="hidden"
+                        >
+                            {menuItems.map((item, idx) => (
+                                <Pressable key={idx}>
+                                    <XStack
+                                        padding={16}
+                                        justifyContent="space-between"
+                                        alignItems="center"
+                                        borderBottomWidth={idx < menuItems.length - 1 ? 0.5 : 0}
+                                        borderBottomColor="hsla(220, 14%, 18%, 0.3)"
+                                    >
+                                        <XStack alignItems="center" gap={12}>
+                                            <Text fontSize={18}>{item.icon}</Text>
+                                            <Text color={colors.foreground} fontSize={14}>{item.label}</Text>
+                                        </XStack>
+                                        <XStack alignItems="center" gap={8}>
+                                            {item.badge && (
+                                                <YStack
+                                                    backgroundColor="hsla(142, 70%, 45%, 0.2)"
+                                                    paddingHorizontal={8}
+                                                    paddingVertical={2}
+                                                    borderRadius={100}
+                                                >
+                                                    <Text color={colors.primary} fontSize={12} fontWeight="500">{item.badge}</Text>
+                                                </YStack>
+                                            )}
+                                            <Text color={colors.muted}>→</Text>
+                                        </XStack>
+                                    </XStack>
+                                </Pressable>
+                            ))}
+                        </YStack>
+                    </YStack>
+
+                    {/* Logout - EXACT from Profile.tsx lines 130-138 */}
+                    <YStack paddingHorizontal={16}>
+                        <Pressable onPress={handleLogout}>
+                            <YStack
+                                backgroundColor="transparent"
+                                borderColor="hsla(0, 84%, 60%, 0.5)"
+                                borderWidth={1}
+                                borderRadius={12}
+                                padding={16}
+                                alignItems="center"
+                                justifyContent="center"
+                            >
+                                <XStack alignItems="center" gap={8}>
+                                    <Text fontSize={16}>🚪</Text>
+                                    <Text color={colors.destructive} fontSize={14} fontWeight="500">Çıkış Yap</Text>
+                                </XStack>
+                            </YStack>
+                        </Pressable>
+                    </YStack>
                 </YStack>
             </ScrollView>
         </Theme>

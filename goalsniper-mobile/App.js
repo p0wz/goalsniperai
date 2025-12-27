@@ -1,147 +1,113 @@
-// GoalSniper Mobile App - Main Entry
-// Premium Dark Theme with Role-Based Navigation
+// GoalSniper Mobile - App.js
+// Navigation with 4 tabs (betting-buddy-ai design)
+// Admin panel removed - managed via web dashboard
 
 import React, { useState, useEffect } from 'react';
-import { StatusBar, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { TamaguiProvider, Text, YStack, Spinner } from 'tamagui';
-import config from './tamagui.config';
-import * as SecureStore from 'expo-secure-store';
-import { API_CONFIG } from './src/config/api';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { TamaguiProvider, YStack, Text, Theme, Spinner } from 'tamagui';
+import { Platform } from 'react-native';
 import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+
+import config from './tamagui.config';
+import { API_CONFIG } from './src/config/api';
 
 // Screens
 import LoginScreen from './src/screens/auth/LoginScreen';
 import HomeScreen from './src/screens/home/HomeScreen';
+import LiveMatchesScreen from './src/screens/live/LiveMatchesScreen';
 import TahminlerimScreen from './src/screens/predictions/TahminlerimScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
-import AdminPanelScreen from './src/screens/admin/AdminPanelScreen';
 
-const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
-// Premium Theme Colors
+// Design System from betting-buddy-ai
 const theme = {
-  bg: '#0A0A0A',
-  cardBg: '#111111',
-  primary: '#4ADE80',
-  text: '#FFFFFF',
-  textMuted: '#6B7280',
+  bg: 'hsl(220, 20%, 6%)',
+  cardBg: 'hsl(220, 18%, 10%)',
+  primary: 'hsl(142, 70%, 45%)',
+  accent: 'hsl(38, 92%, 50%)',
+  text: 'hsl(0, 0%, 98%)',
+  textMuted: 'hsl(220, 10%, 60%)',
 };
 
-// Tab Icon Component
-const TabIcon = ({ icon, focused }) => (
-  <YStack alignItems="center" justifyContent="center">
-    <Text fontSize={22} opacity={focused ? 1 : 0.5}>
-      {icon}
+// Custom Tab Bar Icon
+const TabIcon = ({ focused, icon, label }) => (
+  <YStack alignItems="center" paddingTop={8}>
+    <YStack
+      width={focused ? 44 : 36}
+      height={focused ? 44 : 36}
+      borderRadius={focused ? 14 : 10}
+      backgroundColor={focused ? theme.primary : 'transparent'}
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Text fontSize={focused ? 18 : 16}>{icon}</Text>
+    </YStack>
+    <Text
+      color={focused ? theme.primary : theme.textMuted}
+      fontSize={10}
+      fontWeight={focused ? '700' : '500'}
+      marginTop={4}
+    >
+      {label}
     </Text>
   </YStack>
 );
 
-// User Tabs (3 tabs)
-function UserTabs() {
+// Main Tabs - 4 tabs only (Home, Live, Predictions, Profile)
+// No Admin tab - admin panel is managed via web dashboard
+function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.bg,
-          borderTopColor: '#1A1A1A',
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 85 : 65,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-          paddingTop: 10,
+          backgroundColor: theme.cardBg,
+          borderTopWidth: 0,
+          height: 80,
+          paddingBottom: 10,
         },
-        tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.textMuted,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
+        tabBarShowLabel: false,
       }}
     >
       <Tab.Screen
-        name="AnaSayfa"
+        name="Ana Sayfa"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Ana Sayfa',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="🏠" label="Ana Sayfa" />
+          ),
         }}
       />
       <Tab.Screen
-        name="Tahminlerim"
+        name="Canlı"
+        component={LiveMatchesScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="⚡" label="Canlı" />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Tahminler"
         component={TahminlerimScreen}
         options={{
-          tabBarLabel: 'Tahminler',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📋" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="📊" label="Tahminler" />
+          ),
         }}
       />
       <Tab.Screen
         name="Profil"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Profil',
-          tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
-        }}
-      />
-    </Tab.Navigator>
-  );
-}
-
-// Admin Tabs (4 tabs - includes Admin Panel)
-function AdminTabs() {
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: theme.bg,
-          borderTopColor: '#1A1A1A',
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 85 : 65,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-          paddingTop: 10,
-        },
-        tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.textMuted,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
-      }}
-    >
-      <Tab.Screen
-        name="AnaSayfa"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: 'Ana Sayfa',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Tahminlerim"
-        component={TahminlerimScreen}
-        options={{
-          tabBarLabel: 'Tahminler',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📋" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profil"
-        component={ProfileScreen}
-        options={{
-          tabBarLabel: 'Profil',
-          tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Admin"
-        component={AdminPanelScreen}
-        options={{
-          tabBarLabel: 'Admin',
-          tabBarIcon: ({ focused }) => <TabIcon icon="⚡" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="👤" label="Profil" />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -151,42 +117,56 @@ function AdminTabs() {
 // Loading Screen
 function LoadingScreen() {
   return (
-    <YStack flex={1} backgroundColor={theme.bg} alignItems="center" justifyContent="center">
-      <Spinner size="large" color={theme.primary} />
-      <Text color={theme.text} fontSize={16} marginTop="$4">
-        Yükleniyor...
-      </Text>
-    </YStack>
+    <Theme name="dark">
+      <YStack flex={1} backgroundColor={theme.bg} alignItems="center" justifyContent="center">
+        <YStack
+          width={80}
+          height={80}
+          borderRadius={20}
+          backgroundColor={theme.primary}
+          alignItems="center"
+          justifyContent="center"
+          marginBottom="$4"
+        >
+          <Text fontSize={36}>🎯</Text>
+        </YStack>
+        <Text color={theme.text} fontSize={22} fontWeight="800" marginBottom="$2">
+          GoalSniper
+        </Text>
+        <Spinner size="large" color={theme.primary} />
+      </YStack>
+    </Theme>
   );
 }
 
-// Register Screen (Placeholder)
+// Simple Register Placeholder
 function RegisterScreen({ navigation }) {
   return (
-    <YStack flex={1} backgroundColor={theme.bg} alignItems="center" justifyContent="center" padding="$4">
-      <Text color={theme.text} fontSize={24} fontWeight="800">
-        Kayıt Ol
-      </Text>
-      <Text color={theme.textMuted} fontSize={14} marginTop="$2" textAlign="center">
-        Kayıt sayfası yakında eklenecek
-      </Text>
-      <Text
-        color={theme.primary}
-        fontSize={14}
-        fontWeight="600"
-        marginTop="$4"
-        onPress={() => navigation.navigate('Login')}
-      >
-        ← Giriş Yap
-      </Text>
-    </YStack>
+    <Theme name="dark">
+      <YStack flex={1} backgroundColor={theme.bg} alignItems="center" justifyContent="center" padding="$4">
+        <Text color={theme.text} fontSize={24} fontWeight="800" marginBottom="$4">
+          Kayıt Ol
+        </Text>
+        <Text color={theme.textMuted} fontSize={14} textAlign="center">
+          Kayıt sayfası yakında eklenecek
+        </Text>
+        <Text
+          color={theme.primary}
+          fontSize={14}
+          fontWeight="600"
+          marginTop="$4"
+          onPress={() => navigation.navigate('Login')}
+        >
+          ← Giriş Yap
+        </Text>
+      </YStack>
+    </Theme>
   );
 }
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -194,40 +174,27 @@ export default function App() {
 
   const checkAuth = async () => {
     try {
-      // For web platform, SecureStore doesn't work
+      let token;
       if (Platform.OS === 'web') {
-        // Check localStorage for web
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          // Verify token and get user role
-          const api = axios.create({ baseURL: API_CONFIG.BASE_URL });
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-          try {
-            const response = await api.get('/api/mobile/profile');
-            if (response.data.user) {
-              setIsLoggedIn(true);
-              setIsAdmin(response.data.user.role === 'admin');
-            }
-          } catch (error) {
-            // Token invalid - stay logged out
-            localStorage.removeItem('authToken');
-          }
-        }
+        token = localStorage.getItem('authToken');
       } else {
-        // Native platforms
-        const token = await SecureStore.getItemAsync('authToken');
-        if (token) {
-          const api = axios.create({ baseURL: API_CONFIG.BASE_URL });
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        token = await SecureStore.getItemAsync('authToken');
+      }
 
-          try {
-            const response = await api.get('/api/mobile/profile');
-            if (response.data.user) {
-              setIsLoggedIn(true);
-              setIsAdmin(response.data.user.role === 'admin');
-            }
-          } catch (error) {
+      if (token) {
+        const api = axios.create({ baseURL: API_CONFIG.BASE_URL });
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+        try {
+          const response = await api.get('/api/mobile/profile');
+          if (response.data.user) {
+            setIsLoggedIn(true);
+          }
+        } catch (error) {
+          console.log('Token invalid, clearing...');
+          if (Platform.OS === 'web') {
+            localStorage.removeItem('authToken');
+          } else {
             await SecureStore.deleteItemAsync('authToken');
           }
         }
@@ -249,21 +216,15 @@ export default function App() {
 
   return (
     <TamaguiProvider config={config}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.bg} />
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!isLoggedIn ? (
-            <>
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Register" component={RegisterScreen} />
-            </>
-          ) : (
-            <Stack.Screen
-              name="Main"
-              component={isAdmin ? AdminTabs : UserTabs}
-            />
-          )}
-        </Stack.Navigator>
+        {isLoggedIn ? (
+          <MainTabs />
+        ) : (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </Stack.Navigator>
+        )}
       </NavigationContainer>
     </TamaguiProvider>
   );

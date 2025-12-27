@@ -754,6 +754,30 @@ export default function AdminPanel({ user, handleLogout }) {
                             <h2 className="text-xl font-semibold">🎯 Approved Bets</h2>
                             <div className="flex gap-2">
                                 <button
+                                    onClick={async () => {
+                                        if (!confirm('Mobil tahminler listesi sıfırlanacak. Emin misiniz?')) return;
+                                        try {
+                                            const token = localStorage.getItem('token');
+                                            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/mobile-predictions`, {
+                                                method: 'DELETE',
+                                                headers: { 'Authorization': `Bearer ${token}` }
+                                            });
+                                            const data = await res.json();
+                                            if (data.success) {
+                                                alert('✅ Mobil tahminler sıfırlandı! ' + (data.deleted || 0) + ' kayıt silindi.');
+                                                fetchApprovedBets();
+                                            } else {
+                                                alert('Hata: ' + data.error);
+                                            }
+                                        } catch (e) {
+                                            alert('Hata: ' + e.message);
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+                                >
+                                    📱 Mobil Sıfırla
+                                </button>
+                                <button
                                     onClick={handleManualSettlement}
                                     className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                                 >

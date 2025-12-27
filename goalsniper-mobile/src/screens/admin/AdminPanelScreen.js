@@ -1,8 +1,8 @@
-// GoalSniper Mobile - Admin Panel Screen
-// Full admin functionality matching web admin panel
+// GoalSniper Mobile - Admin Panel
+// Matches design system
 
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Alert, RefreshControl } from 'react-native';
+import { RefreshControl, ScrollView, Platform, Alert } from 'react-native';
 import {
     YStack,
     XStack,
@@ -16,57 +16,65 @@ import { API_CONFIG } from '../../config/api';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-// Premium Theme
+// Design System Colors
 const theme = {
     bg: '#0A0A0A',
-    cardBg: '#111111',
-    cardBorder: '#1A1A1A',
+    cardBg: '#111114',
+    cardBorder: '#1A1A1F',
     primary: '#4ADE80',
+    accent: '#F59E0B',
+    error: '#EF4444',
     text: '#FFFFFF',
     textSecondary: '#9CA3AF',
     textMuted: '#6B7280',
-    success: '#4ADE80',
-    error: '#EF4444',
-    warning: '#F59E0B',
-    blue: '#3B82F6',
-    purple: '#8B5CF6',
 };
 
 const api = axios.create({
     baseURL: API_CONFIG.BASE_URL,
-    timeout: 30000,
+    timeout: 15000,
 });
 
 export default function AdminPanelScreen() {
-    const [botStatus, setBotStatus] = useState(false);
-    const [loading, setLoading] = useState({});
+    const [botActive, setBotActive] = useState(false);
+    const [stats, setStats] = useState({ pending: 0, won: 0, lost: 0, winRate: 0 });
     const [refreshing, setRefreshing] = useState(false);
-    const [stats, setStats] = useState({ pendingBets: 0, wonBets: 0, lostBets: 0, winRate: 0 });
-    const [pendingBets, setPendingBets] = useState([]);
+    const [loading, setLoading] = useState({});
+    const [picks, setPicks] = useState([]);
 
     useEffect(() => {
         loadData();
     }, []);
 
+    const getToken = async () => {
+        if (Platform.OS === 'web') {
+            return localStorage.getItem('authToken');
+        }
+        return await SecureStore.getItemAsync('authToken');
+    };
+
     const loadData = async () => {
         try {
-            const token = await SecureStore.getItemAsync('authToken');
+            const token = await getToken();
             if (token) {
                 api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             }
 
-            // Fetch admin status and bets
-            const [statusRes, picksRes, botRes] = await Promise.all([
+            const [statusRes, adminRes, picksRes] = await Promise.all([
+                api.get('/api/bot/status').catch(() => ({ data: { active: false } })),
                 api.get('/api/mobile/admin/status').catch(() => ({ data: { status: {} } })),
                 api.get('/api/mobile/picks').catch(() => ({ data: { picks: [] } })),
-                api.get('/api/bot/status').catch(() => ({ data: { running: false } })),
             ]);
 
-            setStats(statusRes.data.status || {});
-            setPendingBets((picksRes.data.picks || []).filter(p => p.status === 'PENDING'));
-            setBotStatus(botRes.data.running || false);
+            setBotActive(statusRes.data?.active || false);
+            setStats({
+                pending: adminRes.data?.status?.pendingBets || 0,
+                won: adminRes.data?.status?.wonBets || 0,
+                lost: adminRes.data?.status?.lostBets || 0,
+                winRate: adminRes.data?.status?.winRate || 0,
+            });
+            setPicks((picksRes.data?.picks || []).filter(p => p.status === 'PENDING'));
         } catch (error) {
-            console.error('Load admin data error:', error);
+            console.error('Load data error:', error);
         }
     };
 
@@ -78,109 +86,43 @@ export default function AdminPanelScreen() {
 
     const toggleBot = async () => {
         try {
-            setLoading(prev => ({ ...prev, bot: true }));
-            const endpoint = botStatus ? '/api/bot/stop' : '/api/bot/start';
+            const endpoint = botActive ? '/api/bot/stop' : '/api/bot/start';
             await api.post(endpoint);
-            setBotStatus(!botStatus);
-            Alert.alert('Başarılı', botStatus ? 'Bot durduruldu' : 'Bot başlatıldı');
+            setBotActive(!botActive);
         } catch (error) {
-            Alert.alert('Hata', 'Bot durumu değiştirilemedi');
-        } finally {
-            setLoading(prev => ({ ...prev, bot: false }));
+            console.error('Toggle bot error:', error);
         }
     };
 
-    const runDailyAnalysis = async () => {
+    const runAction = async (action, endpoint) => {
+        setLoading(prev => ({ ...prev, [action]: true }));
         try {
-            setLoading(prev => ({ ...prev, daily: true }));
-            Alert.alert('Başlatılıyor', 'Daily Analysis çalıştırılıyor...');
-            await api.post('/api/analysis/daily');
-            Alert.alert('Başarılı', 'Daily Analysis tamamlandı!');
-        } catch (error) {
-            Alert.alert('Hata', 'Daily Analysis başarısız');
-        } finally {
-            setLoading(prev => ({ ...prev, daily: false }));
-        }
-    };
-
-    const runSettlement = async () => {
-        try {
-            setLoading(prev => ({ ...prev, settlement: true }));
-            await api.post('/api/approved-bets/settle-all');
-            Alert.alert('Başarılı', 'Auto Settlement tamamlandı!');
+            const token = await getToken();
+            if (token) {
+                api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            }
+            await api.post(endpoint);
+            Alert.alert('Başarılı', `${action} tamamlandı`);
             await loadData();
         } catch (error) {
-            Alert.alert('Hata', 'Settlement başarısız');
+            Alert.alert('Hata', error.message);
         } finally {
-            setLoading(prev => ({ ...prev, settlement: false }));
+            setLoading(prev => ({ ...prev, [action]: false }));
         }
     };
 
-    const syncPinecone = async () => {
+    const settleBet = async (betId, result) => {
         try {
-            setLoading(prev => ({ ...prev, pinecone: true }));
-            await api.post('/api/training/sync');
-            Alert.alert('Başarılı', 'Pinecone sync tamamlandı!');
-        } catch (error) {
-            Alert.alert('Hata', 'Pinecone sync başarısız');
-        } finally {
-            setLoading(prev => ({ ...prev, pinecone: false }));
-        }
-    };
-
-    const resetDailyPicks = async () => {
-        Alert.alert(
-            'Onay',
-            'Günün tüm tahminleri sıfırlanacak. Emin misiniz?',
-            [
-                { text: 'İptal', style: 'cancel' },
-                {
-                    text: 'Sıfırla',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setLoading(prev => ({ ...prev, reset: true }));
-                            await api.post('/api/mobile/admin/reset-picks');
-                            Alert.alert('Başarılı', 'Günün tahminleri sıfırlandı!');
-                            await loadData();
-                        } catch (error) {
-                            Alert.alert('Hata', 'Sıfırlama başarısız');
-                        } finally {
-                            setLoading(prev => ({ ...prev, reset: false }));
-                        }
-                    }
-                },
-            ]
-        );
-    };
-
-    const settleBet = async (betId, status) => {
-        try {
-            await api.post(`/api/approved-bets/${betId}/settle`, { status });
-            Alert.alert('Başarılı', `Bahis ${status} olarak işaretlendi`);
+            const token = await getToken();
+            if (token) {
+                api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            }
+            await api.post(`/api/approved-bets/${betId}/settle`, { result });
             await loadData();
         } catch (error) {
-            Alert.alert('Hata', 'İşlem başarısız');
+            Alert.alert('Hata', error.message);
         }
     };
-
-    const ActionButton = ({ icon, label, onPress, color = theme.primary, isLoading = false }) => (
-        <Button
-            flex={1}
-            size="$4"
-            backgroundColor={color + '15'}
-            color={color}
-            borderColor={color + '30'}
-            borderWidth={1}
-            borderRadius={14}
-            fontWeight="700"
-            onPress={onPress}
-            disabled={isLoading}
-            pressStyle={{ opacity: 0.8, scale: 0.98 }}
-        >
-            {isLoading ? '...' : `${icon} ${label}`}
-        </Button>
-    );
 
     return (
         <Theme name="dark">
@@ -192,267 +134,151 @@ export default function AdminPanelScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 <YStack padding="$4" gap="$4">
-
                     {/* Header */}
-                    <XStack alignItems="center" gap="$3">
-                        <YStack
-                            width={50}
-                            height={50}
-                            borderRadius={14}
-                            backgroundColor={theme.purple + '20'}
-                            alignItems="center"
-                            justifyContent="center"
-                        >
-                            <Text fontSize={24}>⚡</Text>
-                        </YStack>
-                        <YStack>
-                            <Text color={theme.text} fontSize={22} fontWeight="800">
-                                Admin Panel
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={12}>
-                                Bot & Bahis Yönetimi
-                            </Text>
-                        </YStack>
-                    </XStack>
+                    <Text color={theme.text} fontSize={24} fontWeight="800">
+                        Admin Panel
+                    </Text>
 
                     {/* Bot Control Card */}
                     <Card
                         backgroundColor={theme.cardBg}
-                        borderColor={botStatus ? theme.success + '40' : theme.error + '40'}
+                        borderColor={theme.cardBorder}
                         borderWidth={1}
-                        borderRadius={20}
-                        padding="$5"
-                        overflow="hidden"
+                        borderRadius={16}
+                        padding="$4"
                     >
-                        <YStack
-                            position="absolute"
-                            top={-30}
-                            right={-30}
-                            width={100}
-                            height={100}
-                            backgroundColor={botStatus ? theme.success : theme.error}
-                            opacity={0.1}
-                            borderRadius={50}
-                        />
-
                         <XStack justifyContent="space-between" alignItems="center">
-                            <XStack alignItems="center" gap="$4">
-                                <YStack
-                                    width={56}
-                                    height={56}
-                                    borderRadius={16}
-                                    backgroundColor={botStatus ? theme.success + '20' : theme.error + '20'}
-                                    alignItems="center"
-                                    justifyContent="center"
-                                >
-                                    <Text fontSize={28}>🤖</Text>
-                                </YStack>
-                                <YStack>
-                                    <Text color={theme.text} fontSize={18} fontWeight="800">
-                                        Live Bot
-                                    </Text>
-                                    <XStack alignItems="center" gap="$2" marginTop={2}>
-                                        <YStack
-                                            width={8}
-                                            height={8}
-                                            borderRadius={4}
-                                            backgroundColor={botStatus ? theme.success : theme.error}
-                                        />
-                                        <Text
-                                            color={botStatus ? theme.success : theme.error}
-                                            fontSize={12}
-                                            fontWeight="600"
-                                        >
-                                            {botStatus ? 'Aktif' : 'Durduruldu'}
-                                        </Text>
-                                    </XStack>
-                                </YStack>
-                            </XStack>
-
+                            <YStack>
+                                <Text color={theme.text} fontSize={16} fontWeight="700">
+                                    Canlı Bot
+                                </Text>
+                                <Text color={botActive ? theme.primary : theme.error} fontSize={12}>
+                                    {botActive ? '● Aktif' : '○ Pasif'}
+                                </Text>
+                            </YStack>
                             <Switch
-                                size="$5"
-                                checked={botStatus}
+                                size="$4"
+                                checked={botActive}
                                 onCheckedChange={toggleBot}
-                                backgroundColor={botStatus ? theme.success : theme.cardBorder}
-                                disabled={loading.bot}
+                                backgroundColor={botActive ? theme.primary : theme.cardBorder}
                             >
-                                <Switch.Thumb animation="quick" backgroundColor={theme.text} />
+                                <Switch.Thumb animation="quick" />
                             </Switch>
                         </XStack>
                     </Card>
 
-                    {/* Quick Stats */}
+                    {/* Stats */}
                     <XStack gap="$3">
-                        <Card
-                            flex={1}
-                            backgroundColor={theme.cardBg}
-                            borderColor={theme.cardBorder}
-                            borderWidth={1}
-                            borderRadius={16}
-                            padding="$3"
-                            alignItems="center"
-                        >
-                            <Text color={theme.warning} fontSize={26} fontWeight="800">
-                                {stats.pendingBets}
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={10} fontWeight="600">PENDING</Text>
+                        <Card flex={1} backgroundColor={theme.cardBg} borderRadius={16} padding="$3" alignItems="center">
+                            <Text color={theme.accent} fontSize={24} fontWeight="800">{stats.pending}</Text>
+                            <Text color={theme.textMuted} fontSize={10}>Bekleyen</Text>
                         </Card>
-                        <Card
-                            flex={1}
-                            backgroundColor={theme.cardBg}
-                            borderColor={theme.cardBorder}
-                            borderWidth={1}
-                            borderRadius={16}
-                            padding="$3"
-                            alignItems="center"
-                        >
-                            <Text color={theme.success} fontSize={26} fontWeight="800">
-                                {stats.wonBets}
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={10} fontWeight="600">WON</Text>
+                        <Card flex={1} backgroundColor={theme.cardBg} borderRadius={16} padding="$3" alignItems="center">
+                            <Text color={theme.primary} fontSize={24} fontWeight="800">{stats.won}</Text>
+                            <Text color={theme.textMuted} fontSize={10}>Kazandı</Text>
                         </Card>
-                        <Card
-                            flex={1}
-                            backgroundColor={theme.cardBg}
-                            borderColor={theme.cardBorder}
-                            borderWidth={1}
-                            borderRadius={16}
-                            padding="$3"
-                            alignItems="center"
-                        >
-                            <Text color={theme.primary} fontSize={26} fontWeight="800">
-                                {stats.winRate}%
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={10} fontWeight="600">WIN RATE</Text>
+                        <Card flex={1} backgroundColor={theme.cardBg} borderRadius={16} padding="$3" alignItems="center">
+                            <Text color={theme.primary} fontSize={24} fontWeight="800">{stats.winRate}%</Text>
+                            <Text color={theme.textMuted} fontSize={10}>Win Rate</Text>
                         </Card>
                     </XStack>
 
-                    {/* Action Buttons Row 1 */}
-                    <YStack gap="$3">
-                        <Text color={theme.textSecondary} fontSize={12} fontWeight="600" letterSpacing={0.5}>
-                            ANALİZ & SETTLEMENT
-                        </Text>
+                    {/* Action Buttons */}
+                    <YStack gap="$2">
+                        <Button
+                            size="$4"
+                            backgroundColor={theme.primary}
+                            color={theme.bg}
+                            borderRadius={12}
+                            fontWeight="700"
+                            onPress={() => runAction('Daily Analysis', '/api/analysis/daily')}
+                            disabled={loading['Daily Analysis']}
+                        >
+                            {loading['Daily Analysis'] ? '⏳' : '📊'} Günlük Analiz
+                        </Button>
 
-                        <XStack gap="$3">
-                            <ActionButton
-                                icon="📊"
-                                label="Daily"
-                                onPress={runDailyAnalysis}
-                                color={theme.blue}
-                                isLoading={loading.daily}
-                            />
-                            <ActionButton
-                                icon="⚡"
-                                label="Settlement"
-                                onPress={runSettlement}
-                                color={theme.success}
-                                isLoading={loading.settlement}
-                            />
-                        </XStack>
+                        <Button
+                            size="$4"
+                            backgroundColor={theme.cardBg}
+                            color={theme.text}
+                            borderColor={theme.cardBorder}
+                            borderWidth={1}
+                            borderRadius={12}
+                            fontWeight="600"
+                            onPress={() => runAction('Settlement', '/api/approved-bets/settle-all')}
+                            disabled={loading['Settlement']}
+                        >
+                            {loading['Settlement'] ? '⏳' : '✓'} Otomatik Settle
+                        </Button>
 
-                        <XStack gap="$3">
-                            <ActionButton
-                                icon="🧠"
-                                label="Pinecone"
-                                onPress={syncPinecone}
-                                color={theme.purple}
-                                isLoading={loading.pinecone}
-                            />
-                            <ActionButton
-                                icon="🗑️"
-                                label="Reset Picks"
-                                onPress={resetDailyPicks}
-                                color={theme.error}
-                                isLoading={loading.reset}
-                            />
-                        </XStack>
+                        <Button
+                            size="$4"
+                            backgroundColor={theme.cardBg}
+                            color={theme.text}
+                            borderColor={theme.cardBorder}
+                            borderWidth={1}
+                            borderRadius={12}
+                            fontWeight="600"
+                            onPress={() => runAction('Reset', '/api/mobile/admin/reset-picks')}
+                            disabled={loading['Reset']}
+                        >
+                            {loading['Reset'] ? '⏳' : '🗑️'} Günü Sıfırla
+                        </Button>
                     </YStack>
 
                     {/* Pending Bets */}
-                    <YStack gap="$3">
-                        <Text color={theme.textSecondary} fontSize={12} fontWeight="600" letterSpacing={0.5}>
-                            BEKLEYEN BAHİSLER ({pendingBets.length})
-                        </Text>
+                    {picks.length > 0 && (
+                        <YStack gap="$3">
+                            <Text color={theme.text} fontSize={16} fontWeight="700">
+                                Bekleyen Bahisler ({picks.length})
+                            </Text>
 
-                        {pendingBets.length > 0 ? (
-                            pendingBets.map((bet) => (
+                            {picks.map((pick, index) => (
                                 <Card
-                                    key={bet.id}
+                                    key={index}
                                     backgroundColor={theme.cardBg}
                                     borderColor={theme.cardBorder}
                                     borderWidth={1}
                                     borderRadius={16}
                                     padding="$4"
                                 >
-                                    <YStack gap="$3">
-                                        <YStack>
-                                            <Text color={theme.text} fontSize={14} fontWeight="700">
-                                                {bet.match}
-                                            </Text>
-                                            <XStack gap="$2" marginTop={4} alignItems="center">
-                                                <Text
-                                                    backgroundColor={theme.primary + '20'}
-                                                    color={theme.primary}
-                                                    paddingHorizontal="$2"
-                                                    paddingVertical={2}
-                                                    borderRadius={4}
-                                                    fontSize={10}
-                                                    fontWeight="700"
-                                                >
-                                                    {bet.market}
-                                                </Text>
-                                                <Text color={theme.blue} fontSize={12} fontWeight="700">
-                                                    @ {bet.odds}
-                                                </Text>
-                                            </XStack>
-                                        </YStack>
+                                    <Text color={theme.text} fontSize={14} fontWeight="600" marginBottom="$1">
+                                        {pick.match}
+                                    </Text>
+                                    <Text color={theme.textMuted} fontSize={11} marginBottom="$2">
+                                        {pick.market} • {pick.league}
+                                    </Text>
 
-                                        <XStack gap="$2">
-                                            <Button
-                                                flex={1}
-                                                size="$3"
-                                                backgroundColor={theme.success}
-                                                color={theme.bg}
-                                                borderRadius={10}
-                                                fontWeight="700"
-                                                onPress={() => settleBet(bet.id, 'WON')}
-                                                pressStyle={{ scale: 0.97 }}
-                                            >
-                                                ✓ WON
-                                            </Button>
-                                            <Button
-                                                flex={1}
-                                                size="$3"
-                                                backgroundColor={theme.error}
-                                                color={theme.text}
-                                                borderRadius={10}
-                                                fontWeight="700"
-                                                onPress={() => settleBet(bet.id, 'LOST')}
-                                                pressStyle={{ scale: 0.97 }}
-                                            >
-                                                ✗ LOST
-                                            </Button>
-                                        </XStack>
-                                    </YStack>
+                                    <XStack gap="$2">
+                                        <Button
+                                            flex={1}
+                                            size="$3"
+                                            backgroundColor={theme.primary}
+                                            color={theme.bg}
+                                            borderRadius={8}
+                                            fontWeight="700"
+                                            onPress={() => settleBet(pick.id, 'WON')}
+                                        >
+                                            ✓ WON
+                                        </Button>
+                                        <Button
+                                            flex={1}
+                                            size="$3"
+                                            backgroundColor={theme.error}
+                                            color="#fff"
+                                            borderRadius={8}
+                                            fontWeight="700"
+                                            onPress={() => settleBet(pick.id, 'LOST')}
+                                        >
+                                            ✗ LOST
+                                        </Button>
+                                    </XStack>
                                 </Card>
-                            ))
-                        ) : (
-                            <Card
-                                backgroundColor={theme.cardBg}
-                                borderColor={theme.cardBorder}
-                                borderWidth={1}
-                                borderRadius={16}
-                                padding="$6"
-                                alignItems="center"
-                            >
-                                <Text color={theme.textMuted} fontSize={13}>
-                                    Bekleyen bahis yok
-                                </Text>
-                            </Card>
-                        )}
-                    </YStack>
+                            ))}
+                        </YStack>
+                    )}
 
-                    <YStack height={40} />
+                    <YStack height={100} />
                 </YStack>
             </ScrollView>
         </Theme>

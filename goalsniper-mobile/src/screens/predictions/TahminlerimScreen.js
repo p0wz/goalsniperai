@@ -1,33 +1,29 @@
-// GoalSniper Mobile - Tahminlerim Screen (My Predictions)
-// Based on reference design - Dark theme with green accents
+// GoalSniper Mobile - Tahminlerim
+// Shows approved bets from admin panel (betting-buddy-ai design)
 
 import React, { useState, useEffect } from 'react';
-import { RefreshControl, ScrollView } from 'react-native';
+import { RefreshControl, ScrollView, Platform, Pressable } from 'react-native';
 import {
     YStack,
     XStack,
     Text,
-    Card,
-    H1,
     Theme,
-    Button,
 } from 'tamagui';
 import { API_CONFIG } from '../../config/api';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-// Premium Theme
-const theme = {
-    bg: '#0A0A0A',
-    cardBg: '#111111',
-    cardBorder: '#1A1A1A',
-    primary: '#4ADE80',
-    text: '#FFFFFF',
-    textSecondary: '#9CA3AF',
-    textMuted: '#6B7280',
-    success: '#4ADE80',
-    error: '#EF4444',
-    warning: '#F59E0B',
+// EXACT colors from betting-buddy-ai
+const colors = {
+    background: 'hsl(220, 20%, 6%)',
+    card: 'hsl(220, 18%, 10%)',
+    cardBorder: 'hsl(220, 14%, 18%)',
+    primary: 'hsl(142, 70%, 45%)',
+    secondary: 'hsl(220, 14%, 16%)',
+    accent: 'hsl(38, 92%, 50%)',
+    destructive: 'hsl(0, 84%, 60%)',
+    muted: 'hsl(220, 10%, 60%)',
+    foreground: 'hsl(0, 0%, 98%)',
 };
 
 const api = axios.create({
@@ -37,31 +33,67 @@ const api = axios.create({
 
 export default function TahminlerimScreen() {
     const [picks, setPicks] = useState([]);
-    const [stats, setStats] = useState({ won: 0, lost: 0, pending: 0 });
+    const [stats, setStats] = useState({ total: 0, won: 0, lost: 0, pending: 0 });
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('all');
+    const [filter, setFilter] = useState('all');
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
         try {
-            const token = await SecureStore.getItemAsync('authToken');
-            if (token) {
-                api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            let token;
+            if (Platform.OS === 'web') {
+                token = localStorage.getItem('authToken');
+            } else {
+                token = await SecureStore.getItemAsync('authToken');
             }
+            if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-            const [picksRes, statsRes] = await Promise.all([
-                api.get('/api/mobile/picks').catch(() => ({ data: { picks: [] } })),
-                api.get('/api/mobile/stats').catch(() => ({ data: { stats: {} } })),
-            ]);
+            // Fetch approved bets from backend
+            const response = await api.get('/api/approved-bets').catch(() => ({ data: { bets: [] } }));
+            const bets = response.data.bets || response.data || [];
 
-            setPicks(picksRes.data.picks || []);
-            setStats(statsRes.data.stats || { won: 0, lost: 0, pending: 0 });
+            // Map approved bets to display format
+            const mappedPicks = bets.map(bet => ({
+                id: bet.id,
+                match: bet.match || `${bet.homeTeam || bet.home_team} vs ${bet.awayTeam || bet.away_team}`,
+                homeTeam: bet.homeTeam || bet.home_team,
+                awayTeam: bet.awayTeam || bet.away_team,
+                league: bet.league || 'Football',
+                market: bet.market || bet.prediction,
+                odds: bet.odds || '1.85',
+                confidence: bet.confidence || 75,
+                status: bet.status || 'PENDING',
+                resultScore: bet.resultScore || bet.result_score,
+                date: bet.matchTime || bet.match_time || formatDate(bet.approvedAt || bet.approved_at),
+            }));
+
+            setPicks(mappedPicks);
+
+            // Calculate stats
+            const wonCount = mappedPicks.filter(p => p.status === 'WON').length;
+            const lostCount = mappedPicks.filter(p => p.status === 'LOST').length;
+            const pendingCount = mappedPicks.filter(p => p.status === 'PENDING').length;
+
+            setStats({
+                total: mappedPicks.length,
+                won: wonCount,
+                lost: lostCount,
+                pending: pendingCount,
+            });
         } catch (error) {
             console.error('Load data error:', error);
         }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return 'Bugün';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'Bugün';
+        if (diffDays === 1) return 'Dün';
+        return `${diffDays} gün önce`;
     };
 
     const onRefresh = async () => {
@@ -70,216 +102,253 @@ export default function TahminlerimScreen() {
         setRefreshing(false);
     };
 
-    // Filter picks based on active tab
-    const filteredPicks = picks.filter(pick => {
-        if (activeTab === 'all') return true;
-        if (activeTab === 'won') return pick.status === 'WON';
-        if (activeTab === 'lost') return pick.status === 'LOST';
-        if (activeTab === 'pending') return pick.status === 'PENDING';
-        return true;
-    });
+    // Filter predictions
+    const filteredPredictions = filter === 'all'
+        ? picks
+        : picks.filter(p => {
+            if (filter === 'pending') return p.status === 'PENDING';
+            if (filter === 'won') return p.status === 'WON';
+            if (filter === 'lost') return p.status === 'LOST';
+            return true;
+        });
 
-    const TabButton = ({ label, count, tabKey, icon }) => (
-        <Button
-            flex={1}
-            size="$3"
-            backgroundColor={activeTab === tabKey ? theme.primary : 'transparent'}
-            color={activeTab === tabKey ? theme.bg : theme.textSecondary}
-            borderRadius={12}
-            fontWeight="600"
-            fontSize={12}
-            onPress={() => setActiveTab(tabKey)}
-            pressStyle={{ scale: 0.97 }}
-        >
-            {icon} {count}
-        </Button>
-    );
+    // Status styles
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'WON': return '✓';
+            case 'LOST': return '✗';
+            default: return '◷';
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'WON': return colors.primary;
+            case 'LOST': return colors.destructive;
+            default: return colors.accent;
+        }
+    };
+
+    const filters = [
+        { key: 'all', label: 'Tümü' },
+        { key: 'pending', label: 'Bekleyen' },
+        { key: 'won', label: 'Kazanan' },
+        { key: 'lost', label: 'Kaybeden' },
+    ];
 
     return (
         <Theme name="dark">
-            <YStack flex={1} backgroundColor={theme.bg}>
-                {/* Header */}
-                <YStack padding="$4" paddingBottom="$2">
-                    <XStack justifyContent="space-between" alignItems="center">
-                        <Text color={theme.text} fontSize={24} fontWeight="800" letterSpacing={-0.5}>
-                            Tahminlerim
-                        </Text>
-                        <XStack
-                            backgroundColor={theme.primary + '20'}
-                            paddingHorizontal="$3"
-                            paddingVertical="$2"
-                            borderRadius={12}
-                            alignItems="center"
-                            gap="$2"
-                        >
-                            <Text fontSize={14}>🔥</Text>
-                            <Text color={theme.primary} fontSize={12} fontWeight="700">
-                                {Math.abs(stats?.streak || 0)} Seri
-                            </Text>
+            <ScrollView
+                style={{ flex: 1, backgroundColor: colors.background }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+                showsVerticalScrollIndicator={false}
+            >
+                <YStack paddingBottom={100}>
+                    {/* Header - EXACT from Predictions.tsx */}
+                    <YStack padding={16}>
+                        <XStack alignItems="center" gap={8} marginBottom={8}>
+                            <Text color={colors.primary} fontSize={16}>🎯</Text>
+                            <Text color={colors.foreground} fontSize={20} fontWeight="bold">Günün Tahminleri</Text>
                         </XStack>
-                    </XStack>
+                        <Text color={colors.muted} fontSize={13}>
+                            Admin tarafından onaylanmış tahminler
+                        </Text>
+                    </YStack>
 
-                    {/* Stats Row - Like reference design */}
-                    <XStack marginTop="$4" gap="$4" justifyContent="space-around">
-                        <YStack alignItems="center">
-                            <Text color={theme.text} fontSize={28} fontWeight="800">
-                                {stats.won}
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={12}>KAZANDI</Text>
-                        </YStack>
-                        <YStack alignItems="center">
-                            <Text color={theme.text} fontSize={28} fontWeight="800">
-                                {stats.lost}
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={12}>KAYBETTİ</Text>
-                        </YStack>
-                        <YStack alignItems="center">
-                            <Text color={theme.text} fontSize={28} fontWeight="800">
-                                {stats.pending}
-                            </Text>
-                            <Text color={theme.textMuted} fontSize={12}>BEKLİYOR</Text>
-                        </YStack>
-                    </XStack>
-
-                    {/* Filter Tabs */}
-                    <XStack
-                        marginTop="$4"
-                        backgroundColor={theme.cardBg}
-                        borderRadius={14}
-                        padding="$1"
-                        gap="$1"
-                    >
-                        <TabButton label="Tümü" count={picks.length} tabKey="all" icon="📋" />
-                        <TabButton label="Kazandı" count={stats.won} tabKey="won" icon="✓" />
-                        <TabButton label="Kaybetti" count={stats.lost} tabKey="lost" icon="✗" />
-                        <TabButton label="Bekliyor" count={stats.pending} tabKey="pending" icon="⏳" />
-                    </XStack>
-                </YStack>
-
-                <ScrollView
-                    style={{ flex: 1 }}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
-                    }
-                    showsVerticalScrollIndicator={false}
-                >
-                    <YStack padding="$4" paddingTop={0} gap="$3">
-                        {filteredPicks.length > 0 ? (
-                            filteredPicks.map((pick, index) => (
-                                <Card
-                                    key={index}
-                                    backgroundColor={theme.cardBg}
-                                    borderColor={theme.cardBorder}
-                                    borderWidth={1}
-                                    borderRadius={16}
-                                    padding="$4"
-                                    overflow="hidden"
-                                >
-                                    {/* Status indicator line */}
-                                    <YStack
-                                        position="absolute"
-                                        left={0}
-                                        top={0}
-                                        bottom={0}
-                                        width={3}
-                                        backgroundColor={
-                                            pick.status === 'WON' ? theme.success :
-                                                pick.status === 'LOST' ? theme.error :
-                                                    theme.warning
-                                        }
-                                    />
-
-                                    <YStack gap="$2" paddingLeft="$2">
-                                        {/* Status and Odds Row */}
-                                        <XStack justifyContent="space-between" alignItems="center">
-                                            <XStack alignItems="center" gap="$2">
-                                                <Text
-                                                    color={
-                                                        pick.status === 'WON' ? theme.success :
-                                                            pick.status === 'LOST' ? theme.error :
-                                                                theme.warning
-                                                    }
-                                                    fontSize={12}
-                                                    fontWeight="700"
-                                                >
-                                                    {pick.status === 'WON' ? '✓ Dün' :
-                                                        pick.status === 'LOST' ? '✗ Dün' :
-                                                            '⏳ Dün'}
-                                                </Text>
-                                            </XStack>
-
-                                            <Text color={theme.textSecondary} fontSize={14} fontWeight="700">
-                                                {pick.odds}x
-                                            </Text>
-                                        </XStack>
-
-                                        {/* Match Name */}
-                                        <Text color={theme.text} fontSize={15} fontWeight="600">
-                                            {pick.match}
-                                        </Text>
-
-                                        {/* Market and Result */}
-                                        <XStack justifyContent="space-between" alignItems="center">
-                                            <XStack alignItems="center" gap="$2">
-                                                <Text
-                                                    backgroundColor={theme.primary + '20'}
-                                                    color={theme.primary}
-                                                    paddingHorizontal="$2"
-                                                    paddingVertical={2}
-                                                    borderRadius={4}
-                                                    fontSize={10}
-                                                    fontWeight="700"
-                                                >
-                                                    {pick.market}
-                                                </Text>
-                                                <Text color={theme.textMuted} fontSize={11}>
-                                                    {pick.league}
-                                                </Text>
-                                            </XStack>
-
-                                            {pick.resultScore && (
-                                                <Text color={theme.textSecondary} fontSize={12}>
-                                                    Sonuç: {pick.resultScore}
-                                                </Text>
-                                            )}
-                                        </XStack>
-                                    </YStack>
-                                </Card>
-                            ))
-                        ) : (
-                            <Card
-                                backgroundColor={theme.cardBg}
-                                borderColor={theme.cardBorder}
-                                borderWidth={1}
-                                borderRadius={20}
-                                padding="$8"
+                    {/* Stats - 4 column grid */}
+                    <YStack paddingHorizontal={16} marginBottom={24}>
+                        <XStack gap={8}>
+                            {/* Total */}
+                            <YStack
+                                flex={1}
+                                backgroundColor={colors.card}
+                                borderColor={colors.cardBorder}
+                                borderWidth={0.5}
+                                borderRadius={12}
+                                padding={12}
                                 alignItems="center"
                             >
+                                <Text color={colors.foreground} fontSize={20} fontWeight="bold">{stats.total}</Text>
+                                <Text color={colors.muted} fontSize={12}>Toplam</Text>
+                            </YStack>
+
+                            {/* Won */}
+                            <YStack
+                                flex={1}
+                                backgroundColor={colors.card}
+                                borderColor={colors.cardBorder}
+                                borderWidth={0.5}
+                                borderLeftWidth={2}
+                                borderLeftColor={colors.primary}
+                                borderRadius={12}
+                                padding={12}
+                                alignItems="center"
+                            >
+                                <Text color={colors.primary} fontSize={20} fontWeight="bold">{stats.won}</Text>
+                                <Text color={colors.muted} fontSize={12}>Kazandı</Text>
+                            </YStack>
+
+                            {/* Lost */}
+                            <YStack
+                                flex={1}
+                                backgroundColor={colors.card}
+                                borderColor={colors.cardBorder}
+                                borderWidth={0.5}
+                                borderLeftWidth={2}
+                                borderLeftColor={colors.destructive}
+                                borderRadius={12}
+                                padding={12}
+                                alignItems="center"
+                            >
+                                <Text color={colors.destructive} fontSize={20} fontWeight="bold">{stats.lost}</Text>
+                                <Text color={colors.muted} fontSize={12}>Kaybetti</Text>
+                            </YStack>
+
+                            {/* Pending */}
+                            <YStack
+                                flex={1}
+                                backgroundColor={colors.card}
+                                borderColor={colors.cardBorder}
+                                borderWidth={0.5}
+                                borderLeftWidth={2}
+                                borderLeftColor={colors.accent}
+                                borderRadius={12}
+                                padding={12}
+                                alignItems="center"
+                            >
+                                <Text color={colors.accent} fontSize={20} fontWeight="bold">{stats.pending}</Text>
+                                <Text color={colors.muted} fontSize={12}>Bekliyor</Text>
+                            </YStack>
+                        </XStack>
+                    </YStack>
+
+                    {/* Filter Buttons */}
+                    <YStack paddingHorizontal={16} marginBottom={16}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <XStack gap={8}>
+                                {filters.map((f) => (
+                                    <Pressable key={f.key} onPress={() => setFilter(f.key)}>
+                                        <YStack
+                                            backgroundColor={filter === f.key ? colors.primary : 'transparent'}
+                                            borderColor={filter === f.key ? colors.primary : colors.cardBorder}
+                                            borderWidth={1}
+                                            borderRadius={12}
+                                            paddingHorizontal={16}
+                                            paddingVertical={8}
+                                        >
+                                            <Text
+                                                color={filter === f.key ? colors.foreground : colors.muted}
+                                                fontSize={14}
+                                                fontWeight="500"
+                                            >
+                                                {f.label}
+                                            </Text>
+                                        </YStack>
+                                    </Pressable>
+                                ))}
+                            </XStack>
+                        </ScrollView>
+                    </YStack>
+
+                    {/* Predictions List */}
+                    <YStack paddingHorizontal={16} gap={12}>
+                        {filteredPredictions.length > 0 ? (
+                            filteredPredictions.map((pred, i) => (
                                 <YStack
-                                    width={70}
-                                    height={70}
-                                    borderRadius={20}
-                                    backgroundColor={theme.primary + '10'}
-                                    alignItems="center"
-                                    justifyContent="center"
-                                    marginBottom="$3"
+                                    key={pred.id || i}
+                                    backgroundColor={colors.card}
+                                    borderColor={colors.cardBorder}
+                                    borderWidth={0.5}
+                                    borderLeftWidth={4}
+                                    borderLeftColor={getStatusColor(pred.status)}
+                                    borderRadius={12}
+                                    padding={16}
                                 >
-                                    <Text fontSize={32}>📋</Text>
+                                    {/* Match & Status Icon */}
+                                    <XStack justifyContent="space-between" alignItems="flex-start" marginBottom={8}>
+                                        <YStack flex={1}>
+                                            <Text color={colors.foreground} fontSize={14} fontWeight="500">
+                                                {pred.match}
+                                            </Text>
+                                            <XStack alignItems="center" gap={8} marginTop={4}>
+                                                <YStack
+                                                    backgroundColor="hsla(220, 14%, 16%, 0.5)"
+                                                    paddingHorizontal={8}
+                                                    paddingVertical={2}
+                                                    borderRadius={4}
+                                                >
+                                                    <Text color={colors.muted} fontSize={12}>{pred.league}</Text>
+                                                </YStack>
+                                                <Text color={colors.muted} fontSize={12}>{pred.date}</Text>
+                                            </XStack>
+                                        </YStack>
+                                        <Text color={getStatusColor(pred.status)} fontSize={20}>{getStatusIcon(pred.status)}</Text>
+                                    </XStack>
+
+                                    {/* Prediction & Odds & Confidence */}
+                                    <XStack justifyContent="space-between" alignItems="center" marginTop={12}>
+                                        <XStack alignItems="center" gap={12}>
+                                            {/* Prediction pill */}
+                                            <YStack
+                                                backgroundColor="hsla(142, 70%, 45%, 0.2)"
+                                                paddingHorizontal={12}
+                                                paddingVertical={4}
+                                                borderRadius={8}
+                                            >
+                                                <Text color={colors.primary} fontSize={14} fontWeight="500">{pred.market}</Text>
+                                            </YStack>
+                                            <Text color={colors.accent} fontSize={14} fontWeight="600">{pred.odds}</Text>
+                                        </XStack>
+                                        <XStack alignItems="center" gap={8}>
+                                            {/* Progress bar */}
+                                            <YStack width={64} height={6} backgroundColor={colors.secondary} borderRadius={3} overflow="hidden">
+                                                <YStack
+                                                    height="100%"
+                                                    width={`${pred.confidence}%`}
+                                                    backgroundColor={colors.primary}
+                                                    borderRadius={3}
+                                                />
+                                            </YStack>
+                                            <Text color={colors.primary} fontSize={12}>{pred.confidence}%</Text>
+                                        </XStack>
+                                    </XStack>
+
+                                    {/* Result Score if available */}
+                                    {pred.resultScore && (
+                                        <XStack marginTop={8}>
+                                            <YStack
+                                                backgroundColor="hsla(220, 14%, 16%, 0.5)"
+                                                paddingHorizontal={8}
+                                                paddingVertical={4}
+                                                borderRadius={6}
+                                            >
+                                                <Text color={colors.muted} fontSize={11}>Sonuç: {pred.resultScore}</Text>
+                                            </YStack>
+                                        </XStack>
+                                    )}
                                 </YStack>
-                                <Text color={theme.text} fontSize={16} fontWeight="600" marginBottom="$1">
+                            ))
+                        ) : (
+                            <YStack
+                                backgroundColor={colors.card}
+                                borderColor={colors.cardBorder}
+                                borderWidth={0.5}
+                                borderRadius={16}
+                                padding={32}
+                                alignItems="center"
+                            >
+                                <Text fontSize={48} marginBottom={16}>🎯</Text>
+                                <Text color={colors.foreground} fontSize={16} fontWeight="600" marginBottom={4}>
                                     Henüz tahmin yok
                                 </Text>
-                                <Text color={theme.textMuted} fontSize={13} textAlign="center">
-                                    Admin tarafından onaylanan tahminler
-                                    {'\n'}burada görünecek
+                                <Text color={colors.muted} fontSize={13} textAlign="center">
+                                    Günün tahminleri admin tarafından onaylandığında burada görünecek
                                 </Text>
-                            </Card>
+                            </YStack>
                         )}
-
-                        <YStack height={30} />
                     </YStack>
-                </ScrollView>
-            </YStack>
+                </YStack>
+            </ScrollView>
         </Theme>
     );
 }
