@@ -605,41 +605,59 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         // ============================================
         // NEW MARKET K: 1X + 1.5 Üst (Double Chance + Over 1.5)
         // ============================================
-        if (homeHomeStats.lossCount <= 1 &&
-            awayAwayStats.winRate < 35 &&
-            homeHomeStats.winRate >= 45 &&
-            homeHomeStats.scoringRate >= 80 &&
-            proxyLeagueAvg >= 2.3 &&
-            homeForm.over15Rate >= 70) {
+        const dc15Check = {
+            lossCount: homeHomeStats.lossCount <= 1,
+            awayWinRate: awayAwayStats.winRate < 35,
+            homeWinRate: homeHomeStats.winRate >= 45,
+            scoringRate: homeHomeStats.scoringRate >= 80,
+            leagueAvg: proxyLeagueAvg >= 2.3,
+            over15Rate: homeForm.over15Rate >= 70
+        };
+        log.info(`   📊 [1X+1.5Ü] HomeLoss≤1: ${homeHomeStats.lossCount}(${dc15Check.lossCount ? '✓' : '✗'}) | AwayWin<35: ${awayAwayStats.winRate?.toFixed(0)}%(${dc15Check.awayWinRate ? '✓' : '✗'}) | HomeWin≥45: ${homeHomeStats.winRate?.toFixed(0)}%(${dc15Check.homeWinRate ? '✓' : '✗'}) | Scoring≥80: ${homeHomeStats.scoringRate?.toFixed(0)}%(${dc15Check.scoringRate ? '✓' : '✗'}) | LeagueAvg≥2.3: ${proxyLeagueAvg?.toFixed(2)}(${dc15Check.leagueAvg ? '✓' : '✗'}) | O15≥70: ${homeForm.over15Rate?.toFixed(0)}%(${dc15Check.over15Rate ? '✓' : '✗'})`);
+
+        if (Object.values(dc15Check).every(v => v)) {
             candidates.doubleChanceOver15.push({ ...m, filterStats: stats, market: '1X + 1.5 Üst' });
             passedFilters.push('1X + 1.5Ü');
+            log.info(`   ✅ 1X + 1.5 Üst PASSED!`);
         }
 
         // ============================================
         // NEW MARKET L: Ev Herhangi Yarıyı Kazanır
         // Uses eitherHalfWinRate from calculateAdvancedStats + matchDetails validation
         // ============================================
-        if (homeHomeStats.eitherHalfWinRate >= 70 &&
-            homeHomeStats.firstHalfWinRate >= 45 &&
-            homeHomeStats.secondHalfWinRate >= 45 &&
-            homeHomeStats.winRate >= 55 &&
-            homeHomeStats.scoringRate >= 85 &&
-            awayAwayStats.eitherHalfWinRate < 45) {
+        const evHalfCheck = {
+            eitherHalf: (homeHomeStats.eitherHalfWinRate || 0) >= 70,
+            firstHalf: (homeHomeStats.firstHalfWinRate || 0) >= 45,
+            secondHalf: (homeHomeStats.secondHalfWinRate || 0) >= 45,
+            winRate: homeHomeStats.winRate >= 55,
+            scoring: homeHomeStats.scoringRate >= 85,
+            awayEitherHalf: (awayAwayStats.eitherHalfWinRate || 0) < 45
+        };
+        log.info(`   📊 [Ev Yarı] EitherHalf≥70: ${(homeHomeStats.eitherHalfWinRate || 0).toFixed(0)}%(${evHalfCheck.eitherHalf ? '✓' : '✗'}) | 1H≥45: ${(homeHomeStats.firstHalfWinRate || 0).toFixed(0)}%(${evHalfCheck.firstHalf ? '✓' : '✗'}) | 2H≥45: ${(homeHomeStats.secondHalfWinRate || 0).toFixed(0)}%(${evHalfCheck.secondHalf ? '✓' : '✗'}) | Win≥55: ${homeHomeStats.winRate?.toFixed(0)}%(${evHalfCheck.winRate ? '✓' : '✗'}) | Scr≥85: ${homeHomeStats.scoringRate?.toFixed(0)}%(${evHalfCheck.scoring ? '✓' : '✗'}) | AwayEither<45: ${(awayAwayStats.eitherHalfWinRate || 0).toFixed(0)}%(${evHalfCheck.awayEitherHalf ? '✓' : '✗'})`);
+
+        if (Object.values(evHalfCheck).every(v => v)) {
             candidates.homeWinsEitherHalf.push({ ...m, filterStats: stats, market: 'Ev Herhangi Yarı' });
             passedFilters.push('Ev Her.Yarı');
+            log.info(`   ✅ Ev Herhangi Yarı PASSED!`);
         }
 
         // ============================================
         // NEW MARKET M: Dep DNB (Deplasman Beraberlikte İade)
         // ============================================
-        if (awayAwayStats.winRate >= 45 &&
-            awayAwayStats.lossCount <= 1 &&
-            homeHomeStats.winRate < 45 &&
-            awayAwayStats.scoringRate >= 80 &&
-            awayForm.avgScored >= 1.5 &&
-            homeHomeStats.lossCount >= 2) {
+        const depDnbCheck = {
+            awayWinRate: awayAwayStats.winRate >= 45,
+            awayLossCount: awayAwayStats.lossCount <= 1,
+            homeWinRate: homeHomeStats.winRate < 45,
+            awayScoring: awayAwayStats.scoringRate >= 80,
+            awayFormScored: awayForm.avgScored >= 1.5,
+            homeLossCount: homeHomeStats.lossCount >= 2
+        };
+        log.info(`   📊 [Dep DNB] AwayWin≥45: ${awayAwayStats.winRate?.toFixed(0)}%(${depDnbCheck.awayWinRate ? '✓' : '✗'}) | AwayLoss≤1: ${awayAwayStats.lossCount}(${depDnbCheck.awayLossCount ? '✓' : '✗'}) | HomeWin<45: ${homeHomeStats.winRate?.toFixed(0)}%(${depDnbCheck.homeWinRate ? '✓' : '✗'}) | AwayScr≥80: ${awayAwayStats.scoringRate?.toFixed(0)}%(${depDnbCheck.awayScoring ? '✓' : '✗'}) | AwayFormScr≥1.5: ${awayForm.avgScored?.toFixed(2)}(${depDnbCheck.awayFormScored ? '✓' : '✗'}) | HomeLoss≥2: ${homeHomeStats.lossCount}(${depDnbCheck.homeLossCount ? '✓' : '✗'})`);
+
+        if (Object.values(depDnbCheck).every(v => v)) {
             candidates.awayDNB.push({ ...m, filterStats: stats, market: 'Dep DNB' });
             passedFilters.push('Dep DNB');
+            log.info(`   ✅ Dep DNB PASSED!`);
         }
 
         if (passedFilters.length > 0) {
