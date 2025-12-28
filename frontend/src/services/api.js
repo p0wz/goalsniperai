@@ -314,6 +314,11 @@ export const betsService = {
     clearAll: async () => {
         const response = await api.delete('/bets');
         return response.data;
+    },
+    // Get bets by market
+    getByMarket: async (market) => {
+        const response = await api.get(`/bets?market=${encodeURIComponent(market)}`);
+        return response.data;
     }
 };
 

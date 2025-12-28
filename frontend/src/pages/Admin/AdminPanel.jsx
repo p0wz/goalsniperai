@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api, { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService, betsService } from '../../services/api';
 import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
 import { RawStatsTab } from '../../RawStatsTab';
+import MarketStatsTab from '../../MarketStatsTab';
 import NBAProps from './NBAProps';
 import clsx from 'clsx';
 import NeuButton from '../../components/ui/NeuButton';
@@ -666,7 +667,7 @@ export default function AdminPanel({ user, handleLogout }) {
             <main className="container mx-auto p-4 md:p-6">
                 {/* Navigation Tabs */}
                 <div className="mb-6 flex gap-2 border-b overflow-x-auto">
-                    {['live', 'bets', 'training', 'sentio', 'payments', 'raw-stats', 'analiz', 'nba-props', ...Object.keys(MARKET_CONFIG)].map((tab) => (
+                    {['live', 'bets', 'market-stats', 'training', 'sentio', 'payments', 'raw-stats', 'analiz', 'nba-props', ...Object.keys(MARKET_CONFIG)].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -679,6 +680,7 @@ export default function AdminPanel({ user, handleLogout }) {
                         >
                             {tab === 'live' && '📡 Live'}
                             {tab === 'bets' && '🎯 Approved Bets'}
+                            {tab === 'market-stats' && '📊 Market Stats'}
                             {tab === 'mobile' && '📱 Mobil Yönetim'}
                             {tab === 'training' && '🧠 Training Pool'}
                             {tab === 'analiz' && '🎯 Analiz'}
@@ -971,6 +973,11 @@ export default function AdminPanel({ user, handleLogout }) {
                             </table>
                         </div>
                     </div>
+                )}
+
+                {/* Tab Content: MARKET STATS */}
+                {activeTab === 'market-stats' && (
+                    <MarketStatsTab />
                 )}
 
                 {/* Tab Content: TRAINING POOL */}
