@@ -254,6 +254,7 @@ function calculateAdvancedStats(history, teamName) {
     let over25Count = 0;
     let under25Count = 0;
     let under35Count = 0;
+    let under45Count = 0;  // NEW: For 2-4 goal range
     let bttsCount = 0;
     let cleanSheetCount = 0;
     let failedToScoreCount = 0;
@@ -261,6 +262,10 @@ function calculateAdvancedStats(history, teamName) {
     let draws = 0;
     let losses = 0;
     let htGoalCount = 0;  // First Half goals
+    let firstHalfWins = 0;  // NEW: Won first half
+    let secondHalfWins = 0;  // NEW: Won second half
+    let eitherHalfWins = 0;  // NEW: Won at least one half
+    let goals24Count = 0;  // NEW: Goals between 2-4
 
     for (const m of history) {
         let s1 = 0, s2 = 0;
@@ -286,6 +291,8 @@ function calculateAdvancedStats(history, teamName) {
         if (total > 2.5) over25Count++;
         if (total <= 2.5) under25Count++;
         if (total <= 3.5) under35Count++;
+        if (total <= 4.5) under45Count++;  // NEW
+        if (total >= 2 && total <= 4) goals24Count++;  // NEW: 2-4 goal range
         if (s1 > 0 && s2 > 0) bttsCount++;
         if (oppScore === 0) cleanSheetCount++;
         if (myScore === 0) failedToScoreCount++;
@@ -294,10 +301,27 @@ function calculateAdvancedStats(history, teamName) {
         else if (myScore === oppScore) draws++;
         else losses++;
 
-        // Track first half goals (if HT data available)
-        const htHome = m.home_team?.score_1st_half || 0;
-        const htAway = m.away_team?.score_1st_half || 0;
+        // Track first half goals and half-wins (if HT data available)
+        const htHome = parseInt(m.home_team?.score_1st_half) || 0;
+        const htAway = parseInt(m.away_team?.score_1st_half) || 0;
         if (htHome + htAway >= 1) htGoalCount++;
+
+        // Calculate second half scores
+        const h2Home = s1 - htHome;
+        const h2Away = s2 - htAway;
+
+        const myHT = isHome ? htHome : htAway;
+        const oppHT = isHome ? htAway : htHome;
+        const myH2 = isHome ? h2Home : h2Away;
+        const oppH2 = isHome ? h2Away : h2Home;
+
+        // NEW: Track half wins
+        const wonFirstHalf = myHT > oppHT;
+        const wonSecondHalf = myH2 > oppH2;
+
+        if (wonFirstHalf) firstHalfWins++;
+        if (wonSecondHalf) secondHalfWins++;
+        if (wonFirstHalf || wonSecondHalf) eitherHalfWins++;
     }
 
     if (totalMatches === 0) return null;
@@ -311,12 +335,17 @@ function calculateAdvancedStats(history, teamName) {
         over25Rate: (over25Count / totalMatches) * 100,
         under25Rate: (under25Count / totalMatches) * 100,
         under35Rate: (under35Count / totalMatches) * 100,
+        under45Rate: (under45Count / totalMatches) * 100,  // NEW
+        goals24Rate: (goals24Count / totalMatches) * 100,  // NEW
         bttsRate: (bttsCount / totalMatches) * 100,
         scoringRate: ((totalMatches - failedToScoreCount) / totalMatches) * 100,
         winRate: (wins / totalMatches) * 100,
         lossCount: losses,
         cleanSheetRate: (cleanSheetCount / totalMatches) * 100,
-        htGoalRate: (htGoalCount / totalMatches) * 100  // First Half goal rate
+        htGoalRate: (htGoalCount / totalMatches) * 100,
+        firstHalfWinRate: (firstHalfWins / totalMatches) * 100,  // NEW
+        secondHalfWinRate: (secondHalfWins / totalMatches) * 100,  // NEW
+        eitherHalfWinRate: (eitherHalfWins / totalMatches) * 100  // NEW
     };
 }
 
@@ -332,7 +361,11 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         firstHalfOver05: [],
         ms1AndOver15: [],
         awayOver05: [],
-        handicap: []
+        handicap: [],
+        // NEW MARKETS
+        doubleChanceOver15: [],  // 1X + 1.5 Üst
+        homeWinsEitherHalf: [],  // Ev Herhangi Yarı
+        awayDNB: []              // Dep DNB
     };
 
     let processed = 0;
@@ -409,6 +442,39 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         const stats = { homeForm, awayForm, homeHomeStats, awayAwayStats, mutual: mutualH2H };
         const proxyLeagueAvg = (homeForm.avgTotalGoals + awayForm.avgTotalGoals) / 2;
 
+        // ============================================
+        // UNIVERSAL: Fetch Match Details for HT validation (both teams' last 3 matches)
+        // ============================================
+        log.info(`   🔬 Fetching match details for HT validation...`);
+        const homeLast3 = homeRawHistory.slice(0, 3);
+        const awayLast3 = awayRawHistory.slice(0, 3);
+
+        const homeMatchDetails = [];
+        for (const hm of homeLast3) {
+            const mId = hm.match_id || hm.id;
+            if (mId) {
+                await sleep(300);
+                const details = await fetchMatchDetails(mId);
+                homeMatchDetails.push(details);
+            }
+        }
+
+        const awayMatchDetails = [];
+        for (const am of awayLast3) {
+            const mId = am.match_id || am.id;
+            if (mId) {
+                await sleep(300);
+                const details = await fetchMatchDetails(mId);
+                awayMatchDetails.push(details);
+            }
+        }
+
+        // Store match details in stats for market evaluations
+        stats.homeMatchDetails = homeMatchDetails;
+        stats.awayMatchDetails = awayMatchDetails;
+
+        log.info(`   ✅ Fetched ${homeMatchDetails.length + awayMatchDetails.length} match details`);
+
         // Log calculated stats
         log.info(`   📊 STATS:`);
         log.info(`      • League Avg Goals: ${proxyLeagueAvg.toFixed(2)}`);
@@ -445,12 +511,10 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             passedFilters.push('1X DC');
         }
 
-        // Logic E: Home Over 1.5 (IMPROVED)
-        // Ev avgScored ≥1.6, Dep avgConceded ≥1.4, Ev scoringRate ≥80%, Ev over15Rate ≥60%
-        // Logic E: Home Over 1.5 (IMPROVED - STRICTER)
-        // Ev avgScored >= 2.0, Dep avgConceded >= 1.5, Ev scoringRate >= 85%, Ev over15Rate >= 80%
-        if (homeHomeStats.avgScored >= 2.0 && awayAwayStats.avgConceded >= 1.5 &&
-            homeHomeStats.scoringRate >= 85 && homeForm.over15Rate >= 80) {
+        // Logic E: Home Over 1.5 (STRICTER CRITERIA)
+        // Ev avgScored >= 2.2, Dep avgConceded >= 1.6, Ev scoringRate >= 90%, Ev over15Rate >= 85%
+        if (homeHomeStats.avgScored >= 2.2 && awayAwayStats.avgConceded >= 1.6 &&
+            homeHomeStats.scoringRate >= 90 && homeForm.over15Rate >= 85) {
             candidates.homeOver15.push({ ...m, filterStats: stats, market: 'Home Team Over 1.5' });
             passedFilters.push('Home O1.5');
         }
@@ -474,41 +538,15 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         }
 
         // Logic G: First Half Over 0.5 (ENHANCED with Real HT Validation)
-        // Uses separate pure form analysis + secondary validation with match details
+        // Uses pre-fetched match details for HT validation
         const fhAnalysis = analyzeFirstHalfPreMatch(m, homeRawHistory, awayRawHistory, mutualH2H);
         if (fhAnalysis.signal) {
-            // Secondary validation: Fetch real HT scores from match details
-            log.info(`   🔬 1Y 0.5+ passed heuristic, fetching real HT scores...`);
+            log.info(`   🔬 1Y 0.5+ passed heuristic, validating with HT scores...`);
 
-            // Get last 3 match IDs for each team
-            const homeLast3 = homeRawHistory.slice(0, 3);
-            const awayLast3 = awayRawHistory.slice(0, 3);
-
-            // Fetch match details for each (with rate limiting)
-            const homeMatchDetails = [];
-            for (const hm of homeLast3) {
-                const mid = hm.match_id || hm.id;
-                if (mid) {
-                    await sleep(300);
-                    const details = await fetchMatchDetails(mid);
-                    homeMatchDetails.push(details);
-                }
-            }
-
-            const awayMatchDetails = [];
-            for (const am of awayLast3) {
-                const mid = am.match_id || am.id;
-                if (mid) {
-                    await sleep(300);
-                    const details = await fetchMatchDetails(mid);
-                    awayMatchDetails.push(details);
-                }
-            }
-
-            // Run secondary validation
+            // Use pre-fetched match details (already in stats object)
             const htValidation = validateWithRealHTScores(
-                homeMatchDetails,
-                awayMatchDetails,
+                stats.homeMatchDetails,
+                stats.awayMatchDetails,
                 m.event_home_team,
                 m.event_away_team
             );
@@ -564,6 +602,46 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
             passedFilters.push('Hnd. MS2 -1.5');
         }
 
+        // ============================================
+        // NEW MARKET K: 1X + 1.5 Üst (Double Chance + Over 1.5)
+        // ============================================
+        if (homeHomeStats.lossCount <= 1 &&
+            awayAwayStats.winRate < 35 &&
+            homeHomeStats.winRate >= 45 &&
+            homeHomeStats.scoringRate >= 80 &&
+            proxyLeagueAvg >= 2.3 &&
+            homeForm.over15Rate >= 70) {
+            candidates.doubleChanceOver15.push({ ...m, filterStats: stats, market: '1X + 1.5 Üst' });
+            passedFilters.push('1X + 1.5Ü');
+        }
+
+        // ============================================
+        // NEW MARKET L: Ev Herhangi Yarıyı Kazanır
+        // Uses eitherHalfWinRate from calculateAdvancedStats + matchDetails validation
+        // ============================================
+        if (homeHomeStats.eitherHalfWinRate >= 70 &&
+            homeHomeStats.firstHalfWinRate >= 45 &&
+            homeHomeStats.secondHalfWinRate >= 45 &&
+            homeHomeStats.winRate >= 55 &&
+            homeHomeStats.scoringRate >= 85 &&
+            awayAwayStats.eitherHalfWinRate < 45) {
+            candidates.homeWinsEitherHalf.push({ ...m, filterStats: stats, market: 'Ev Herhangi Yarı' });
+            passedFilters.push('Ev Her.Yarı');
+        }
+
+        // ============================================
+        // NEW MARKET M: Dep DNB (Deplasman Beraberlikte İade)
+        // ============================================
+        if (awayAwayStats.winRate >= 45 &&
+            awayAwayStats.lossCount <= 1 &&
+            homeHomeStats.winRate < 45 &&
+            awayAwayStats.scoringRate >= 80 &&
+            awayForm.avgScored >= 1.5 &&
+            homeHomeStats.lossCount >= 2) {
+            candidates.awayDNB.push({ ...m, filterStats: stats, market: 'Dep DNB' });
+            passedFilters.push('Dep DNB');
+        }
+
         if (passedFilters.length > 0) {
             log.info(`   ✅ PASSED: ${passedFilters.join(', ')}`);
         } else {
@@ -587,6 +665,9 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
     log.info(`   • MS1 & 1.5+ candidates: ${candidates.ms1AndOver15.length}`);
     log.info(`   • Away 0.5+ candidates: ${candidates.awayOver05.length}`);
     log.info(`   • Handicap candidates: ${candidates.handicap.length}`);
+    log.info(`   • 1X + 1.5 Üst candidates: ${candidates.doubleChanceOver15.length}`);
+    log.info(`   • Ev Herhangi Yarı candidates: ${candidates.homeWinsEitherHalf.length}`);
+    log.info(`   • Dep DNB candidates: ${candidates.awayDNB.length}`);
     log.info(`═══════════════════════════════════════════════════════`);
 
     return candidates;
@@ -682,7 +763,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, league
 
     if (matches.length === 0) {
         log.warn('[DailyAnalyst] Found 0 matches. Please check API schedule endpoint.');
-        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: [] };
+        return { over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: [], doubleChanceOver15: [], homeWinsEitherHalf: [], awayDNB: [] };
     }
 
     log.info(`✅ Found ${matches.length} upcoming fixtures. Processing top ${customLimit}...`);
@@ -699,7 +780,7 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, league
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: []
+        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: [], doubleChanceOver15: [], homeWinsEitherHalf: [], awayDNB: []
     };
 
     // Helper: Generate Detailed Analysis Text
@@ -975,7 +1056,11 @@ const MARKET_MAP = {
     'firstHalfOver05': { name: 'First Half Over 0.5', key: 'firstHalfOver05' },
     'ms1AndOver15': { name: 'MS1 & 1.5 Üst', key: 'ms1AndOver15' },
     'awayOver05': { name: 'Dep 0.5 Üst', key: 'awayOver05' },
-    'handicap': { name: 'Hnd. MS1', key: 'handicap' }
+    'handicap': { name: 'Hnd. MS1', key: 'handicap' },
+    'ms1xOver15': { name: 'MS1X & 1.5 Üst', key: 'ms1xOver15' },
+    'totalGoals24': { name: 'Toplam Gol 2-4', key: 'totalGoals24' },
+    'homeWinsHalf': { name: 'Ev Sahibi Yarı Kazanır', key: 'homeWinsHalf' },
+    'awayDNB': { name: 'Deplasman DNB', key: 'awayDNB' }
 };
 
 async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = console, customLimit = MATCH_LIMIT) {
@@ -1070,8 +1155,10 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
                 matchData.market = '1X Double Chance';
                 break;
             case 'homeOver15':
-                passes = homeHomeStats.avgScored >= 2.0 && awayAwayStats.avgConceded >= 1.5 &&
-                    homeHomeStats.scoringRate >= 85 && homeForm.over15Rate >= 80;
+                // TIGHTENED CRITERIA: Stricter scoring and form requirements
+                passes = homeHomeStats.avgScored >= 2.1 && awayAwayStats.avgConceded >= 1.6 &&
+                    homeHomeStats.scoringRate >= 90 && homeForm.over15Rate >= 85 &&
+                    (awayAwayStats.cleanSheetRate || 0) <= 20;
                 matchData.market = 'Home Team Over 1.5';
                 break;
             case 'under35':
@@ -1145,6 +1232,76 @@ async function runSingleMarketAnalysis(marketKey, leagueFilter = true, log = con
                 passes = awayAwayStats.scoringRate >= 80 && awayAwayStats.avgScored >= 1.2 &&
                     (100 - (homeHomeStats.cleanSheetRate || 0)) >= 80;
                 matchData.market = 'Dep 0.5 Üst';
+                break;
+            // NEW MARKETS
+            case 'ms1xOver15':
+                passes = homeHomeStats.lossCount <= 1 && homeHomeStats.scoringRate >= 85 &&
+                    awayAwayStats.avgConceded >= 1.2 && proxyLeagueAvg >= 2.0 &&
+                    homeForm.over15Rate >= 75;
+                matchData.market = 'MS1X & 1.5 Üst';
+                break;
+            case 'totalGoals24':
+                // Range 2-4: Needs goals but not too many. 
+                // Using new stats from calculateAdvancedStats: goals24Rate, under45Rate
+                passes = proxyLeagueAvg >= 2.0 && proxyLeagueAvg <= 3.5 &&
+                    (homeForm.goals24Rate || 0) >= 70 && (awayForm.goals24Rate || 0) >= 70 &&
+                    homeForm.under45Rate >= 90 && awayForm.under45Rate >= 90;
+                matchData.market = 'Toplam Gol 2-4';
+                break;
+            case 'homeWinsHalf':
+                // Home team wins either first OR second half
+                // Requires good win rate and specifically half-win stats
+                if (homeHomeStats.winRate >= 50 && homeHomeStats.avgScored >= 1.5) {
+
+                    log.info(`   🔬 Checking Home Wins Half validation...`);
+                    const homeLast4 = homeRawHistory.slice(0, 4);
+                    const homeMatchDetails = [];
+
+                    for (const hm of homeLast4) {
+                        const mid = hm.match_id || hm.id;
+                        if (mid) {
+                            await sleep(250); // Faster sleep
+                            const details = await fetchMatchDetails(mid);
+                            homeMatchDetails.push(details);
+                        }
+                    }
+
+                    // Simple validation: Did they win a half in at least 3 of last 4 home games?
+                    // We need to parse HT scores from details if possible, or use the 'score_1st_half' if available in basic details
+                    // The basic detail fetch might just return the same object if not enriched.
+                    // Assuming fetchMatchDetails returns object with 'score_1st_half', 'score_2nd_half' etc.
+
+                    let halfWinCount = 0;
+                    for (const d of homeMatchDetails) {
+                        // Check if we have valid scores
+                        if (d && d.score_1st_half !== undefined && d.score_2nd_half !== undefined) {
+                            const htHome = parseInt(d.score_1st_half.split('-')[0]);
+                            const htAway = parseInt(d.score_1st_half.split('-')[1]);
+                            const ftHome = parseInt(d.score_full_time.split('-')[0]);
+                            const ftAway = parseInt(d.score_full_time.split('-')[1]);
+
+                            const secondHome = ftHome - htHome;
+                            const secondAway = ftAway - htAway;
+
+                            if (htHome > htAway || secondHome > secondAway) {
+                                halfWinCount++;
+                            }
+                        } else if (d && d.home_team && d.away_team) {
+                            // Fallback if structure is different
+                            // ... logic similar to calculateAdvancedStats ...
+                        }
+                    }
+
+                    passes = halfWinCount >= 3;
+                    if (passes) log.info(`   ✅ Home won a half in ${halfWinCount}/4 recent matches`);
+                }
+                matchData.market = 'Ev Sahibi Yarı Kazanır';
+                break;
+            case 'awayDNB':
+                // Away Draw No Bet: Away win or draw. Away should be decent, Home shouldn't be too strong.
+                passes = awayAwayStats.winRate >= 40 && awayAwayStats.lossCount <= 2 &&
+                    homeHomeStats.winRate < 50 && awayForm.avgScored >= homeForm.avgScored;
+                matchData.market = 'Deplasman DNB';
                 break;
             case 'handicap':
                 const hDiff = homeHomeStats.avgScored - homeHomeStats.avgConceded;

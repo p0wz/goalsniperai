@@ -103,7 +103,7 @@ async function getPendingBets() {
 async function getSettledBets() {
     try {
         const result = await db.execute(`
-            SELECT * FROM approved_bets WHERE status IN ('WON', 'LOST') ORDER BY settled_at DESC
+            SELECT * FROM approved_bets WHERE status IN ('WON', 'LOST', 'REFUND') ORDER BY settled_at DESC
         `);
         return result.rows.map(formatBetRow);
     } catch (e) {
@@ -161,8 +161,8 @@ async function toggleMobile(betId, isMobile) {
 // ============================================
 
 async function settleBet(betId, status, resultScore = null) {
-    if (!['WON', 'LOST'].includes(status)) {
-        return { success: false, error: 'Status must be WON or LOST' };
+    if (!['WON', 'LOST', 'REFUND'].includes(status)) {
+        return { success: false, error: 'Status must be WON, LOST, or REFUND' };
     }
 
     try {
@@ -227,7 +227,8 @@ async function getStats() {
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
                 SUM(CASE WHEN status = 'WON' THEN 1 ELSE 0 END) as won,
-                SUM(CASE WHEN status = 'LOST' THEN 1 ELSE 0 END) as lost
+                SUM(CASE WHEN status = 'LOST' THEN 1 ELSE 0 END) as lost,
+                SUM(CASE WHEN status = 'REFUND' THEN 1 ELSE 0 END) as refund
             FROM approved_bets
         `);
 
@@ -236,8 +237,9 @@ async function getStats() {
         const pending = row.pending || 0;
         const won = row.won || 0;
         const lost = row.lost || 0;
-        const settled = won + lost;
-        const winRate = settled > 0 ? ((won / settled) * 100).toFixed(1) : 0;
+        const refund = row.refund || 0;
+        const settled = won + lost + refund;
+        const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : 0;
 
         // Get by market stats
         const marketResult = await db.execute(`

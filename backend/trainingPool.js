@@ -116,7 +116,8 @@ async function getStats() {
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN result = 'WON' THEN 1 ELSE 0 END) as won,
-                SUM(CASE WHEN result = 'LOST' THEN 1 ELSE 0 END) as lost
+                SUM(CASE WHEN result = 'LOST' THEN 1 ELSE 0 END) as lost,
+                SUM(CASE WHEN result = 'REFUND' THEN 1 ELSE 0 END) as refund
             FROM training_pool
         `);
 
@@ -124,11 +125,12 @@ async function getStats() {
         const total = row.total || 0;
         const won = row.won || 0;
         const lost = row.lost || 0;
-        const winRate = total > 0 ? ((won / total) * 100).toFixed(1) : 0;
+        const refund = row.refund || 0;
+        const winRate = (won + lost) > 0 ? ((won / (won + lost)) * 100).toFixed(1) : 0;
 
-        return { total, won, lost, winRate: parseFloat(winRate) };
+        return { total, won, lost, refund, winRate: parseFloat(winRate) };
     } catch (e) {
-        return { total: 0, won: 0, lost: 0, winRate: 0 };
+        return { total: 0, won: 0, lost: 0, refund: 0, winRate: 0 };
     }
 }
 

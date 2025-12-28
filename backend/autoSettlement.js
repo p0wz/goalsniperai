@@ -196,21 +196,41 @@ function evaluatePrediction(market, prediction, homeGoals, awayGoals, halfTimeHo
     if (marketLower.includes('away -2.5') || predLower.includes('away -2.5')) {
         return (awayGoals - homeGoals) >= 3;
     }
+    // ============================================
+    // NEW: 1X + 1.5 Üst (Double Chance + Over 1.5)
+    // ============================================
+    if (marketLower.includes('1x + 1.5') || marketLower.includes('1x and 1.5') ||
+        marketLower.includes('1x ve 1.5') || predLower.includes('1x + 1.5')) {
+        // Home wins or draws AND total goals >= 2
+        return (homeGoals >= awayGoals && totalGoals >= 2) ? 'WON' : 'LOST';
+    }
 
     // ============================================
-    // EXACT GOALS
+    // NEW: Ev Herhangi Yarıyı Kazanır (Home Wins Either Half)
     // ============================================
-    if (marketLower.includes('exact 0') || predLower.includes('exact 0')) {
-        return totalGoals === 0;
+    if (marketLower.includes('ev herhangi') || marketLower.includes('home wins either half') ||
+        marketLower.includes('ev yarı') || predLower.includes('ev herhangi')) {
+        // Need HT scores to evaluate
+        if (halfTimeHome !== null && halfTimeAway !== null) {
+            const homeWonFirstHalf = halfTimeHome > halfTimeAway;
+            const secondHalfHome = homeGoals - halfTimeHome;
+            const secondHalfAway = awayGoals - halfTimeAway;
+            const homeWonSecondHalf = secondHalfHome > secondHalfAway;
+            return (homeWonFirstHalf || homeWonSecondHalf) ? 'WON' : 'LOST';
+        }
+        // Fallback if no HT data: home win means they won at least one half
+        return homeGoals > awayGoals ? 'WON' : 'LOST';
     }
-    if (marketLower.includes('exact 1') || predLower.includes('exact 1')) {
-        return totalGoals === 1;
-    }
-    if (marketLower.includes('exact 2') || predLower.includes('exact 2')) {
-        return totalGoals === 2;
-    }
-    if (marketLower.includes('exact 3') || predLower.includes('exact 3')) {
-        return totalGoals === 3;
+
+    // ============================================
+    // NEW: Deplasman Beraberlikte İade (Away DNB - Draw No Bet)
+    // ============================================
+    if (marketLower.includes('dep dnb') || marketLower.includes('away dnb') ||
+        marketLower.includes('deplasman dnb') || marketLower.includes('beraberlikte iade') ||
+        predLower.includes('dep dnb') || predLower.includes('away dnb')) {
+        if (awayGoals > homeGoals) return 'WON';
+        if (awayGoals === homeGoals) return 'REFUND';
+        return 'LOST';
     }
 
     // Unknown market - log and skip
@@ -296,11 +316,34 @@ async function fetchMatchResult(eventId) {
 
         console.log(`[AutoSettlement] Parsed: home=${homeGoals}, away=${awayGoals}, status=${matchStatus}, isFinished=${isFinished}`);
 
+        // Parse HT scores for half-based markets
+        let halfTimeHome = null;
+        let halfTimeAway = null;
+
+        // Try various HT score formats
+        if (data.home_team?.score_1st_half !== undefined && data.away_team?.score_1st_half !== undefined) {
+            halfTimeHome = parseInt(data.home_team.score_1st_half) || 0;
+            halfTimeAway = parseInt(data.away_team.score_1st_half) || 0;
+        } else if (data.home_score?.period1 !== undefined && data.away_score?.period1 !== undefined) {
+            halfTimeHome = parseInt(data.home_score.period1) || 0;
+            halfTimeAway = parseInt(data.away_score.period1) || 0;
+        } else if (data.scores?.['1st_half']) {
+            const htScoreParts = String(data.scores['1st_half']).split('-');
+            if (htScoreParts.length === 2) {
+                halfTimeHome = parseInt(htScoreParts[0]) || 0;
+                halfTimeAway = parseInt(htScoreParts[1]) || 0;
+            }
+        }
+
+        console.log(`[AutoSettlement] HT Scores: ${halfTimeHome}-${halfTimeAway}`);
+
         if (homeGoals !== null && awayGoals !== null) {
             return {
                 success: true,
                 homeGoals,
                 awayGoals,
+                halfTimeHome,
+                halfTimeAway,
                 finalScore: `${homeGoals}-${awayGoals}`,
                 isFinished,
                 matchStatus
@@ -394,16 +437,17 @@ async function runSettlementCheck() {
                 continue;
             }
 
-            // Evaluate prediction
-            const isWon = evaluatePrediction(bet.market, bet.prediction, result.homeGoals, result.awayGoals);
+            // Evaluate prediction - can return boolean (legacy) or string status (new markets)
+            const evalResult = evaluatePrediction(bet.market, bet.prediction, result.homeGoals, result.awayGoals, result.halfTimeHome, result.halfTimeAway);
 
-            if (isWon === null) {
+            if (evalResult === null) {
                 console.log(`[AutoSettlement] ⚠️ Skipping unknown market: ${bet.match} - ${bet.market}`);
                 errors++;
                 continue;
             }
 
-            const status = isWon ? 'WON' : 'LOST';
+            // Handle both boolean (legacy) and string status (new markets)
+            const status = typeof evalResult === 'string' ? evalResult : (evalResult ? 'WON' : 'LOST');
 
             // Settle the bet
             await approvedBets.settleBet(bet.id, status, result.finalScore);
