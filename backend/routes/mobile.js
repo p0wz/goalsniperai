@@ -14,34 +14,47 @@ const { getUserById } = require('../database');
 // ============================================
 
 // Get today's picks for mobile app (public for logged-in users)
-router.get('/picks', requireAuth, async (req, res) => {
+router.get('/picks', require('../auth').optionalAuth, async (req, res) => {
     try {
         const allBets = await approvedBets.getAllBets();
 
         // ONLY show manually selected Mobile picks
         const mobilePicks = allBets.filter(bet => bet.isMobile);
 
+        // Check user plan
+        const user = req.user;
+        const isPremium = user && (user.plan === 'pro' || user.plan === 'premium' || user.role === 'admin');
+
         // Format for mobile
-        const picks = mobilePicks.map(bet => ({
-            id: bet.id,
-            match: bet.match,
-            homeTeam: bet.homeTeam,
-            awayTeam: bet.awayTeam,
-            league: bet.league,
-            matchTime: bet.matchTime,
-            market: bet.market,
-            odds: bet.odds,
-            confidence: bet.confidence,
-            status: bet.status,
-            resultScore: bet.resultScore,
-            approvedAt: bet.approvedAt,
-            isMobile: true
-        }));
+        const picks = mobilePicks.map(bet => {
+            const isLocked = !isPremium;
+
+            return {
+                id: bet.id,
+                match: bet.match,
+                homeTeam: bet.homeTeam,
+                awayTeam: bet.awayTeam,
+                league: bet.league,
+                matchTime: bet.matchTime,
+                market: bet.market, // Always show market (e.g. "MS 1") as teaser
+                odds: bet.odds,     // Show odds as teaser
+                confidence: isLocked ? null : bet.confidence, // Hide confidence
+                status: bet.status,
+                resultScore: bet.resultScore,
+                approvedAt: bet.approvedAt,
+                isMobile: true,
+                isLocked: isLocked, // Auto-lock for non-premium
+                prediction: isLocked ? "🔒 VIP Tahmin" : bet.prediction, // Mask prediction text
+                aiAnalysis: isLocked ? "Bu analiz sadece VIP üyeler içindir." : bet.aiReason
+            };
+        });
 
         res.json({
             success: true,
             picks,
-            count: picks.length
+            count: picks.length,
+            isGuest: !user,
+            userPlan: user ? user.plan : 'guest'
         });
     } catch (error) {
         console.error('[Mobile] Picks error:', error);
@@ -53,7 +66,7 @@ router.get('/picks', requireAuth, async (req, res) => {
 // 📊 Mobile Stats
 // ============================================
 
-router.get('/stats', requireAuth, async (req, res) => {
+router.get('/stats', require('../auth').optionalAuth, async (req, res) => {
     try {
         const allBets = await approvedBets.getAllBets();
 

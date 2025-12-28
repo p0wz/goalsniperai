@@ -5,9 +5,9 @@ import 'package:http/http.dart' as http;
 class ApiService {
   // Base URL for the backend API
   // Change this to your production URL when deploying
-  static const String baseUrl = 'https://goalgpt-pro.onrender.com';
+  static const String baseUrl = 'https://goalsniperai.onrender.com';
   // static const String baseUrl = 'http://localhost:3000'; // For local testing
-  
+
   String? _authToken;
 
   /// Set authentication token for authorized requests
@@ -102,7 +102,11 @@ class ApiService {
   }
 
   /// Register new account
-  Future<Map<String, dynamic>?> register(String name, String email, String password) async {
+  Future<Map<String, dynamic>?> register(
+    String name,
+    String email,
+    String password,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/register'),
