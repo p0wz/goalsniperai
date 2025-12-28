@@ -27,8 +27,8 @@ export default function Navbar({ user }) {
     return (
         <nav
             className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled
-                    ? 'bg-background/80 backdrop-blur-xl border-b border-border/50 py-3'
-                    : 'bg-transparent py-5'
+                ? 'bg-background/80 backdrop-blur-xl border-b border-border/50 py-3'
+                : 'bg-transparent py-5'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
@@ -42,7 +42,7 @@ export default function Navbar({ user }) {
                         <Zap className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <span className="text-xl font-bold tracking-tight text-foreground">
-                        GoalSniper
+                        Goalify
                     </span>
                 </Link>
 
@@ -54,8 +54,8 @@ export default function Navbar({ user }) {
                                 key={link.label}
                                 to={link.path}
                                 className={`text-sm font-medium transition-colors ${isActive(link.path)
-                                        ? 'text-primary'
-                                        : 'text-muted-foreground hover:text-foreground'
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground hover:text-foreground'
                                     }`}
                             >
                                 {link.label}
@@ -122,7 +122,7 @@ export default function Navbar({ user }) {
                                 <Zap className="w-5 h-5 text-primary-foreground" />
                             </div>
                             <span className="text-xl font-bold tracking-tight text-foreground">
-                                GoalSniper
+                                Goalify
                             </span>
                         </div>
                         <button
@@ -141,8 +141,8 @@ export default function Navbar({ user }) {
                                     to={link.path}
                                     onClick={() => setMobileMenuOpen(false)}
                                     className={`text-lg font-medium py-4 px-4 rounded-xl transition-colors ${isActive(link.path)
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'text-foreground hover:bg-secondary'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'text-foreground hover:bg-secondary'
                                         }`}
                                 >
                                     {link.label}

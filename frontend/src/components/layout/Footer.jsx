@@ -13,7 +13,7 @@ export default function Footer() {
                                 <Zap className="w-5 h-5 text-primary-foreground" />
                             </div>
                             <span className="text-xl font-bold tracking-tight text-foreground">
-                                GoalSniper
+                                Goalify
                             </span>
                         </div>
                         <p className="text-muted-foreground leading-relaxed max-w-sm">
@@ -95,7 +95,7 @@ export default function Footer() {
                 </div>
 
                 <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-                    <div>© 2024 GoalSniper. Tüm hakları saklıdır.</div>
+                    <div>© 2024 Goalify. Tüm hakları saklıdır.</div>
                     <div className="flex gap-6">
                         <span>Made with 🧠 + 💻</span>
                         <span>v3.2.0</span>
