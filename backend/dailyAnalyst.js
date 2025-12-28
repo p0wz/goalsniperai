@@ -497,6 +497,101 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
 
         log.info(`   ✅ Fetched ${homeMatchDetails.length + awayMatchDetails.length} match details`);
 
+        // Debug: Log first match details structure to find HT fields
+        if (homeMatchDetails.length > 0 && homeMatchDetails[0]) {
+            const md = homeMatchDetails[0];
+            console.log(`[MatchDetails Debug] Structure:`, {
+                topLevelKeys: Object.keys(md).slice(0, 15),
+                hasScores: !!md.scores || !!md.SCORE,
+                score: md.score || md.SCORE || md.scores,
+                homeScoreKeys: md.home_team ? Object.keys(md.home_team) : 'no home_team',
+                game: md.game ? Object.keys(md.game) : 'no game key',
+                periods: md.periods || md.PERIODS,
+                halfTimeData: md.half_time || md.halftime || md.ht || md.HT
+            });
+        }
+
+        // ============================================
+        // NEW: Calculate HT Win Rates from Match Details
+        // ============================================
+        const calculateHTWinRatesFromDetails = (matchDetails, teamName) => {
+            let firstHalfWins = 0, secondHalfWins = 0, eitherHalfWins = 0;
+            let totalWithHT = 0;
+
+            for (const md of matchDetails) {
+                if (!md) continue;
+
+                // Try to find HT scores in various possible locations
+                // Flashscore API structure varies - check multiple paths
+                const htHome =
+                    parseInt(md.home_team?.score_1st_half) ||
+                    parseInt(md.score?.home_1st_half) ||
+                    parseInt(md.scores?.home_1st_half) ||
+                    parseInt(md.SCORE?.['1ST_HALF']?.[0]) ||
+                    parseInt(md.periods?.find(p => p.period === '1ST_HALF')?.home) ||
+                    0;
+                const htAway =
+                    parseInt(md.away_team?.score_1st_half) ||
+                    parseInt(md.score?.away_1st_half) ||
+                    parseInt(md.scores?.away_1st_half) ||
+                    parseInt(md.SCORE?.['1ST_HALF']?.[1]) ||
+                    parseInt(md.periods?.find(p => p.period === '1ST_HALF')?.away) ||
+                    0;
+
+                const ftHome = parseInt(md.home_team?.score) || parseInt(md.score?.home) || 0;
+                const ftAway = parseInt(md.away_team?.score) || parseInt(md.score?.away) || 0;
+
+                // Skip if we don't have valid scores
+                if (ftHome === 0 && ftAway === 0) continue;
+
+                totalWithHT++;
+
+                // Determine if team is home or away in this match
+                const isHome = md.home_team?.name?.includes(teamName) || md.HOME?.NAME?.includes(teamName);
+
+                const myHT = isHome ? htHome : htAway;
+                const oppHT = isHome ? htAway : htHome;
+                const myFT = isHome ? ftHome : ftAway;
+                const oppFT = isHome ? ftAway : ftHome;
+
+                // Calculate second half scores
+                const myH2 = myFT - myHT;
+                const oppH2 = oppFT - oppHT;
+
+                const wonFirstHalf = myHT > oppHT;
+                const wonSecondHalf = myH2 > oppH2;
+
+                if (wonFirstHalf) firstHalfWins++;
+                if (wonSecondHalf) secondHalfWins++;
+                if (wonFirstHalf || wonSecondHalf) eitherHalfWins++;
+            }
+
+            if (totalWithHT === 0) return null;
+
+            return {
+                firstHalfWinRate: (firstHalfWins / totalWithHT) * 100,
+                secondHalfWinRate: (secondHalfWins / totalWithHT) * 100,
+                eitherHalfWinRate: (eitherHalfWins / totalWithHT) * 100,
+                totalMatches: totalWithHT
+            };
+        };
+
+        // Overlay HT stats from match details if available
+        const homeHTStats = calculateHTWinRatesFromDetails(homeMatchDetails, m.event_home_team);
+        const awayHTStats = calculateHTWinRatesFromDetails(awayMatchDetails, m.event_away_team);
+
+        if (homeHTStats) {
+            homeHomeStats.firstHalfWinRate = homeHTStats.firstHalfWinRate;
+            homeHomeStats.secondHalfWinRate = homeHTStats.secondHalfWinRate;
+            homeHomeStats.eitherHalfWinRate = homeHTStats.eitherHalfWinRate;
+            log.info(`   📊 Home HT Stats (from details): 1H=${homeHTStats.firstHalfWinRate.toFixed(0)}% 2H=${homeHTStats.secondHalfWinRate.toFixed(0)}% Either=${homeHTStats.eitherHalfWinRate.toFixed(0)}%`);
+        }
+        if (awayHTStats) {
+            awayAwayStats.firstHalfWinRate = awayHTStats.firstHalfWinRate;
+            awayAwayStats.secondHalfWinRate = awayHTStats.secondHalfWinRate;
+            awayAwayStats.eitherHalfWinRate = awayHTStats.eitherHalfWinRate;
+        }
+
         // Log calculated stats
         log.info(`   📊 STATS:`);
         log.info(`      • League Avg Goals: ${proxyLeagueAvg.toFixed(2)}`);
