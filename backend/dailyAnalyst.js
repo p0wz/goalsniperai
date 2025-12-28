@@ -302,8 +302,30 @@ function calculateAdvancedStats(history, teamName) {
         else losses++;
 
         // Track first half goals and half-wins (if HT data available)
-        const htHome = parseInt(m.home_team?.score_1st_half) || 0;
-        const htAway = parseInt(m.away_team?.score_1st_half) || 0;
+        // Try multiple possible field names for HT scores
+        const htHome = parseInt(m.home_team?.score_1st_half) ||
+            parseInt(m.home_team?.['1st_half_score']) ||
+            parseInt(m.home_team?.firstHalfScore) ||
+            parseInt(m.home_team?.ht_score) ||
+            parseInt(m.scores?.home_1st_half) || 0;
+        const htAway = parseInt(m.away_team?.score_1st_half) ||
+            parseInt(m.away_team?.['1st_half_score']) ||
+            parseInt(m.away_team?.firstHalfScore) ||
+            parseInt(m.away_team?.ht_score) ||
+            parseInt(m.scores?.away_1st_half) || 0;
+
+        // Debug: Log first match's HT structure to understand API response
+        if (totalMatches === 1) {
+            console.log(`[HT Debug] First match HT structure:`, {
+                home_score_1st_half: m.home_team?.score_1st_half,
+                away_score_1st_half: m.away_team?.score_1st_half,
+                home_team_keys: Object.keys(m.home_team || {}),
+                away_team_keys: Object.keys(m.away_team || {}),
+                scores: m.scores,
+                parsedHT: { htHome, htAway }
+            });
+        }
+
         if (htHome + htAway >= 1) htGoalCount++;
 
         // Calculate second half scores
