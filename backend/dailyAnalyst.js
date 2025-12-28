@@ -711,7 +711,82 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 async function validateWithAI(match, retries = 3) {
     if (!GROQ_API_KEY) return { verdict: 'SKIP', reason: 'GROQ_API_KEY not configured' };
 
-    const prompt = `You are a professional football betting analyst. Analyze this match for market: ${match.market}.
+    // Build market-specific prompt based on market type
+    let prompt;
+    const marketLower = (match.market || '').toLowerCase();
+
+    if (marketLower.includes('ev herhangi') || marketLower.includes('home wins either half')) {
+        // Special prompt for "Home Wins Either Half" with HT statistics
+        const homeStats = match.filterStats.homeHomeStats;
+        const awayStats = match.filterStats.awayAwayStats;
+
+        prompt = `You are a professional football analyst specializing in HALF-TIME markets. Analyze this match for: "${match.market}".
+
+Match: ${match.event_home_team} vs ${match.event_away_team}
+
+HALF-TIME STATISTICS (Critical for this market):
+- Home Team @ Home - First Half Win Rate: ${(homeStats.firstHalfWinRate || 0).toFixed(0)}%
+- Home Team @ Home - Second Half Win Rate: ${(homeStats.secondHalfWinRate || 0).toFixed(0)}%
+- Home Team @ Home - Either Half Win Rate: ${(homeStats.eitherHalfWinRate || 0).toFixed(0)}%
+- Away Team @ Away - Either Half Win Rate: ${(awayStats.eitherHalfWinRate || 0).toFixed(0)}%
+
+SCORING STATS:
+- Home @ Home: Win Rate ${homeStats.winRate?.toFixed(0)}%, Scoring Rate ${homeStats.scoringRate?.toFixed(0)}%, Avg Scored ${homeStats.avgScored?.toFixed(2)}
+- Away @ Away: Win Rate ${awayStats.winRate?.toFixed(0)}%, Scoring Rate ${awayStats.scoringRate?.toFixed(0)}%, Avg Conceded ${awayStats.avgConceded?.toFixed(2)}
+
+MARKET INFO: "Home Wins Either Half" means home team must score MORE goals than away team in AT LEAST one half (1st half OR 2nd half).
+
+CRITICAL FACTORS:
+1. Does home team consistently dominate at least one half?
+2. Is their first half or second half performance stronger?
+3. Does away team struggle to win halves on the road?
+
+RESPOND WITH ONLY JSON: {"verdict": "PLAY" or "SKIP", "confidence": 70-95, "reason": "Brief reason focusing on half-time patterns"}`;
+    }
+    else if (marketLower.includes('1x + 1.5') || marketLower.includes('1x ve 1.5')) {
+        // Special prompt for Double Chance + Over 1.5
+        prompt = `You are a professional football analyst. Analyze this match for: "${match.market}".
+
+Match: ${match.event_home_team} vs ${match.event_away_team}
+
+Statistics:
+- Home @ Home: Win Rate ${match.filterStats.homeHomeStats.winRate?.toFixed(0)}%, Loss Count ${match.filterStats.homeHomeStats.lossCount}, Scoring Rate ${match.filterStats.homeHomeStats.scoringRate?.toFixed(0)}%
+- Away @ Away: Win Rate ${match.filterStats.awayAwayStats.winRate?.toFixed(0)}%
+- Home Form Over 1.5 Rate: ${match.filterStats.homeForm.over15Rate?.toFixed(0)}%
+- League Avg Goals: ${match.filterStats.proxyLeagueAvg?.toFixed(2) || 'N/A'}
+
+MARKET INFO: "1X + Over 1.5" means: Home Win OR Draw AND at least 2 goals total.
+
+CRITICAL FACTORS:
+1. Home team rarely loses at home (strong 1X probability)
+2. Games involving home team tend to have 2+ goals
+3. Away team struggles to win away
+
+RESPOND WITH ONLY JSON: {"verdict": "PLAY" or "SKIP", "confidence": 70-95, "reason": "Brief reason"}`;
+    }
+    else if (marketLower.includes('dep dnb') || marketLower.includes('away dnb')) {
+        // Special prompt for Away DNB (Draw No Bet)
+        prompt = `You are a professional football analyst. Analyze this match for: "${match.market}".
+
+Match: ${match.event_home_team} vs ${match.event_away_team}
+
+Statistics:
+- Home @ Home: Win Rate ${match.filterStats.homeHomeStats.winRate?.toFixed(0)}%, Loss Count ${match.filterStats.homeHomeStats.lossCount}
+- Away @ Away: Win Rate ${match.filterStats.awayAwayStats.winRate?.toFixed(0)}%, Loss Count ${match.filterStats.awayAwayStats.lossCount}, Scoring Rate ${match.filterStats.awayAwayStats.scoringRate?.toFixed(0)}%
+- Away Form Avg Scored: ${match.filterStats.awayForm.avgScored?.toFixed(2)}
+
+MARKET INFO: "Away Draw No Bet" means: Away Win = WON, Draw = REFUND, Home Win = LOST.
+
+CRITICAL FACTORS:
+1. Away team is strong on the road (high win rate, low losses)
+2. Home team is weak at home (low win rate, multiple losses)
+3. Away team scores consistently (high scoring rate)
+
+RESPOND WITH ONLY JSON: {"verdict": "PLAY" or "SKIP", "confidence": 70-95, "reason": "Brief reason"}`;
+    }
+    else {
+        // Default prompt for other markets
+        prompt = `You are a professional football betting analyst. Analyze this match for market: ${match.market}.
 
 Match: ${match.event_home_team} vs ${match.event_away_team}
 
@@ -724,6 +799,7 @@ Statistics:
 IMPORTANT: These matches have ALREADY passed strict statistical filters. If you recommend PLAY, give confidence between 80-95%. Only use 70-79% if there are significant concerns.
 
 RESPOND WITH ONLY JSON: {"verdict": "PLAY", "confidence": 85, "reason": "Brief reason"}`;
+    }
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
