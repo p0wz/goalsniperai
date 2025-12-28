@@ -13,7 +13,11 @@ const MARKET_CONFIG = {
     firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' },
     ms1AndOver15: { name: 'MS1 & 1.5 Üst', icon: '1️⃣', desc: 'Ev Kazanır ve 1.5 Üst' },
     awayOver05: { name: 'Dep 0.5 Üst', icon: '🚀', desc: 'Deplasman gol atar' },
-    handicap: { name: 'Hnd. -1.5', icon: '💪', desc: 'Favori takım farklı kazanır (-1.5)' }
+    handicap: { name: 'Hnd. -1.5', icon: '💪', desc: 'Favori takım farklı kazanır (-1.5)' },
+    // NEW MARKETS
+    doubleChanceOver15: { name: '1X + 1.5Ü', icon: '🎯', desc: 'Ev kaybetmez + 2 gol' },
+    homeWinsEitherHalf: { name: 'Ev Her.Yarı', icon: '⚡', desc: 'Ev herhangi yarıyı kazanır' },
+    awayDNB: { name: 'Dep DNB', icon: '🔄', desc: 'Deplasman beraberlikte iade' }
 };
 
 function MarketTab({ marketKey, handleAddToPicks }) {
