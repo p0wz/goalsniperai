@@ -3301,6 +3301,11 @@ function startBanner() {
 }
 
 // ============================================
+// 🔐 Admin API Routes (for Admin Panel)
+// ============================================
+app.use('/api/admin', require('./auth').requireAdmin, adminRoutes);
+
+// ============================================
 // 📱 Mobile API Routes
 // ============================================
 app.use('/api/mobile', mobileRoutes);
