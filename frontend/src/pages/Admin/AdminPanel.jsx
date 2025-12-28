@@ -273,10 +273,10 @@ export default function AdminPanel({ user, handleLogout }) {
         }
     };
 
-    const handleRunDaily = async (leagueFilter = true) => {
+    const handleRunDaily = async (leagueFilter = true, limit = null) => {
         try {
             setIsAnalysing(true);
-            const res = await signalService.getDailyAnalysis(true, leagueFilter);
+            const res = await signalService.getDailyAnalysis(true, leagueFilter, limit);
             if (res.success) setDailyAnalysis(res.data);
         } catch (err) {
             alert('Analysis failed: ' + err.message);
@@ -1518,6 +1518,13 @@ Yukarıdaki maç havuzunu detaylı incele. Amacımız "BANKO" (Güvenilir) kupon
 
                             {/* Analysis Content Grid */}
                             <div className="flex justify-center gap-4 mb-8 flex-wrap">
+                                <button
+                                    onClick={() => handleRunDaily(false, 10)}
+                                    disabled={isAnalysing}
+                                    className="px-5 py-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+                                >
+                                    {isAnalysing ? '⏳...' : '🧪 HIZLI TEST (10 Maç)'}
+                                </button>
                                 <button
                                     onClick={() => handleRunDaily(true)}
                                     disabled={isAnalysing}

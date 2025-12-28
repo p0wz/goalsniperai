@@ -74,8 +74,10 @@ export const signalService = {
         const response = await api.get('/signals');
         return response.data;
     },
-    getDailyAnalysis: async (force = false, leagueFilter = true) => {
-        const response = await api.get(`/daily-analysis?force=${force}&leagueFilter=${leagueFilter}`);
+    getDailyAnalysis: async (force = false, leagueFilter = true, limit = null) => {
+        let url = `/daily-analysis?force=${force}&leagueFilter=${leagueFilter}`;
+        if (limit) url += `&limit=${limit}`;
+        const response = await api.get(url);
         return response.data;
     },
     // New: Single-Market Analysis
