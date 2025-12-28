@@ -100,11 +100,15 @@ async function getPendingBets() {
     }
 }
 
-async function getSettledBets() {
+async function getSettledBets(marketFilter = null) {
     try {
-        const result = await db.execute(`
-            SELECT * FROM approved_bets WHERE status IN ('WON', 'LOST', 'REFUND') ORDER BY settled_at DESC
-        `);
+        let query = `SELECT * FROM approved_bets WHERE status IN ('WON', 'LOST', 'REFUND')`;
+        if (marketFilter) {
+            query += ` AND market = '${marketFilter}'`;
+        }
+        query += ` ORDER BY settled_at DESC`;
+
+        const result = await db.execute(query);
         return result.rows.map(formatBetRow);
     } catch (e) {
         console.error('[ApprovedBets] Get Settled Error:', e.message);
@@ -254,11 +258,15 @@ async function getStats() {
 
         const byMarket = {};
         marketResult.rows.forEach(r => {
+            const mWon = r.won || 0;
+            const mLost = r.lost || 0;
+            const mWinRate = (mWon + mLost) > 0 ? ((mWon / (mWon + mLost)) * 100).toFixed(1) : 0;
             byMarket[r.market] = {
                 total: r.total,
-                won: r.won,
-                lost: r.lost,
-                pending: r.pending
+                won: mWon,
+                lost: mLost,
+                pending: r.pending || 0,
+                winRate: parseFloat(mWinRate)
             };
         });
 
