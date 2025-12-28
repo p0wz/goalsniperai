@@ -30,7 +30,7 @@ export default function FreeDashboard({ user }) {
                         <div className="flex-1 text-center md:text-left">
                             <h2 className="text-2xl font-bold text-text-main mb-2 flex items-center justify-center md:justify-start gap-2">
                                 <Sparkles className="text-yellow-400" size={24} />
-                                Meet SENTIO AI
+                                Meet Goalify AI
                             </h2>
                             <p className="text-text-muted mb-4">
                                 Your AI-powered betting advisor. Get unlimited chat,
@@ -65,7 +65,7 @@ export default function FreeDashboard({ user }) {
                             🤖
                         </div>
                         <div>
-                            <h3 className="font-bold text-lg text-text-main">SENTIO AI Chat</h3>
+                            <h3 className="font-bold text-lg text-text-main">Goalify AI Chat</h3>
                             <p className="text-sm text-text-muted">AI Betting Advisor</p>
                         </div>
                     </div>
@@ -134,7 +134,7 @@ export default function FreeDashboard({ user }) {
                                 <td className="text-center py-3 px-4 text-green-500">✓</td>
                             </tr>
                             <tr className="border-b border-text-muted/10">
-                                <td className="py-3 px-4 text-text-muted">SENTIO AI Chat</td>
+                                <td className="py-3 px-4 text-text-muted">Goalify AI Chat</td>
                                 <td className="text-center py-3 px-4 text-red-500">✗</td>
                                 <td className="text-center py-3 px-4 text-green-500">✓ Unlimited</td>
                             </tr>

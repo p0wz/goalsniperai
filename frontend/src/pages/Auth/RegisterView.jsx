@@ -52,7 +52,7 @@ export default function RegisterView({ onRegister, error }) {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-primary glow-primary mb-4">
                         <Zap className="w-8 h-8 text-primary-foreground" />
                     </div>
-                    <h1 className="text-3xl font-bold text-foreground">Goalify</h1>
+                    <h1 className="text-3xl font-bold text-foreground">Goalify AI</h1>
                     <p className="text-muted-foreground mt-2">Profesyonel tahmin platformu</p>
                 </div>
 

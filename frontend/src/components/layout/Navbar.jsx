@@ -42,7 +42,7 @@ export default function Navbar({ user }) {
                         <Zap className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <span className="text-xl font-bold tracking-tight text-foreground">
-                        Goalify
+                        Goalify AI
                     </span>
                 </Link>
 
@@ -122,7 +122,7 @@ export default function Navbar({ user }) {
                                 <Zap className="w-5 h-5 text-primary-foreground" />
                             </div>
                             <span className="text-xl font-bold tracking-tight text-foreground">
-                                Goalify
+                                Goalify AI
                             </span>
                         </div>
                         <button

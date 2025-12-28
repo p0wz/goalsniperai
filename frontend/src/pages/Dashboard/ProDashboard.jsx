@@ -64,7 +64,7 @@ export default function ProDashboard({ user }) {
                 </div>
             </div>
 
-            {/* SENTIO Chat */}
+            {/* Goalify AI Chat */}
             <div className="px-5 mb-6">
                 <div className="max-w-3xl mx-auto animate-slide-up" style={{ animationDelay: '200ms' }}>
                     <SentioChat />
@@ -76,7 +76,7 @@ export default function ProDashboard({ user }) {
                 <div className="max-w-3xl mx-auto glass-card rounded-2xl p-5 animate-slide-up" style={{ animationDelay: '250ms' }}>
                     <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-primary" />
-                        SENTIO'ya ne sorabilirsin?
+                        Goalify AI'a ne sorabilirsin?
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div className="flex items-start gap-2 text-muted-foreground">

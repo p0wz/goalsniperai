@@ -31,14 +31,14 @@ export default function About() {
                             <Zap className="w-8 h-8 text-primary-foreground" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-foreground">Goalify</h2>
+                            <h2 className="text-xl font-bold text-foreground">Goalify AI</h2>
                             <p className="text-muted-foreground text-sm">AI Destekli Tahmin Platformu</p>
                         </div>
                     </div>
 
                     <div className="space-y-4 text-muted-foreground leading-relaxed">
                         <p>
-                            <strong className="text-foreground">Goalify</strong>, yapay zeka destekli
+                            <strong className="text-foreground">Goalify AI</strong>, yapay zeka destekli
                             profesyonel spor tahmin platformudur. Günlük maç analizleri ve istatistiksel
                             öngörüler sunar.
                         </p>

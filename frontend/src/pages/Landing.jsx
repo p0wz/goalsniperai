@@ -61,7 +61,7 @@ export default function Landing() {
                     </h1>
 
                     <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 animate-slide-up" style={{ animationDelay: '200ms' }}>
-                        SENTIO AI ile günlük maç analizleri ve tahminler.
+                        Goalify AI ile günlük maç analizleri ve tahminler.
                         Yapay zeka destekli öngörülerle bir adım önde olun.
                     </p>
 
@@ -109,7 +109,7 @@ export default function Landing() {
             <section className="py-16 px-4">
                 <div className="max-w-5xl mx-auto">
                     <div className="text-center mb-12">
-                        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Neden Goalify?</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Neden Goalify AI?</h2>
                         <p className="text-muted-foreground">Akıllı tahmin platformunun avantajları</p>
                     </div>
 
@@ -197,7 +197,7 @@ export default function Landing() {
                             </div>
                             <h2 className="text-3xl font-bold text-white mb-4">Hemen Başla</h2>
                             <p className="text-white/80 mb-8 max-w-md mx-auto">
-                                SENTIO AI ile günlük tahminlere erişin. Ücretsiz kayıt olun ve profesyonel analizleri keşfedin.
+                                Goalify AI ile günlük tahminlere erişin. Ücretsiz kayıt olun ve profesyonel analizleri keşfedin.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                                 <button
