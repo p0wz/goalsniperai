@@ -1,63 +1,102 @@
 import { Link } from 'react-router-dom';
-import { Bot, Twitter, Github, Globe } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export default function Footer() {
     return (
-        <footer className="bg-base pt-20 pb-10 border-t border-white/20 relative z-10">
+        <footer className="bg-background border-t border-border pt-16 pb-8 relative z-10">
             <div className="max-w-7xl mx-auto px-6">
-                <div className="grid md:grid-cols-4 gap-12 mb-16">
+                <div className="grid md:grid-cols-4 gap-12 mb-12">
                     {/* Brand */}
                     <div className="col-span-1 md:col-span-2 space-y-6">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-base shadow-neu-extruded flex items-center justify-center overflow-hidden">
-                                <img src="/sentio-logo.jpg" alt="SENTIO" className="w-full h-full object-cover" />
+                            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                                <Zap className="w-5 h-5 text-primary-foreground" />
                             </div>
-                            <span className="text-2xl font-black tracking-tight text-text-main">
-                                SENTIO
+                            <span className="text-xl font-bold tracking-tight text-foreground">
+                                GoalSniper
                             </span>
                         </div>
-                        <p className="text-text-muted leading-relaxed max-w-sm">
-                            Advanced AI-powered football betting analysis.
-                            We process thousands of data points to give you the unfair advantage.
+                        <p className="text-muted-foreground leading-relaxed max-w-sm">
+                            AI destekli profesyonel spor tahmin platformu.
+                            Günlük analizler ve öngörülerle maçları takip edin.
                         </p>
-                        <div className="flex gap-4">
-                            {[Twitter, Github, Globe].map((Icon, i) => (
-                                <a
-                                    key={i}
-                                    href="#"
-                                    className="w-10 h-10 rounded-full bg-base shadow-neu-extruded flex items-center justify-center text-text-muted hover:text-accent hover:shadow-neu-extruded-hover transition-all"
-                                >
-                                    <Icon size={18} />
-                                </a>
-                            ))}
+                        <div className="flex gap-3">
+                            <a
+                                href="https://t.me/goalsniperai"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            >
+                                📢
+                            </a>
+                            <a
+                                href="https://twitter.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            >
+                                𝕏
+                            </a>
                         </div>
                     </div>
 
                     {/* Links */}
                     <div>
-                        <h4 className="font-bold text-lg mb-6">Product</h4>
-                        <ul className="space-y-4 text-text-muted">
-                            <li><Link to="/dashboard" className="hover:text-accent transition-colors">Live Scanner</Link></li>
-                            <li><Link to="/pricing" className="hover:text-accent transition-colors">Pricing</Link></li>
-                            <li><Link to="/dashboard" className="hover:text-accent transition-colors">Daily Picks</Link></li>
-                            <li><span className="text-accent bg-accent/10 px-2 py-0.5 rounded text-xs font-bold">New</span> API Access</li>
+                        <h4 className="font-semibold text-foreground mb-6">Platform</h4>
+                        <ul className="space-y-4 text-muted-foreground text-sm">
+                            <li>
+                                <Link to="/dashboard" className="hover:text-primary transition-colors">
+                                    Dashboard
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/pricing" className="hover:text-primary transition-colors">
+                                    Fiyatlandırma
+                                </Link>
+                            </li>
+                            <li>
+                                <a
+                                    href="https://t.me/goalsniperai"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:text-primary transition-colors"
+                                >
+                                    Telegram Kanalı
+                                </a>
+                            </li>
                         </ul>
                     </div>
 
                     <div>
-                        <h4 className="font-bold text-lg mb-6">Company</h4>
-                        <ul className="space-y-4 text-text-muted">
-                            <li><Link to="/about" className="hover:text-accent transition-colors">About Us</Link></li>
-                            <li><a href="#" className="hover:text-accent transition-colors">Terms of Service</a></li>
-                            <li><a href="#" className="hover:text-accent transition-colors">Privacy Policy</a></li>
-                            <li><a href="#" className="hover:text-accent transition-colors">Contact Support</a></li>
+                        <h4 className="font-semibold text-foreground mb-6">Şirket</h4>
+                        <ul className="space-y-4 text-muted-foreground text-sm">
+                            <li>
+                                <Link to="/about" className="hover:text-primary transition-colors">
+                                    Hakkımızda
+                                </Link>
+                            </li>
+                            <li>
+                                <a href="#" className="hover:text-primary transition-colors">
+                                    Kullanım Şartları
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" className="hover:text-primary transition-colors">
+                                    Gizlilik Politikası
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" className="hover:text-primary transition-colors">
+                                    İletişim
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-text-muted font-medium">
-                    <div>© 2024 SENTIO. All rights reserved.</div>
-                    <div className="flex gap-8">
+                <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+                    <div>© 2024 GoalSniper. Tüm hakları saklıdır.</div>
+                    <div className="flex gap-6">
                         <span>Made with 🧠 + 💻</span>
                         <span>v3.2.0</span>
                     </div>

@@ -1,223 +1,227 @@
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Sparkles, Trophy, Shield, Zap, ArrowRight, CheckCircle2 } from 'lucide-react';
-import NeuCard from '../components/ui/NeuCard';
-import NeuButton from '../components/ui/NeuButton';
+import { Sparkles, Trophy, Shield, Zap, ArrowRight, Check, TrendingUp, Star, Crown } from 'lucide-react';
 
 export default function Landing() {
     const navigate = useNavigate();
 
+    const features = [
+        {
+            icon: Sparkles,
+            title: "AI Destekli Analiz",
+            description: "Yapay zeka ile maç analizleri ve tahminler. Güncel verilerle desteklenen öngörüler.",
+            color: "primary"
+        },
+        {
+            icon: TrendingUp,
+            title: "Günlük Tahminler",
+            description: "Her gün güncellenen profesyonel tahminler. Form, istatistik ve performans analizleri.",
+            color: "accent"
+        },
+        {
+            icon: Shield,
+            title: "Veri Odaklı",
+            description: "Gerçek istatistiklere dayalı öngörüler. H2H geçmişi, lig ortalamaları analiz edilir.",
+            color: "win"
+        }
+    ];
+
+    const stats = [
+        { value: "78%", label: "Başarı Oranı", icon: Trophy },
+        { value: "500+", label: "Günlük Kullanıcı", icon: Star },
+        { value: "1000+", label: "Analiz Edilen Maç", icon: Zap }
+    ];
+
+    const proFeatures = [
+        "Sınırsız günlük tahmin",
+        "AI destekli detaylı analizler",
+        "Özel Telegram grubu erişimi",
+        "Anlık bildirimler",
+        "7/24 destek",
+        "Erken erişim öngörüleri"
+    ];
+
     return (
-        <div className="flex flex-col gap-24 pb-16">
+        <div className="min-h-screen bg-background">
+            {/* Background Effects */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+            </div>
 
-            {/* HERO SECTION */}
-            <section className="relative pt-16 px-6">
-                {/* Background Glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cyan-500/20 rounded-full blur-[120px] -z-10" />
-
-                <div className="max-w-4xl mx-auto text-center space-y-8">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-sm font-bold text-cyan-400 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
-                        </span>
-                        SENTIO AI Active
+            {/* Hero Section */}
+            <section className="relative pt-20 pb-16 px-4">
+                <div className="max-w-4xl mx-auto text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6 animate-slide-up" style={{ animationDelay: '0ms' }}>
+                        <Sparkles className="w-4 h-4" />
+                        <span className="text-sm font-semibold">AI Tahmin Platformu</span>
                     </div>
 
-                    <h1 className="text-4xl md:text-6xl font-black text-text-main tracking-tight leading-[1.15] animate-in slide-in-from-bottom-8 duration-700 delay-100">
-                        AI-Powered<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-                            Betting Advisor
-                        </span>
+                    <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6 tracking-tight animate-slide-up" style={{ animationDelay: '100ms' }}>
+                        Profesyonel <span className="text-gradient">Spor Tahminleri</span>
                     </h1>
 
-                    <p className="text-lg md:text-xl text-text-muted font-medium max-w-2xl mx-auto leading-relaxed animate-in slide-in-from-bottom-8 duration-700 delay-200">
-                        SENTIO AI analyzes today's matches and provides personalized predictions.
-                        No more researching stats yourself - just ask!
+                    <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 animate-slide-up" style={{ animationDelay: '200ms' }}>
+                        SENTIO AI ile günlük maç analizleri ve tahminler.
+                        Yapay zeka destekli öngörülerle bir adım önde olun.
                     </p>
 
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in slide-in-from-bottom-8 duration-700 delay-300">
-                        <NeuButton onClick={() => navigate('/register')} variant="primary" className="px-8 py-4 text-lg rounded-xl group bg-gradient-to-r from-cyan-500 to-blue-600 border-0">
-                            Start Free
-                            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </NeuButton>
-                        <NeuButton onClick={() => navigate('/login')} variant="secondary" className="px-8 py-4 text-lg rounded-xl">
-                            Sign In
-                        </NeuButton>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up" style={{ animationDelay: '300ms' }}>
+                        <button
+                            onClick={() => navigate('/register')}
+                            className="px-8 py-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-lg glow-primary flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                        >
+                            Ücretsiz Başla
+                            <ArrowRight className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="px-8 py-4 rounded-xl bg-secondary text-secondary-foreground font-semibold text-lg hover:bg-secondary/80 transition-colors"
+                        >
+                            Giriş Yap
+                        </button>
                     </div>
                 </div>
             </section>
 
-            {/* SENTIO PREVIEW */}
-            <section className="max-w-4xl mx-auto px-6">
-                <NeuCard className="relative overflow-hidden" padding="p-0">
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/30 to-blue-900/30" />
-                    <div className="relative p-8 flex flex-col md:flex-row items-center gap-8">
-                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-5xl shadow-lg shadow-cyan-500/30 flex-shrink-0">
-                            🤖
+            {/* Stats Section */}
+            <section className="py-12 px-4">
+                <div className="max-w-4xl mx-auto">
+                    <div className="glass-card-premium rounded-3xl p-8">
+                        <div className="grid grid-cols-3 gap-8">
+                            {stats.map((stat, idx) => {
+                                const Icon = stat.icon;
+                                return (
+                                    <div key={idx} className="text-center">
+                                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-3">
+                                            <Icon className="w-6 h-6 text-primary" />
+                                        </div>
+                                        <p className="text-2xl md:text-3xl font-bold text-foreground">{stat.value}</p>
+                                        <p className="text-sm text-muted-foreground">{stat.label}</p>
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <div className="flex-1 text-center md:text-left">
-                            <h2 className="text-2xl font-bold text-text-main mb-3 flex items-center justify-center md:justify-start gap-2">
-                                <Sparkles className="text-yellow-400" size={24} />
-                                Meet SENTIO
-                            </h2>
-                            <p className="text-text-muted mb-4">
-                                Ask questions like "Which matches are safest today?", "Any Over 2.5 recommendations?"
-                                SENTIO analyzes current stats and provides personalized insights.
+                    </div>
+                </div>
+            </section>
+
+            {/* Features Section */}
+            <section className="py-16 px-4">
+                <div className="max-w-5xl mx-auto">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Neden GoalSniper?</h2>
+                        <p className="text-muted-foreground">Akıllı tahmin platformunun avantajları</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-6">
+                        {features.map((feature, idx) => {
+                            const Icon = feature.icon;
+                            return (
+                                <div key={idx} className="glass-card-premium rounded-2xl p-6 card-hover">
+                                    <div className={`w-14 h-14 rounded-xl bg-${feature.color}/10 flex items-center justify-center mb-4`}>
+                                        <Icon className={`w-7 h-7 text-${feature.color}`} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-foreground mb-2">{feature.title}</h3>
+                                    <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
+
+            {/* PRO Plan Section */}
+            <section className="py-16 px-4">
+                <div className="max-w-lg mx-auto">
+                    <div className="text-center mb-8">
+                        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+                            PRO <span className="text-gradient">Üyelik</span>
+                        </h2>
+                        <p className="text-muted-foreground">Tüm özelliklere sınırsız erişim</p>
+                    </div>
+
+                    <div className="glass-card-premium rounded-3xl p-8 border-2 border-primary/30 glow-primary">
+                        {/* Badge */}
+                        <div className="flex justify-center mb-6">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full gradient-accent text-accent-foreground">
+                                <Crown className="w-4 h-4" />
+                                <span className="text-sm font-bold">EN AVANTAJLI</span>
+                            </div>
+                        </div>
+
+                        {/* Price */}
+                        <div className="text-center mb-8">
+                            <div className="flex items-baseline justify-center gap-1">
+                                <span className="text-5xl font-bold text-foreground">₺99</span>
+                                <span className="text-muted-foreground">/ay</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-2">7 gün ücretsiz deneme</p>
+                        </div>
+
+                        {/* Features */}
+                        <div className="space-y-4 mb-8">
+                            {proFeatures.map((feature, idx) => (
+                                <div key={idx} className="flex items-center gap-3">
+                                    <div className="w-5 h-5 rounded-full gradient-primary flex items-center justify-center">
+                                        <Check className="w-3 h-3 text-primary-foreground" />
+                                    </div>
+                                    <span className="text-foreground">{feature}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* CTA */}
+                        <button
+                            onClick={() => navigate('/pricing')}
+                            className="w-full py-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-lg glow-primary hover:opacity-90 transition-opacity"
+                        >
+                            PRO'ya Yükselt
+                        </button>
+
+                        <p className="text-center text-xs text-muted-foreground mt-4">
+                            İstediğiniz zaman iptal edebilirsiniz
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            {/* CTA Section */}
+            <section className="py-16 px-4">
+                <div className="max-w-3xl mx-auto">
+                    <div className="rounded-3xl p-8 md:p-12 gradient-premium relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIj48cGF0aCBkPSJNMCAyMGgyME0yMCAwdjIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIuMDUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IGZpbGw9InVybCgjYSkiIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiLz48L3N2Zz4=')] opacity-30" />
+
+                        <div className="relative text-center">
+                            <div className="w-16 h-16 mx-auto rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center mb-6">
+                                <Sparkles className="w-8 h-8 text-white" />
+                            </div>
+                            <h2 className="text-3xl font-bold text-white mb-4">Hemen Başla</h2>
+                            <p className="text-white/80 mb-8 max-w-md mx-auto">
+                                SENTIO AI ile günlük tahminlere erişin. Ücretsiz kayıt olun ve profesyonel analizleri keşfedin.
                             </p>
-                            <div className="flex flex-wrap gap-3 justify-center md:justify-start text-sm">
-                                <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300">💬 Natural Chat</span>
-                                <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300">📊 Live Data</span>
-                                <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300">🎯 Personal Tips</span>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button
+                                    onClick={() => navigate('/register')}
+                                    className="px-8 py-4 rounded-xl bg-white text-primary font-semibold hover:bg-white/90 transition-colors"
+                                >
+                                    Ücretsiz Kayıt Ol
+                                </button>
+                                <a
+                                    href="https://t.me/goalsniperai"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-8 py-4 rounded-xl bg-white/20 text-white font-semibold hover:bg-white/30 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    📢 Telegram Kanalı
+                                </a>
                             </div>
                         </div>
                     </div>
-                </NeuCard>
-            </section>
-
-            {/* FEATURES */}
-            <section className="max-w-5xl mx-auto px-6">
-                <div className="text-center mb-12">
-                    <h2 className="text-3xl md:text-4xl font-bold text-text-main mb-4">Why GoalSniper?</h2>
-                    <p className="text-text-muted">The smarter way to bet</p>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-6">
-                    <NeuCard className="text-center" padding="p-8">
-                        <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-6">
-                            <MessageCircle size={32} />
-                        </div>
-                        <h3 className="text-xl font-bold text-text-main mb-3">Chat & Learn</h3>
-                        <p className="text-text-muted text-sm">
-                            Ask SENTIO anything. Match analysis, coupon suggestions,
-                            stat comparisons - all just a message away.
-                        </p>
-                    </NeuCard>
-
-                    <NeuCard className="text-center" padding="p-8">
-                        <div className="w-16 h-16 mx-auto rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-6">
-                            <Shield size={32} />
-                        </div>
-                        <h3 className="text-xl font-bold text-text-main mb-3">Data-Driven</h3>
-                        <p className="text-text-muted text-sm">
-                            Predictions are based on real statistics, not gut feelings.
-                            Form, H2H history, home/away performance all analyzed.
-                        </p>
-                    </NeuCard>
-
-                    <NeuCard className="text-center" padding="p-8">
-                        <div className="w-16 h-16 mx-auto rounded-2xl bg-green-500/10 text-green-400 flex items-center justify-center mb-6">
-                            <Zap size={32} />
-                        </div>
-                        <h3 className="text-xl font-bold text-text-main mb-3">Daily Updates</h3>
-                        <p className="text-text-muted text-sm">
-                            Fresh match data added to the system every day.
-                            Always analyze with the latest information.
-                        </p>
-                    </NeuCard>
                 </div>
             </section>
 
-            {/* PRICING */}
-            <section className="max-w-4xl mx-auto px-6">
-                <div className="text-center mb-12">
-                    <h2 className="text-3xl md:text-4xl font-bold text-text-main mb-4">Simple Pricing</h2>
-                    <p className="text-text-muted">Choose the plan that fits your needs</p>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-8">
-                    {/* Free Plan */}
-                    <NeuCard padding="p-8">
-                        <div className="mb-6">
-                            <h3 className="text-xl font-bold text-text-main mb-1">Free</h3>
-                            <p className="text-text-muted text-sm">Get started</p>
-                        </div>
-                        <div className="mb-6">
-                            <span className="text-4xl font-black text-text-main">$0</span>
-                            <span className="text-text-muted">/month</span>
-                        </div>
-                        <ul className="space-y-3 mb-8">
-                            <li className="flex items-center gap-2 text-text-muted text-sm">
-                                <CheckCircle2 size={18} className="text-green-400" />
-                                Telegram channel access
-                            </li>
-                            <li className="flex items-center gap-2 text-text-muted text-sm">
-                                <CheckCircle2 size={18} className="text-green-400" />
-                                Daily free tips
-                            </li>
-                            <li className="flex items-center gap-2 text-text-muted/40 text-sm line-through">
-                                SENTIO AI Chat
-                            </li>
-                            <li className="flex items-center gap-2 text-text-muted/40 text-sm line-through">
-                                Custom coupon suggestions
-                            </li>
-                        </ul>
-                        <NeuButton onClick={() => navigate('/register')} variant="secondary" className="w-full py-3">
-                            Start Free
-                        </NeuButton>
-                    </NeuCard>
-
-                    {/* PRO Plan */}
-                    <NeuCard className="relative border-2 border-cyan-500/50" padding="p-8">
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full text-xs font-bold text-white">
-                            RECOMMENDED
-                        </div>
-                        <div className="mb-6">
-                            <h3 className="text-xl font-bold text-text-main mb-1">PRO</h3>
-                            <p className="text-text-muted text-sm">Full experience</p>
-                        </div>
-                        <div className="mb-6">
-                            <span className="text-4xl font-black text-cyan-400">$15</span>
-                            <span className="text-text-muted">/month</span>
-                        </div>
-                        <ul className="space-y-3 mb-8">
-                            <li className="flex items-center gap-2 text-text-muted text-sm">
-                                <CheckCircle2 size={18} className="text-green-400" />
-                                Telegram channel access
-                            </li>
-                            <li className="flex items-center gap-2 text-text-muted text-sm">
-                                <CheckCircle2 size={18} className="text-green-400" />
-                                Daily free tips
-                            </li>
-                            <li className="flex items-center gap-2 text-text-main text-sm font-medium">
-                                <CheckCircle2 size={18} className="text-cyan-400" />
-                                Unlimited SENTIO AI Chat
-                            </li>
-                            <li className="flex items-center gap-2 text-text-main text-sm font-medium">
-                                <CheckCircle2 size={18} className="text-cyan-400" />
-                                Custom coupon suggestions
-                            </li>
-                        </ul>
-                        <NeuButton onClick={() => navigate('/pricing')} variant="primary" className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 border-0">
-                            Upgrade to PRO
-                        </NeuButton>
-                    </NeuCard>
-                </div>
-            </section>
-
-            {/* CTA */}
-            <section className="max-w-3xl mx-auto px-6 text-center">
-                <NeuCard className="bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border border-cyan-500/30" padding="p-12">
-                    <h2 className="text-3xl font-bold text-text-main mb-4">Start Now</h2>
-                    <p className="text-text-muted mb-8">
-                        Begin smart betting with SENTIO AI. Sign up free,
-                        join our Telegram channel, and follow daily tips.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <NeuButton onClick={() => navigate('/register')} variant="primary" className="px-8 py-4 text-lg bg-gradient-to-r from-cyan-500 to-blue-600 border-0">
-                            Sign Up Free
-                        </NeuButton>
-                        <a
-                            href="https://t.me/goalsniperai"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-8 py-4 rounded-xl bg-blue-500/20 text-blue-400 font-bold hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
-                        >
-                            📢 Telegram Channel
-                        </a>
-                    </div>
-                </NeuCard>
-            </section>
-
+            {/* Footer spacing */}
+            <div className="h-16" />
         </div>
     );
 }

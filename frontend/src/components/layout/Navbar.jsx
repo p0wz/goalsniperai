@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Bot, Menu, X, User } from 'lucide-react';
-import NeuButton from '../ui/NeuButton';
+import { Menu, X, User, Zap, Crown } from 'lucide-react';
 
 export default function Navbar({ user }) {
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
+
+    const isPro = user?.role === 'pro' || user?.role === 'admin' || user?.plan === 'pro';
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -16,17 +17,18 @@ export default function Navbar({ user }) {
     }, []);
 
     const navLinks = [
-        { label: 'Analysis Hub', path: '/dashboard', allowGuest: false },
-        { label: 'Live Scanner', path: '/dashboard', allowGuest: false },
-        { label: 'Pricing', path: '/pricing', allowGuest: true },
-        { label: 'About', path: '/about', allowGuest: true },
+        { label: 'Dashboard', path: '/dashboard', allowGuest: false },
+        { label: 'Fiyatlandırma', path: '/pricing', allowGuest: true },
+        { label: 'Hakkımızda', path: '/about', allowGuest: true },
     ];
 
     const isActive = (path) => location.pathname === path;
 
     return (
         <nav
-            className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-base/80 backdrop-blur-lg shadow-neu-flat py-3' : 'bg-transparent py-5'
+            className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled
+                    ? 'bg-background/80 backdrop-blur-xl border-b border-border/50 py-3'
+                    : 'bg-transparent py-5'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
@@ -36,11 +38,11 @@ export default function Navbar({ user }) {
                     to={user ? '/dashboard' : '/'}
                     className="flex items-center gap-3 cursor-pointer group"
                 >
-                    <div className="w-10 h-10 rounded-xl bg-base shadow-neu-extruded flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
-                        <img src="/sentio-logo.jpg" alt="SENTIO" className="w-full h-full object-cover" />
+                    <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary group-hover:scale-105 transition-transform">
+                        <Zap className="w-5 h-5 text-primary-foreground" />
                     </div>
-                    <span className="text-2xl font-black tracking-tight text-text-main">
-                        SENTIO
+                    <span className="text-xl font-bold tracking-tight text-foreground">
+                        GoalSniper
                     </span>
                 </Link>
 
@@ -51,7 +53,9 @@ export default function Navbar({ user }) {
                             <Link
                                 key={link.label}
                                 to={link.path}
-                                className={`text-sm font-bold transition-colors ${isActive(link.path) ? 'text-accent' : 'text-text-muted hover:text-text-main'
+                                className={`text-sm font-medium transition-colors ${isActive(link.path)
+                                        ? 'text-primary'
+                                        : 'text-muted-foreground hover:text-foreground'
                                     }`}
                             >
                                 {link.label}
@@ -59,18 +63,24 @@ export default function Navbar({ user }) {
                     ))}
 
                     {user ? (
-                        <div className="flex items-center gap-4 pl-4 border-l border-white/20">
+                        <div className="flex items-center gap-3 pl-4 border-l border-border">
                             {user.role === 'admin' && (
                                 <Link
                                     to="/admin"
-                                    className="px-4 py-2 text-xs font-bold text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-all"
+                                    className="px-4 py-2 text-xs font-bold text-destructive bg-destructive/10 rounded-lg hover:bg-destructive/20 transition-all"
                                 >
                                     ADMIN
                                 </Link>
                             )}
+                            {isPro && (
+                                <div className="flex items-center gap-1 px-3 py-1 rounded-full gradient-accent">
+                                    <Crown className="w-3 h-3 text-accent-foreground" />
+                                    <span className="text-xs font-bold text-accent-foreground">PRO</span>
+                                </div>
+                            )}
                             <Link
                                 to="/profile"
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-base shadow-neu-extruded hover:shadow-neu-extruded-hover transition-all text-sm font-bold text-text-main"
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors text-sm font-medium text-foreground"
                             >
                                 <User size={16} />
                                 {user.name?.split(' ')[0]}
@@ -80,24 +90,23 @@ export default function Navbar({ user }) {
                         <div className="flex items-center gap-4 pl-4">
                             <Link
                                 to="/login"
-                                className="text-sm font-bold text-text-main hover:text-accent transition-colors"
+                                className="text-sm font-medium text-foreground hover:text-primary transition-colors"
                             >
-                                Login
+                                Giriş
                             </Link>
-                            <NeuButton
+                            <button
                                 onClick={() => navigate('/register')}
-                                variant="primary"
-                                className="px-6 py-2 text-sm"
+                                className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground text-sm font-semibold glow-primary hover:opacity-90 transition-opacity"
                             >
-                                Get Started
-                            </NeuButton>
+                                Başla
+                            </button>
                         </div>
                     )}
                 </div>
 
                 {/* MOBILE TOGGLE */}
                 <button
-                    className="md:hidden p-2 text-text-main"
+                    className="md:hidden p-2 text-foreground"
                     onClick={() => setMobileMenuOpen(true)}
                 >
                     <Menu size={28} />
@@ -106,42 +115,68 @@ export default function Navbar({ user }) {
 
             {/* MOBILE MENU OVERLAY */}
             {mobileMenuOpen && (
-                <div className="fixed inset-0 z-50 bg-base flex flex-col p-6 animate-in slide-in-from-right-full duration-300">
+                <div className="fixed inset-0 z-50 bg-background flex flex-col p-6">
                     <div className="flex justify-between items-center mb-12">
-                        <span className="text-2xl font-black tracking-tight">
-                            SENTIO
-                        </span>
-                        <button onClick={() => setMobileMenuOpen(false)} className="p-2 bg-base shadow-neu-extruded rounded-full text-danger">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                                <Zap className="w-5 h-5 text-primary-foreground" />
+                            </div>
+                            <span className="text-xl font-bold tracking-tight text-foreground">
+                                GoalSniper
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="p-2 bg-secondary rounded-full text-foreground"
+                        >
                             <X size={24} />
                         </button>
                     </div>
 
-                    <div className="flex flex-col gap-6 text-center">
+                    <div className="flex flex-col gap-2">
                         {navLinks.map((link) => (
                             (!user && !link.allowGuest) ? null :
                                 <Link
                                     key={link.label}
                                     to={link.path}
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className="text-xl font-bold text-text-main py-4 border-b border-white/10"
+                                    className={`text-lg font-medium py-4 px-4 rounded-xl transition-colors ${isActive(link.path)
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-foreground hover:bg-secondary'
+                                        }`}
                                 >
                                     {link.label}
                                 </Link>
                         ))}
 
                         {!user && (
-                            <>
-                                <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="text-xl font-bold py-4">Login</Link>
-                                <NeuButton onClick={() => { navigate('/register'); setMobileMenuOpen(false); }} className="w-full py-4 mt-4" variant="primary">
-                                    Get Started
-                                </NeuButton>
-                            </>
+                            <div className="mt-6 space-y-3">
+                                <Link
+                                    to="/login"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="block w-full py-4 text-center font-medium text-foreground bg-secondary rounded-xl"
+                                >
+                                    Giriş Yap
+                                </Link>
+                                <button
+                                    onClick={() => { navigate('/register'); setMobileMenuOpen(false); }}
+                                    className="w-full py-4 gradient-primary text-primary-foreground font-semibold rounded-xl glow-primary"
+                                >
+                                    Ücretsiz Başla
+                                </button>
+                            </div>
                         )}
 
                         {user && (
-                            <NeuButton onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }} className="w-full py-4 mt-4" variant="secondary">
-                                My Profile
-                            </NeuButton>
+                            <div className="mt-6">
+                                <button
+                                    onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
+                                    className="w-full py-4 bg-secondary text-foreground font-medium rounded-xl flex items-center justify-center gap-2"
+                                >
+                                    <User size={18} />
+                                    Profilim
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
