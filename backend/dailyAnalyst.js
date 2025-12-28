@@ -495,12 +495,26 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         }
 
 
-        // Logic C: BTTS (Both Teams To Score)
-        // Ev evinde gol atma ≥75%, Dep deplasmanda gol atma ≥70%, Her iki takım BTTS ≥60%
-        if (homeHomeStats.scoringRate >= 75 && awayAwayStats.scoringRate >= 70 &&
-            homeForm.bttsRate >= 60 && awayForm.bttsRate >= 60) {
+        // Logic C: BTTS (TIGHTENED CRITERIA)
+        // Home Scoring ≥85%, Away Scoring ≥80%, Both Form BTTS ≥70%, H2H BTTS validation
+        const h2hBttsCount = mutualH2H.filter(g =>
+            parseInt(g.home_team?.score || 0) > 0 && parseInt(g.away_team?.score || 0) > 0
+        ).length;
+        const h2hBttsRate = mutualH2H.length > 0 ? (h2hBttsCount / mutualH2H.length) * 100 : 0;
+
+        const bttsCheck = {
+            homeScoring: homeHomeStats.scoringRate >= 85,
+            awayScoring: awayAwayStats.scoringRate >= 80,
+            homeBtts: homeForm.bttsRate >= 70,
+            awayBtts: awayForm.bttsRate >= 70,
+            h2hBtts: h2hBttsRate >= 50 || mutualH2H.length === 0  // 50% H2H BTTS veya H2H yok
+        };
+        log.info(`   📊 [BTTS] HomeScrg≥85: ${homeHomeStats.scoringRate?.toFixed(0)}%(${bttsCheck.homeScoring ? '✓' : '✗'}) | AwayScrg≥80: ${awayAwayStats.scoringRate?.toFixed(0)}%(${bttsCheck.awayScoring ? '✓' : '✗'}) | HomeBTTS≥70: ${homeForm.bttsRate?.toFixed(0)}%(${bttsCheck.homeBtts ? '✓' : '✗'}) | AwayBTTS≥70: ${awayForm.bttsRate?.toFixed(0)}%(${bttsCheck.awayBtts ? '✓' : '✗'}) | H2H-BTTS≥50: ${h2hBttsRate.toFixed(0)}%(${bttsCheck.h2hBtts ? '✓' : '✗'})`);
+
+        if (Object.values(bttsCheck).every(v => v)) {
             candidates.btts.push({ ...m, filterStats: stats, market: 'BTTS (Both Teams To Score)' });
             passedFilters.push('BTTS');
+            log.info(`   ✅ BTTS PASSED!`);
         }
 
         // Logic D: 1X Double Chance (IMPROVED)
