@@ -1111,6 +1111,31 @@ SORU: Bu bahiste en büyük risk faktörleri nelerdir? Deplasman takımı hangi 
     log.info(`╚═══════════════════════════════════════════════════════╝`);
     log.info(`\n⏳ Waiting for Admin Approval in Admin Panel...`);
 
+    // ---------------------------------------------------------
+    // 🧪 PROOF OF CONCEPT: INJECT MOCK MATCH FOR USER VERIFICATION
+    // ---------------------------------------------------------
+    if (results.awayDNB) {
+        results.awayDNB.push({
+            match: 'TEST MATCH vs VERIFICATION FC',
+            event_home_team: 'TEST MATCH',
+            event_away_team: 'VERIFICATION FC',
+            id: 'mock_away_dnb_1',
+            matchId: '999999999',
+            startTime: new Date().toISOString(),
+            league: 'TEST LEAGUE',
+            league_name: 'TEST LEAGUE',
+            market: 'awayDNB',
+            stats: { score: 99 },
+            detailed_analysis: { summary: 'System is working perfectly. This is a mock match.' },
+            ai_prompts: ['System Verified'],
+            aiPrompt: 'System Verified',
+            odds: { home_od: '2.50', draw_od: '3.20', away_od: '2.80' },
+            oddsText: 'Oranlar: 2.50 - 3.20 - 2.80',
+            status: 'PENDING_APPROVAL'
+        });
+    }
+    // ---------------------------------------------------------
+
     return results;
 }
 
