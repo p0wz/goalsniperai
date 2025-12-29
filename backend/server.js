@@ -28,7 +28,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const picksRoutes = require('./routes/picks');
 const mobileRoutes = require('./routes/mobile');
-const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection, MARKET_MAP } = require('./analystEngine');
+const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection, MARKET_MAP } = require('./dailyAnalyst');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
