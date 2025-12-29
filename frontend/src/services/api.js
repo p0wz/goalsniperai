@@ -77,8 +77,67 @@ export const signalService = {
     getDailyAnalysis: async (force = false, leagueFilter = true, limit = null) => {
         let url = `/daily-analysis?force=${force}&leagueFilter=${leagueFilter}`;
         if (limit) url += `&limit=${limit}`;
-        const response = await api.get(url);
-        return response.data;
+
+        // Use raw fetch for SSE handling capability
+        const response = await fetch(api.defaults.baseURL + url, {
+            headers: {
+                'Content-Type': 'application/json',
+                // Add Authorization if needed (axios does this auto, fetch needs manual or cookie)
+            },
+            // Credentials needed for cookies
+            credentials: 'include'
+        });
+
+        // 1. Check content type
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            // It's a standard JSON response (from Cache)
+            return await response.json();
+        }
+
+        // 2. Handle SSE Stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let finalResults = null;
+        let finalSuccess = false;
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'done') {
+                                finalResults = data.results;
+                                finalSuccess = true;
+                            } else if (data.type === 'error') {
+                                throw new Error(data.message);
+                            } else {
+                                // Info/Progress logs - currently ignored but could be passed to a callback
+                                console.log('[Analysis]', data.message || data);
+                            }
+                        } catch (e) {
+                            // Ignore parse errors for partial chunks
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Stream processing error:', error);
+            throw error;
+        }
+
+        if (finalSuccess) {
+            return { success: true, data: finalResults };
+        } else {
+            throw new Error('Analysis stream ended without results');
+        }
     },
     // New: Single-Market Analysis
     analyzeMarket: async (market, leagueFilter = true) => {
