@@ -702,6 +702,16 @@ export default function AdminPanel({ user, handleLogout }) {
                         <button onClick={handleLogout} className="text-red-400 hover:text-red-300">Logout</button>
                     </div>
                 </div>
+                {/* DEBUG STRIP */}
+                {dailyAnalysis && (
+                    <div className="bg-black text-green-400 text-xs font-mono p-1 text-center">
+                        DEBUG:
+                        DepDNB: {dailyAnalysis.awayDNB?.length || 0} |
+                        EvYari: {dailyAnalysis.homeWinsEitherHalf?.length || 0} |
+                        DC15: {dailyAnalysis.doubleChanceOver15?.length || 0} |
+                        Keys: {Object.keys(dailyAnalysis).length}
+                    </div>
+                )}
             </header>
 
             <main className="container mx-auto p-4 md:p-6">
