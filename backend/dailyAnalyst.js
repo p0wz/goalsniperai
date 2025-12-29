@@ -515,8 +515,9 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
                 const ftHome = parseInt(md.home_team?.score) || parseInt(md.score?.home) || 0;
                 const ftAway = parseInt(md.away_team?.score) || parseInt(md.score?.away) || 0;
 
-                // Skip if we don't have valid scores
-                if (ftHome === 0 && ftAway === 0) continue;
+                // Skip only if we don't have valid match data (not just zero scores)
+                // A 0-0 match is still valid data
+                if (!md.home_team && !md.score) continue;
 
                 totalWithHT++;
 
