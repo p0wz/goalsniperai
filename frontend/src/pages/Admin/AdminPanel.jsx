@@ -294,6 +294,7 @@ export default function AdminPanel({ user, handleLogout }) {
     const handleRunDaily = async (leagueFilter = true, limit = null) => {
         try {
             setIsAnalysing(true);
+            const res = await signalService.getDailyAnalysis(true, leagueFilter, limit);
             if (res.success) {
                 console.log('📊 [AdminPanel] MARKET_CONFIG Keys:', Object.keys(MARKET_CONFIG));
                 console.log('📊 [AdminPanel] Analysis Data Keys:', Object.keys(res.data));
