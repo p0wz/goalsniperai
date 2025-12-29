@@ -2628,7 +2628,7 @@ app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
     };
 
     try {
-        streamLog.info(`🚀 Analiz başlıyor (Limit: ${limit} maç, Lig Filtresi: ${leagueFilter ? 'Aktif' : 'Kapalı'})...`);
+        streamLog.info(`🚀 Analiz başlıyor (v3.1) (Limit: ${limit} maç, Lig Filtresi: ${leagueFilter ? 'Aktif' : 'Kapalı'})...`);
 
         const results = await runDailyAnalysis(streamLog, limit, leagueFilter);
 
