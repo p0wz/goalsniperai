@@ -2601,13 +2601,30 @@ app.get('/api/version', (req, res) => {
 
 app.get('/api/debug-results', async (req, res) => {
     try {
+        const fs = require('fs');
+        const path = require('path');
         const streamLog = { info: console.log, warn: console.warn, error: console.error, success: console.log, progress: () => { } };
+
+        // 1. Memory Check
         const results = await runDailyAnalysis(streamLog, 1, false);
+
+        // 2. Disk Check
+        const filePath = path.join(__dirname, 'dailyAnalyst.js');
+        let fileContent = 'File not found';
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            // Extract the 'const results = {' block
+            const match = content.match(/const results = \{([\s\S]*?)\};/);
+            fileContent = match ? match[0] : 'Results block not found in file (regex failed)';
+        } catch (err) {
+            fileContent = 'Error reading file: ' + err.message;
+        }
+
         res.json({
-            version: '3.7',
-            keys: Object.keys(results),
-            awayDNB_exists: !!results.awayDNB,
-            test_key_exists: !!results.TEST_KEY
+            version: '3.8',
+            memory_keys: Object.keys(results),
+            memory_has_test_key: !!results.TEST_KEY,
+            disk_snippet: fileContent
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
