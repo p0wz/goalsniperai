@@ -75,7 +75,7 @@ export const signalService = {
         return response.data;
     },
     getDailyAnalysis: async (force = false, leagueFilter = true, limit = null) => {
-        let url = `/daily-analysis?force=${force}&leagueFilter=${leagueFilter}`;
+        let url = `/daily-analysis?force=${force}&leagueFilter=${leagueFilter}&_t=${Date.now()}`;
         if (limit) url += `&limit=${limit}`;
 
         // Use raw fetch for SSE handling capability
