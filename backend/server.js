@@ -2596,7 +2596,22 @@ app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
 // 📡 Version Check Endpoint
 // ============================================
 app.get('/api/version', (req, res) => {
-    res.json({ version: '3.6', timestamp: new Date().toISOString() });
+    res.json({ version: '3.7', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/debug-results', async (req, res) => {
+    try {
+        const streamLog = { info: console.log, warn: console.warn, error: console.error, success: console.log, progress: () => { } };
+        const results = await runDailyAnalysis(streamLog, 1, false);
+        res.json({
+            version: '3.7',
+            keys: Object.keys(results),
+            awayDNB_exists: !!results.awayDNB,
+            test_key_exists: !!results.TEST_KEY
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
