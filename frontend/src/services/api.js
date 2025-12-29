@@ -135,6 +135,24 @@ export const signalService = {
                     }
                 }
             }
+
+            // Process any remaining buffer content after stream ends
+            if (buffer.trim()) {
+                const parts = buffer.split('\n\n');
+                for (const part of parts) {
+                    if (part.trim().startsWith('data: ')) {
+                        try {
+                            const line = part.trim();
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'done') {
+                                finalResults = data.results;
+                                finalSuccess = true;
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            }
+
         } catch (error) {
             console.error('Stream processing error:', error);
             throw error;
