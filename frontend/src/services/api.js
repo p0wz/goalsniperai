@@ -100,18 +100,25 @@ export const signalService = {
         const decoder = new TextDecoder();
         let finalResults = null;
         let finalSuccess = false;
+        let buffer = '';
 
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n\n');
+                buffer += decoder.decode(value, { stream: true });
 
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
+                // Process buffer for complete messages (doubly newline separated)
+                const parts = buffer.split('\n\n');
+
+                // Keep the last part in buffer (it might be incomplete)
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    if (part.trim().startsWith('data: ')) {
                         try {
+                            const line = part.trim();
                             const data = JSON.parse(line.slice(6));
                             if (data.type === 'done') {
                                 finalResults = data.results;
@@ -119,11 +126,11 @@ export const signalService = {
                             } else if (data.type === 'error') {
                                 throw new Error(data.message);
                             } else {
-                                // Info/Progress logs - currently ignored but could be passed to a callback
+                                // Info/Progress logs
                                 console.log('[Analysis]', data.message || data);
                             }
                         } catch (e) {
-                            // Ignore parse errors for partial chunks
+                            console.warn('Failed to parse SSE message:', e);
                         }
                     }
                 }
@@ -136,7 +143,7 @@ export const signalService = {
         if (finalSuccess) {
             return { success: true, data: finalResults };
         } else {
-            throw new Error('Analysis stream ended without results');
+            throw new Error('Analysis stream ended without final results');
         }
     },
     // New: Single-Market Analysis
