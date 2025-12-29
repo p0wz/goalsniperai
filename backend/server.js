@@ -2621,7 +2621,7 @@ app.get('/api/debug-results', async (req, res) => {
         }
 
         res.json({
-            version: '3.8',
+            version: '3.9',
             memory_keys: Object.keys(results),
             memory_has_test_key: !!results.TEST_KEY,
             disk_snippet: fileContent
@@ -2631,7 +2631,7 @@ app.get('/api/debug-results', async (req, res) => {
     }
 });
 
-app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
+app.get('/api/daily-analysis', requireAuth, async (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'pro') {
         return res.status(403).json({ error: 'Access denied' });
     }
