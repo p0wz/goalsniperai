@@ -74,7 +74,7 @@ export const signalService = {
         const response = await api.get('/signals');
         return response.data;
     },
-    getDailyAnalysis: async (force = false, leagueFilter = true, limit = null) => {
+    getDailyAnalysis: async (force = false, leagueFilter = true, limit = null, onChunk = null) => {
         let url = `/daily-analysis?force=${force}&leagueFilter=${leagueFilter}&_t=${Date.now()}`;
         if (limit) url += `&limit=${limit}`;
 
@@ -82,88 +82,63 @@ export const signalService = {
         const response = await fetch(api.defaults.baseURL + url, {
             headers: {
                 'Content-Type': 'application/json',
-                // Add Authorization if needed (axios does this auto, fetch needs manual or cookie)
+                'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure auth
             },
-            // Credentials needed for cookies
-            credentials: 'include'
         });
 
         // 1. Check content type
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-            // It's a standard JSON response (from Cache)
             return await response.json();
         }
 
         // 2. Handle SSE Stream
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let finalResults = null;
-        let finalSuccess = false;
         let buffer = '';
+        let finalResult = { success: true, data: {} };
 
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                buffer += decoder.decode(value, { stream: true });
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
 
-                // Process buffer for complete messages (doubly newline separated)
-                const parts = buffer.split('\n\n');
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop(); // Keep incomplete part
 
-                // Keep the last part in buffer (it might be incomplete)
-                buffer = parts.pop();
-
-                for (const part of parts) {
-                    if (part.trim().startsWith('data: ')) {
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const jsonStr = line.slice(6);
                         try {
-                            const line = part.trim();
-                            const data = JSON.parse(line.slice(6));
+                            const data = JSON.parse(jsonStr);
+
+                            // Callback if provided
+                            if (onChunk) onChunk(data);
+
                             if (data.type === 'done') {
-                                finalResults = data.results;
-                                finalSuccess = true;
-                            } else if (data.type === 'error') {
-                                throw new Error(data.message);
-                            } else {
-                                // Info/Progress logs
-                                console.log('[Analysis]', data.message || data);
+                                finalResult.data = data.results;
+                            }
+                            if (data.error) {
+                                throw new Error(data.error);
                             }
                         } catch (e) {
-                            console.warn('Failed to parse SSE message:', e);
+                            console.error('SSE Parse Error:', e);
                         }
                     }
                 }
             }
-
-            // Process any remaining buffer content after stream ends
-            if (buffer.trim()) {
-                const parts = buffer.split('\n\n');
-                for (const part of parts) {
-                    if (part.trim().startsWith('data: ')) {
-                        try {
-                            const line = part.trim();
-                            const data = JSON.parse(line.slice(6));
-                            if (data.type === 'done') {
-                                finalResults = data.results;
-                                finalSuccess = true;
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
-                }
-            }
-
         } catch (error) {
-            console.error('Stream processing error:', error);
-            throw error;
+            console.error('Stream Error:', error);
+            if (onChunk) onChunk({ type: 'error', message: error.message });
+            return { success: false, error: error.message };
         }
 
-        if (finalSuccess) {
-            return { success: true, data: finalResults };
-        } else {
-            throw new Error('Analysis stream ended without final results');
-        }
+        return finalResult;
     },
+
     // New: Single-Market Analysis
     analyzeMarket: async (market, leagueFilter = true) => {
         const response = await api.get(`/analysis/${market}?leagueFilter=${leagueFilter}`);

@@ -301,21 +301,42 @@ export default function AdminPanel({ user, handleLogout }) {
     const handleRunDaily = async (leagueFilter = true, limit = null) => {
         try {
             setIsAnalysing(true);
-            const res = await signalService.getDailyAnalysis(true, leagueFilter, limit);
-            if (res.success) {
-                console.log('📊 [AdminPanel] MARKET_CONFIG Keys:', Object.keys(MARKET_CONFIG));
-                console.log('📊 [AdminPanel] Analysis Data Keys:', Object.keys(res.data));
-                console.log('   Stats:', {
-                    evYari_Config: !!MARKET_CONFIG.homeWinsEitherHalf,
-                    evYari_Data: res.data.homeWinsEitherHalf?.length,
-                    depDNB: res.data.awayDNB?.length,
-                    dc15: res.data.doubleChanceOver15?.length
-                });
-                setDailyAnalysis(res.data);
-            }
+            setStatus('Analysis Started...');
+
+            await signalService.getDailyAnalysis(
+                true, // force
+                leagueFilter,
+                limit,
+                (data) => {
+                    // 1. Handle Progress/Info
+                    if (data.type === 'progress' || data.type === 'info') {
+                        if (data.message) setStatus(data.message);
+                    }
+
+                    // 2. Handle Done
+                    if (data.type === 'done') {
+                        setIsAnalysing(false);
+                        const results = data.results || {};
+                        const keys = Object.keys(results);
+
+                        console.log('✅ [AdminPanel] SSE DONE. Keys:', keys);
+                        alert(`SSE DONE. Received ${keys.length} Keys: ${keys.join(', ')}`);
+
+                        setDailyAnalysis(results);
+                        setStatus('Analiz Tamamlandı!');
+                        // Update version badge to force refresh logic if needed
+                        setServerVersion(v => v ? (v.includes('Updated') ? v : v + ' (Updated)') : '3.7 (Updated)');
+                    }
+
+                    // 3. Handle Error
+                    if (data.type === 'error') {
+                        console.error('SSE Error:', data.message);
+                        setStatus('Error: ' + data.message);
+                    }
+                }
+            );
         } catch (err) {
             alert('Analysis failed: ' + err.message);
-        } finally {
             setIsAnalysing(false);
         }
     };
