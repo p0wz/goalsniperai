@@ -2605,6 +2605,8 @@ app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
     res.flushHeaders();
 
     const limit = parseInt(req.query.limit) || 500;
+    // Default to true, only false if explicitly 'false'
+    const leagueFilter = req.query.leagueFilter !== 'false';
 
     // Custom logger that streams to client
     const streamLog = {
@@ -2626,9 +2628,9 @@ app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
     };
 
     try {
-        streamLog.info(`🚀 Analiz başlıyor (Limit: ${limit} maç)...`);
+        streamLog.info(`🚀 Analiz başlıyor (Limit: ${limit} maç, Lig Filtresi: ${leagueFilter ? 'Aktif' : 'Kapalı'})...`);
 
-        const results = await runDailyAnalysis(streamLog, limit);
+        const results = await runDailyAnalysis(streamLog, limit, leagueFilter);
 
         // Update cache
         const today = new Date().toISOString().split('T')[0];
