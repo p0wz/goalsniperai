@@ -88,6 +88,8 @@ export default function AdminPanel({ user, handleLogout }) {
         return prompt;
     };
 
+    const [serverVersion, setServerVersion] = useState('Checking...');
+
     useEffect(() => {
         fetchLiveSignals();
         fetchBetHistory();
@@ -95,6 +97,11 @@ export default function AdminPanel({ user, handleLogout }) {
         fetchApprovedBets();
         fetchTrainingPool();
         fetchCachedDailyAnalysis(); // Load cached analysis on page load
+
+        // Version Check
+        api.get('/version')
+            .then(res => setServerVersion(res.data.version || 'Unknown'))
+            .catch(() => setServerVersion('Offline/Error'));
     }, []);
 
     // Load cached daily analysis on mount
@@ -677,7 +684,12 @@ export default function AdminPanel({ user, handleLogout }) {
                 <div className="container mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">G</div>
-                        <h1 className="text-xl font-bold">SENTIO Pro - ADMIN</h1>
+                        <h1 className="text-xl font-bold">
+                            SENTIO Pro - ADMIN
+                            <span className={`text-xs font-mono px-2 py-0.5 rounded ml-2 border ${serverVersion === 'v3.2' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
+                                v{serverVersion}
+                            </span>
+                        </h1>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                         <Link
