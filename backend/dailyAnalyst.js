@@ -314,18 +314,6 @@ function calculateAdvancedStats(history, teamName) {
             parseInt(m.away_team?.ht_score) ||
             parseInt(m.scores?.away_1st_half) || 0;
 
-        // Debug: Log first match's HT structure to understand API response
-        if (totalMatches === 1) {
-            console.log(`[HT Debug] First match HT structure:`, {
-                home_score_1st_half: m.home_team?.score_1st_half,
-                away_score_1st_half: m.away_team?.score_1st_half,
-                home_team_keys: Object.keys(m.home_team || {}),
-                away_team_keys: Object.keys(m.away_team || {}),
-                scores: m.scores,
-                parsedHT: { htHome, htAway }
-            });
-        }
-
         if (htHome + htAway >= 1) htGoalCount++;
 
         // Calculate second half scores
@@ -496,20 +484,6 @@ async function processAndFilter(matches, log = console, limit = MATCH_LIMIT) {
         stats.awayMatchDetails = awayMatchDetails;
 
         log.info(`   ✅ Fetched ${homeMatchDetails.length + awayMatchDetails.length} match details`);
-
-        // Debug: Log first match details structure to find HT fields
-        if (homeMatchDetails.length > 0 && homeMatchDetails[0]) {
-            const md = homeMatchDetails[0];
-            console.log(`[MatchDetails Debug] Structure:`, {
-                topLevelKeys: Object.keys(md).slice(0, 15),
-                hasScores: !!md.scores || !!md.SCORE,
-                score: md.score || md.SCORE || md.scores,
-                homeScoreKeys: md.home_team ? Object.keys(md.home_team) : 'no home_team',
-                game: md.game ? Object.keys(md.game) : 'no game key',
-                periods: md.periods || md.PERIODS,
-                halfTimeData: md.half_time || md.halftime || md.ht || md.HT
-            });
-        }
 
         // ============================================
         // NEW: Calculate HT Win Rates from Match Details
