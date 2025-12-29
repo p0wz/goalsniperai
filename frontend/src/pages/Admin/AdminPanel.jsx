@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api, { signalService, betService, adminService, picksService, trainingService, sentioService, paymentService, betsService } from '../../services/api';
-import { MarketTab, MARKET_CONFIG } from '../../MarketTab';
+import { MarketTab } from '../../MarketTab';
+
+// Market Configuration (Hardcoded to avoid import caching issues)
+const MARKET_CONFIG = {
+    over25: { name: 'Over 2.5', icon: '🔥', desc: 'Maç sonu 3+ gol' },
+    btts: { name: 'BTTS', icon: '⚽', desc: 'İki takım da gol atar' },
+    doubleChance: { name: '1X DC', icon: '🛡️', desc: 'Ev sahibi kaybetmez' },
+    homeOver15: { name: 'Ev 1.5+', icon: '🏠', desc: 'Ev sahibi 2+ gol' },
+    under35: { name: 'Alt 3.5', icon: '🔒', desc: 'Maç sonu maks 3 gol' },
+    under25: { name: 'Alt 2.5', icon: '🧊', desc: 'Maç sonu maks 2 gol' },
+    firstHalfOver05: { name: '1Y 0.5+', icon: '⏱️', desc: 'İlk yarıda gol' },
+    ms1AndOver15: { name: 'MS1 & 1.5 Üst', icon: '1️⃣', desc: 'Ev Kazanır ve 1.5 Üst' },
+    awayOver05: { name: 'Dep 0.5 Üst', icon: '🚀', desc: 'Deplasman gol atar' },
+    handicap: { name: 'Hnd. -1.5', icon: '💪', desc: 'Favori takım farklı kazanır (-1.5)' },
+    // NEW MARKETS
+    doubleChanceOver15: { name: '1X + 1.5Ü', icon: '🎯', desc: 'Ev kaybetmez + 2 gol' },
+    homeWinsEitherHalf: { name: 'Ev Her.Yarı', icon: '⚡', desc: 'Ev herhangi yarıyı kazanır' },
+    awayDNB: { name: 'Dep DNB', icon: '🔄', desc: 'Deplasman beraberlikte iade' }
+};
 import { RawStatsTab } from '../../RawStatsTab';
 import MarketStatsTab from '../../MarketStatsTab';
 import NBAProps from './NBAProps';
@@ -276,8 +294,17 @@ export default function AdminPanel({ user, handleLogout }) {
     const handleRunDaily = async (leagueFilter = true, limit = null) => {
         try {
             setIsAnalysing(true);
-            const res = await signalService.getDailyAnalysis(true, leagueFilter, limit);
-            if (res.success) setDailyAnalysis(res.data);
+            if (res.success) {
+                console.log('📊 [AdminPanel] MARKET_CONFIG Keys:', Object.keys(MARKET_CONFIG));
+                console.log('📊 [AdminPanel] Analysis Data Keys:', Object.keys(res.data));
+                console.log('   Stats:', {
+                    evYari_Config: !!MARKET_CONFIG.homeWinsEitherHalf,
+                    evYari_Data: res.data.homeWinsEitherHalf?.length,
+                    depDNB: res.data.awayDNB?.length,
+                    dc15: res.data.doubleChanceOver15?.length
+                });
+                setDailyAnalysis(res.data);
+            }
         } catch (err) {
             alert('Analysis failed: ' + err.message);
         } finally {
