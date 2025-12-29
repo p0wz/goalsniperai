@@ -1,6 +1,6 @@
 {
     "name": "goalsniper-pro",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "AI Powered Live Betting Dashboard - First Half Over 0.5 Goal Signals",
     "main": "backend/server.js",
     "scripts": {
@@ -37,7 +37,6 @@
         "passport": "^0.7.0",
         "passport-google-oauth20": "^2.0.0",
         "passport-twitter": "^1.0.4",
-        "puppeteer": "^24.34.0",
         "uuid": "^9.0.0",
         "xss-clean": "^0.1.4"
     }
