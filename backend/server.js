@@ -2596,7 +2596,7 @@ app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
 // 📡 Version Check Endpoint
 // ============================================
 app.get('/api/version', (req, res) => {
-    res.json({ version: '3.3', timestamp: new Date().toISOString() });
+    res.json({ version: '3.4', timestamp: new Date().toISOString() });
 });
 
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {

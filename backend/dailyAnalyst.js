@@ -1049,6 +1049,7 @@ SORU: Bu bahiste en büyük risk faktörleri nelerdir? Deplasman takımı hangi 
     }
 
     // Convert candidates to results format (no AI validation)
+    log.info('\n🏁 --- RESULT GENERATION STARTED ---');
     for (const cat of Object.keys(candidates)) {
         if (!candidates[cat] || candidates[cat].length === 0) continue;
 
@@ -1058,41 +1059,45 @@ SORU: Bu bahiste en büyük risk faktörleri nelerdir? Deplasman takımı hangi 
         log.info(`\n📂 Category: ${cat.toUpperCase()} (${candidates[cat].length} candidates)`);
 
         for (const match of candidates[cat]) {
-            const generatedId = `${match.event_key || match.match_id}_${cat}`;
-            const analysisDetails = generateAnalysisDetails(match, match.filterStats);
-
-            // Fetch odds (optional - may not be available for all matches)
-            let oddsText = '';
-            let oddsData = null;
             try {
-                oddsData = await fetchMatchOdds(match.event_key || match.match_id);
-                oddsText = formatOddsForPrompt(oddsData);
-                if (oddsText) log.info(`   💰 Odds fetched for ${match.event_home_team} vs ${match.event_away_team}`);
-            } catch (e) {
-                // Odds not available - continue without them
+                const generatedId = `${match.event_key || match.match_id}_${cat}`;
+                const analysisDetails = generateAnalysisDetails(match, match.filterStats);
+
+                // Fetch odds (optional - may not be available for all matches)
+                let oddsText = '';
+                let oddsData = null;
+                try {
+                    oddsData = await fetchMatchOdds(match.event_key || match.match_id);
+                    oddsText = formatOddsForPrompt(oddsData);
+                    if (oddsText) log.info(`   💰 Odds fetched for ${match.event_home_team} vs ${match.event_away_team}`);
+                } catch (e) {
+                    // Odds not available - continue without them
+                }
+
+                const aiPrompts = generateAIPrompts(match, match.filterStats, match.market, oddsText);
+
+                results[cat].push({
+                    match: `${match.event_home_team} vs ${match.event_away_team}`,
+                    event_home_team: match.event_home_team,
+                    event_away_team: match.event_away_team,
+                    id: generatedId,
+                    matchId: match.event_key || match.match_id,
+                    startTime: match.event_start_time,
+                    league: match.league_name,
+                    league_name: match.league_name,
+                    market: match.market,
+                    stats: match.filterStats,
+                    detailed_analysis: analysisDetails,
+                    ai_prompts: aiPrompts,
+                    aiPrompt: aiPrompts[0],
+                    odds: oddsData,
+                    oddsText: oddsText,
+                    status: 'PENDING_APPROVAL'
+                });
+                log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
+            } catch (err) {
+                log.error(`⚠️ Error generating results for ${match.event_home_team} vs ${match.event_away_team} [${cat}]: ${err.message}`);
             }
-
-            const aiPrompts = generateAIPrompts(match, match.filterStats, match.market, oddsText);
-
-            results[cat].push({
-                match: `${match.event_home_team} vs ${match.event_away_team}`,
-                event_home_team: match.event_home_team,
-                event_away_team: match.event_away_team,
-                id: generatedId,
-                matchId: match.event_key || match.match_id,
-                startTime: match.event_start_time,
-                league: match.league_name,
-                league_name: match.league_name,
-                market: match.market,
-                stats: match.filterStats,
-                detailed_analysis: analysisDetails,
-                ai_prompts: aiPrompts,
-                aiPrompt: aiPrompts[0], // Primary prompt for easy access
-                odds: oddsData, // Raw odds data (if available)
-                oddsText: oddsText, // Formatted odds text
-                status: 'PENDING_APPROVAL' // Admin needs to approve
-            });
-            log.info(`   ✅ [ID: ${generatedId}] ${match.event_home_team} vs ${match.event_away_team} - ${match.market}`);
         }
     }
 
