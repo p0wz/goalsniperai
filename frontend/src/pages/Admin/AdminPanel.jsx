@@ -40,6 +40,7 @@ export default function AdminPanel({ user, handleLogout }) {
     const [botStatusLoading, setBotStatusLoading] = useState(false);
     const [optimizationReport, setOptimizationReport] = useState(null);
     const [isOptimizing, setIsOptimizing] = useState(false);
+    const [status, setStatus] = useState('');
 
     // AI Auto Analysis State
     const [aiCandidates, setAiCandidates] = useState([]);
