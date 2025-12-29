@@ -28,7 +28,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const picksRoutes = require('./routes/picks');
 const mobileRoutes = require('./routes/mobile');
-const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection, MARKET_MAP } = require('./dailyAnalyst');
+const { runDailyAnalysis, runFirstHalfScan, runSingleMarketAnalysis, runAIAutomatedAnalysis, runRawStatsCollection } = require('./analystEngine');
 const betTracker = require('./betTrackerRedis');
 const ALLOWED_LEAGUES = require('./allowed_leagues');
 
@@ -2596,7 +2596,7 @@ app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
 // 📡 Version Check Endpoint
 // ============================================
 app.get('/api/version', (req, res) => {
-    res.json({ version: '3.4', timestamp: new Date().toISOString() });
+    res.json({ version: '3.5', timestamp: new Date().toISOString() });
 });
 
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
