@@ -2592,6 +2592,13 @@ app.post('/api/sentio/chat-stream', requireAuth, async (req, res) => {
 // ============================================
 // 📡 SSE Streaming Endpoint for Live Analysis
 // ============================================
+// ============================================
+// 📡 Version Check Endpoint
+// ============================================
+app.get('/api/version', (req, res) => {
+    res.json({ version: '3.2', timestamp: new Date().toISOString() });
+});
+
 app.get('/api/daily-analysis/stream', requireAuth, async (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'pro') {
         return res.status(403).json({ error: 'Access denied' });

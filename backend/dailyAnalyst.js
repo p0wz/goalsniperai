@@ -904,7 +904,8 @@ async function runDailyAnalysis(log = console, customLimit = MATCH_LIMIT, league
     log.info(`═══════════════════════════════════════════════════════`);
 
     const results = {
-        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: [], doubleChanceOver15: [], homeWinsEitherHalf: [], awayDNB: []
+        over25: [], doubleChance: [], homeOver15: [], under35: [], under25: [], btts: [], firstHalfOver05: [], ms1AndOver15: [], awayOver05: [], handicap: [], doubleChanceOver15: [], homeWinsEitherHalf: [], awayDNB: [],
+        debug_version: [{ id: 'v3.2', match: 'DEPLOYMENT CHECK v3.2' }]
     };
 
     // Helper: Generate Detailed Analysis Text
